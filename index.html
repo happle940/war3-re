@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>War3 RE</title>
+  <link rel="stylesheet" href="/src/styles.css" />
+</head>
+<body>
+  <!-- 游戏3D画布 -->
+  <canvas id="game-canvas"></canvas>
+
+  <!-- HUD叠加层 -->
+  <div id="hud">
+    <div id="hud-top">
+      <div id="resources">
+        <span class="resource"><span class="icon">⛏</span> <span id="gold">0</span></span>
+        <span class="resource"><span class="icon">🪵</span> <span id="lumber">0</span></span>
+        <span class="resource"><span class="icon">🍖</span> <span id="supply">0/0</span></span>
+      </div>
+      <div id="game-time">00:00</div>
+    </div>
+
+    <div id="hud-bottom">
+      <div id="unit-info">
+        <!-- 单选面板 -->
+        <div id="single-select">
+          <div id="unit-portrait">
+            <canvas id="portrait-canvas" width="76" height="76"></canvas>
+            <div id="unit-type-badge"></div>
+          </div>
+          <div id="unit-details">
+            <div id="unit-name">未选择单位</div>
+            <div id="unit-hp-bar">
+              <div id="unit-hp-fill"></div>
+              <span id="unit-hp-text"></span>
+            </div>
+            <div id="unit-state"></div>
+            <div id="unit-stats"></div>
+          </div>
+        </div>
+        <!-- 多选面板 -->
+        <div id="multi-select" style="display:none">
+          <div id="multi-count"></div>
+          <div id="multi-breakdown"></div>
+          <div id="multi-hp-bar">
+            <div id="multi-hp-fill"></div>
+          </div>
+          <div id="multi-hp-text"></div>
+        </div>
+      </div>
+
+      <!-- 命令卡：建造/训练按钮 -->
+      <div id="command-card"></div>
+
+      <!-- 训练队列进度条 -->
+      <div id="train-queue"></div>
+
+      <div id="minimap">
+        <canvas id="minimap-canvas" width="160" height="160"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- 框选矩形 -->
+  <div id="selection-box"></div>
+
+  <!-- 模式提示（建造/攻击移动/集结点等） -->
+  <div id="mode-hint" style="display:none"></div>
+
+  <!-- 地图加载面板 -->
+  <div id="map-loader">
+    <label for="map-file-input" class="map-load-btn">加载W3X地图</label>
+    <input type="file" id="map-file-input" accept=".w3x,.w3m" style="display:none" />
+    <span id="map-status">当前：程序化地图</span>
+  </div>
+
+  <div id="debug-info">
+    <span id="fps">0 FPS</span> |
+    <span id="camera-pos">0, 0</span> |
+    <span id="tile-info">-</span>
+  </div>
+
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>

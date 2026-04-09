@@ -1,0 +1,561 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: #000;
+  font-family: 'Georgia', 'Times New Roman', serif;
+  color: #d4a846;
+  user-select: none;
+}
+
+#game-canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+/* ===== HUD 布局 ===== */
+
+#hud {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 10;
+}
+
+#hud > * {
+  pointer-events: auto;
+}
+
+/* ===== 顶部资源栏 ===== */
+#hud-top {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 24px;
+  padding: 9px 32px;
+  background: linear-gradient(180deg, rgba(10,8,3,0.97) 0%, rgba(20,16,6,0.85) 75%, transparent 100%);
+  border-bottom: 2px solid rgba(150, 125, 45, 0.5);
+  border-radius: 0 0 6px 6px;
+  min-width: 360px;
+  box-shadow: 0 3px 14px rgba(0,0,0,0.7);
+}
+
+#resources {
+  display: flex;
+  gap: 28px;
+}
+
+.resource {
+  font-size: 17px;
+  font-weight: bold;
+  letter-spacing: 1.2px;
+  text-shadow: 1px 1px 3px rgba(0,0,0,0.9);
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.resource .icon {
+  font-size: 15px;
+  filter: brightness(1.3);
+}
+
+#game-time {
+  font-size: 14px;
+  color: #8a8a78;
+  font-family: monospace;
+  letter-spacing: 2px;
+  text-shadow: 1px 1px 2px rgba(0,0,0,0.8);
+  border-left: 1px solid rgba(100, 82, 30, 0.35);
+  padding-left: 24px;
+}
+
+/* ===== 底部面板 ===== */
+#hud-bottom {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+  height: 162px;
+  background: linear-gradient(0deg,
+    rgba(10, 8, 4, 0.98) 0%,
+    rgba(16, 13, 5, 0.97) 55%,
+    rgba(28, 22, 8, 0.5) 88%,
+    transparent 100%);
+  border-top: 2px solid rgba(140, 115, 40, 0.6);
+  box-shadow: 0 -3px 18px rgba(0,0,0,0.6);
+}
+
+/* ===== 单位信息面板（左侧）===== */
+#unit-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  width: 270px;
+  min-width: 270px;
+  border-right: 2px solid rgba(110, 90, 35, 0.55);
+  background: rgba(5, 4, 2, 0.55);
+  position: relative;
+}
+
+/* 左面板顶部内边线装饰 */
+#unit-info::before {
+  content: '';
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  left: 6px;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(160, 130, 50, 0.25), transparent);
+}
+
+/* 单选容器 */
+#single-select {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+}
+
+#unit-portrait {
+  width: 80px;
+  height: 80px;
+  border: 2px solid #6a5e2a;
+  background: rgba(12, 10, 4, 0.95);
+  box-shadow: inset 0 0 16px rgba(0,0,0,0.8), 0 0 3px rgba(140, 115, 40, 0.2);
+  flex-shrink: 0;
+  border-radius: 1px;
+  position: relative;
+  overflow: hidden;
+}
+
+#portrait-canvas {
+  display: block;
+  width: 76px;
+  height: 76px;
+  margin: 2px 0 0 0;
+}
+
+/* 类型标签（portrait 底部） */
+#unit-type-badge {
+  display: none;
+  position: absolute;
+  bottom: 2px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 1px 6px;
+  background: rgba(10, 8, 4, 0.9);
+  border: 1px solid #5a4e22;
+  color: #c8a840;
+  font-size: 9px;
+  letter-spacing: 0.5px;
+  text-shadow: 1px 1px 1px rgba(0,0,0,0.8);
+  white-space: nowrap;
+  border-radius: 1px;
+}
+
+#unit-details {
+  flex: 1;
+  min-width: 0;
+}
+
+#unit-name {
+  font-size: 15px;
+  margin-bottom: 6px;
+  color: #f0dca0;
+  text-shadow: 1px 1px 3px rgba(0,0,0,0.9);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  letter-spacing: 0.3px;
+}
+
+#unit-hp-bar {
+  width: 100%;
+  height: 14px;
+  background: #0a0804;
+  border: 1px solid #5a4e22;
+  box-shadow: inset 0 1px 5px rgba(0,0,0,0.6);
+  position: relative;
+}
+
+#unit-hp-fill {
+  height: 100%;
+  width: 100%;
+  background: linear-gradient(180deg, #30b830 0%, #1a7a1a 100%);
+  transition: width 0.3s;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.15);
+}
+
+#unit-hp-text {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 9px;
+  font-weight: bold;
+  color: #fff;
+  text-shadow: 1px 1px 2px rgba(0,0,0,0.9);
+  font-family: monospace;
+  letter-spacing: 0.5px;
+  pointer-events: none;
+}
+
+#unit-state {
+  font-size: 11px;
+  color: #a89856;
+  margin-top: 3px;
+  text-shadow: 1px 1px 2px rgba(0,0,0,0.6);
+  letter-spacing: 0.3px;
+}
+
+/* 属性行 */
+#unit-stats {
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+  flex-wrap: wrap;
+}
+
+#unit-stats .stat {
+  font-size: 10px;
+  color: #908868;
+  text-shadow: 1px 1px 1px rgba(0,0,0,0.6);
+  letter-spacing: 0.2px;
+  white-space: nowrap;
+}
+
+/* ===== 多选面板 ===== */
+#multi-select {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  width: 100%;
+  padding: 2px 0;
+}
+
+#multi-count {
+  font-size: 16px;
+  font-weight: bold;
+  color: #f0dca0;
+  text-shadow: 1px 1px 3px rgba(0,0,0,0.9);
+  text-align: center;
+  letter-spacing: 0.5px;
+}
+
+#multi-breakdown {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+#multi-breakdown .breakdown-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: #c0a850;
+  text-shadow: 1px 1px 2px rgba(0,0,0,0.7);
+}
+
+#multi-breakdown .breakdown-icon {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
+
+/* 当前活跃子组（primary type）高亮 */
+#multi-breakdown .breakdown-primary {
+  color: #f0dca0;
+  background: rgba(180, 150, 50, 0.12);
+  border-left: 2px solid #b09530;
+  padding-left: 4px;
+  margin-left: -6px;
+}
+
+#multi-hp-bar {
+  width: 100%;
+  height: 10px;
+  background: #0a0804;
+  border: 1px solid #5a4e22;
+  box-shadow: inset 0 1px 3px rgba(0,0,0,0.5);
+  margin-top: 2px;
+}
+
+#multi-hp-fill {
+  height: 100%;
+  width: 100%;
+  background: linear-gradient(180deg, #30b830 0%, #1a7a1a 100%);
+  transition: width 0.3s;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.15);
+}
+
+#multi-hp-text {
+  font-size: 10px;
+  color: #908868;
+  text-align: center;
+  font-family: monospace;
+  letter-spacing: 0.3px;
+}
+
+/* ===== 命令卡面板（中间）===== */
+#command-card {
+  display: grid;
+  grid-template-columns: repeat(4, 66px);
+  grid-template-rows: repeat(2, 66px);
+  gap: 5px;
+  padding: 10px 18px;
+  flex: 1;
+  justify-content: center;
+  align-content: center;
+  background: rgba(3, 2, 1, 0.3);
+  position: relative;
+}
+
+/* 命令卡顶部装饰线 */
+#command-card::before {
+  content: '';
+  position: absolute;
+  top: 4px;
+  left: 12px;
+  right: 12px;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(160, 130, 50, 0.15), transparent);
+}
+
+/* 命令卡插槽（空位占位） */
+#command-card .cmd-slot {
+  width: 66px;
+  height: 66px;
+  border: 1px solid rgba(58, 48, 18, 0.4);
+  background: rgba(10, 8, 4, 0.5);
+  border-radius: 3px;
+  box-shadow: inset 0 1px 4px rgba(0,0,0,0.4);
+}
+
+#command-card button {
+  width: 66px;
+  height: 66px;
+  border: 2px solid #5a4e22;
+  background: linear-gradient(180deg, rgba(32,26,10,0.97) 0%, rgba(20,16,6,0.97) 100%);
+  color: #d4a846;
+  font-size: 10px;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  line-height: 1.1;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.07),
+    inset 0 -1px 0 rgba(0,0,0,0.5),
+    0 1px 5px rgba(0,0,0,0.6);
+  border-radius: 3px;
+  transition: border-color 0.12s, background 0.12s, box-shadow 0.15s;
+  position: relative;
+}
+
+#command-card button:hover {
+  background: linear-gradient(180deg, rgba(65,52,18,0.97) 0%, rgba(42,34,12,0.97) 100%);
+  border-color: #b09530;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.12),
+    inset 0 -1px 0 rgba(0,0,0,0.3),
+    0 0 12px rgba(180, 150, 50, 0.2);
+}
+
+#command-card button:active {
+  background: linear-gradient(180deg, rgba(16,12,5,0.97) 0%, rgba(32,26,10,0.97) 100%);
+  border-color: #7a6825;
+  box-shadow: inset 0 2px 8px rgba(0,0,0,0.6);
+  transform: scale(0.97);
+}
+
+/* 热键角标 */
+#command-card button .btn-hotkey {
+  position: absolute;
+  top: 2px;
+  right: 3px;
+  font-size: 9px;
+  font-weight: bold;
+  font-family: monospace;
+  color: #807848;
+  text-shadow: 1px 1px 1px rgba(0,0,0,0.9);
+  line-height: 1;
+}
+
+#command-card button .btn-icon {
+  font-size: 20px;
+}
+
+#command-card button .btn-label {
+  font-size: 9px;
+  white-space: nowrap;
+  text-shadow: 1px 1px 2px rgba(0,0,0,0.9);
+}
+
+#command-card button .btn-cost {
+  font-size: 8px;
+  color: #8a7a48;
+}
+
+#command-card button:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+/* ===== 训练队列 ===== */
+#train-queue {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 152px;
+  min-width: 152px;
+  padding: 10px 12px;
+  justify-content: center;
+  border-left: 2px solid rgba(110, 90, 35, 0.55);
+  border-right: 2px solid rgba(110, 90, 35, 0.55);
+  background: rgba(5, 4, 2, 0.4);
+}
+
+.train-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: #bbb;
+  text-shadow: 1px 1px 1px rgba(0,0,0,0.5);
+}
+
+.train-item .train-bar {
+  flex: 1;
+  height: 12px;
+  background: #0a0804;
+  border: 1px solid #3a3018;
+  box-shadow: inset 0 1px 3px rgba(0,0,0,0.5);
+}
+
+.train-item .train-fill {
+  height: 100%;
+  background: linear-gradient(180deg, #4a8acc 0%, #2a5a8a 100%);
+  transition: width 0.1s;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.15);
+}
+
+/* ===== 小地图面板（右侧）===== */
+#minimap {
+  width: 172px;
+  height: 162px;
+  padding: 8px;
+  background: rgba(6, 5, 2, 0.97);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: inset 0 0 14px rgba(0,0,0,0.6);
+}
+
+#minimap-canvas {
+  display: block;
+  border: 2px solid #4a3e1a;
+  box-shadow: 0 0 10px rgba(0,0,0,0.6), inset 0 0 4px rgba(0,0,0,0.3);
+}
+
+/* ===== 调试信息（低存在感）===== */
+#debug-info {
+  position: fixed;
+  top: 42px;
+  left: 6px;
+  font-size: 10px;
+  color: rgba(120, 110, 80, 0.25);
+  z-index: 20;
+  font-family: monospace;
+  pointer-events: none;
+}
+
+/* ===== 框选矩形 ===== */
+#selection-box {
+  position: fixed;
+  border: 1px solid #00ee44;
+  background: rgba(0, 230, 68, 0.08);
+  pointer-events: none;
+  z-index: 15;
+  display: none;
+  box-shadow: 0 0 8px rgba(0, 200, 60, 0.15);
+}
+
+/* ===== 模式提示文字 ===== */
+#mode-hint {
+  position: fixed;
+  bottom: 172px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 7px 22px;
+  background: rgba(10, 8, 4, 0.93);
+  border: 1px solid rgba(160, 130, 50, 0.5);
+  border-radius: 3px;
+  color: #f0d880;
+  font-size: 13px;
+  letter-spacing: 0.5px;
+  text-shadow: 1px 1px 3px rgba(0,0,0,0.9);
+  z-index: 20;
+  pointer-events: none;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.5);
+  white-space: nowrap;
+}
+
+/* ===== 地图加载器 ===== */
+#map-loader {
+  position: fixed;
+  top: 6px;
+  right: 6px;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.map-load-btn {
+  padding: 5px 16px;
+  background: rgba(18, 14, 5, 0.94);
+  border: 1px solid #3a3214;
+  color: #d4a846;
+  font-size: 12px;
+  font-family: 'Georgia', serif;
+  cursor: pointer;
+  border-radius: 2px;
+  transition: border-color 0.1s, background 0.1s;
+}
+
+.map-load-btn:hover {
+  background: rgba(40, 32, 10, 0.94);
+  border-color: #8b7332;
+}
+
+#map-status {
+  font-size: 11px;
+  color: #5a4e32;
+  font-family: monospace;
+}
