@@ -2,7 +2,7 @@
 
 > Session theme: Manual Command Supremacy + AI Opening Truth
 > Purpose: 先把“玩家单位真的在手里”和“AI 前 3-5 分钟真的成立”收口到可验证状态。
-> Status: Phase 0 COMPLETE → Phase 1 IN PROGRESS
+> Status: Phase 1 COMPLETE → Phase 2 IN PROGRESS
 
 ---
 
@@ -170,6 +170,50 @@
 - `move` / `stop` / `hold` / `attackMove` 逻辑路径清楚且 build 通过
 - 至少完成一轮真实 runtime 验证或明确记录验证阻塞
 - commit / push 完成
+
+### Phase 1 Results (2026-04-10)
+
+**build / tsc**: PASS
+
+**Code changes:**
+- Fixed missing `suppressAggroFor` for non-workers when right-clicking near trees
+  - Previously: non-workers moved to tree but could be auto-aggro'd immediately
+  - Now: suppression window (1.5s) applied, matching all other move paths
+
+**Code-level verification of command paths:**
+
+1. **move retreat** ✅
+   - `issueCommand(move)` sets state = Moving, clears attackTarget
+   - `updateAutoAggro` skips Moving units (only checks Idle + AttackMove)
+   - All 5 right-click paths call `suppressAggroFor` after move
+   - On arrival, unit goes Idle; suppression window protects for remaining duration
+
+2. **stop** ✅
+   - Both keyboard 'S' and command card button: `issueCommand(stop)` + `suppressAggroFor(1.5s)`
+   - Sets state = Idle, clears attackTarget, clears previousState (cuts recovery chain)
+   - Suppression prevents auto-aggro for 1.5s; after expiry, auto-aggro can re-engage (correct war3 behavior)
+
+3. **attackMove** ✅
+   - `issueCommand(attackMove)` sets `aggroSuppressUntil = 0` (clears any existing suppression)
+   - `updateAutoAggro` includes AttackMove in its filter → auto-engages enemies
+   - On enemy contact: keeps AttackMove state, pauses movement
+   - On enemy death: `resumeAttackMove()` continues toward target
+
+4. **hold** ✅
+   - `issueCommand(holdPosition)` sets state = HoldPosition
+   - `updateAutoAggro` does NOT target HoldPosition units
+   - HoldPosition manages its own combat in `updateCombat`: scans attack range, engages, does NOT chase
+   - Correct "attack in range, don't pursue" semantics
+
+5. **Recovery chain** ✅
+   - All explicit player commands (move/stop/hold/attack/attackMove/gather/build) clear previousState = null
+   - This cuts the auto-aggro recovery chain at every player intervention
+   - Only auto-aggro itself saves previousState for post-combat restoration
+
+**Verification status:**
+- Command verification (build + tsc): ✅ PASS
+- Code path verification (logic trace): ✅ All 5 paths verified correct
+- Runtime verification (actual gameplay): ❌ NOT YET — requires human playtest or automated test harness
 
 ---
 

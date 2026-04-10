@@ -138,15 +138,21 @@ export class SimpleAI {
       (u) => u.team === team && u.type === 'barracks' && u.hp > 0
         && u.buildProgress < 1,
     )
-    const farmCount = units.filter(
-      (u) => u.team === team && u.type === 'farm' && u.hp > 0,
-    ).length
 
-    // ===== 1. 空闲农民分配 =====
-    this.assignIdleWorkers(myIdleWorkers(), townhall)
+    // 计算训练队列中的 supply 占用（防止超额训练）
+    let queuedSupply = 0
+    for (const u of units) {
+      if (u.team !== team || !u.isBuilding) continue
+      for (const item of u.trainingQueue) {
+        queuedSupply += UNITS[item.type]?.supply ?? 0
+      }
+    }
+    const effectiveUsed = supply.used + queuedSupply
 
-    // ===== 2. Supply 不足 → 建农场（优先于其他建筑）=====
-    const supplyHeadroom = supply.total - supply.used
+    // ===== 1. Supply 不足 → 建农场（优先于分配和训练）=====
+    // 重要：先检查建造需求，再分配空闲农民
+    // 这样 tryBuildBuilding 能找到空闲农民作为 builder
+    const supplyHeadroom = supply.total - effectiveUsed
     const farmInProgress = units.some(
       (u) => u.team === team && u.type === 'farm' && u.hp > 0 && u.buildProgress < 1,
     )
@@ -157,7 +163,7 @@ export class SimpleAI {
       }
     }
 
-    // ===== 3. 没有兵营且没在建 → 建兵营 =====
+    // ===== 2. 没有兵营且没在建 → 建兵营 =====
     if (!hasBarracks && !barracksInProgress) {
       const bDef = BUILDINGS['barracks']
       if (bDef && resources.canAfford(team, bDef.cost)) {
@@ -165,25 +171,26 @@ export class SimpleAI {
       }
     }
 
-    // ===== 4. 训练农民（检查 supply）=====
+    // ===== 3. 空闲农民分配（在建造需求之后）=====
+    // 建造已用掉部分空闲农民，剩余的分配到采集
+    this.assignIdleWorkers(myIdleWorkers(), townhall)
+
+    // ===== 4. 训练农民（检查 supply 含训练队列）=====
     if (workerCount < this.maxWorkers) {
       const wDef = UNITS['worker']
       if (wDef && townhall.trainingQueue.length < 2) {
-        const wSupply = resources.computeSupply(team, [
-          ...units,
-          // 预占一个虚拟 worker 的 supply
-          { team, type: 'worker', isBuilding: false, buildProgress: 1 } as Unit,
-        ])
-        // 只有够 supply 且有资源才训练
+        const wSupplyCost = wDef.supply
+        // 检查：现有 supply + 训练队列中的 + 新 worker 的 ≤ 总 supply
         if (resources.canAfford(team, wDef.cost)
-          && wSupply.used <= wSupply.total) {
+          && effectiveUsed + wSupplyCost <= supply.total) {
           resources.spend(team, wDef.cost)
           issueCommand([], { type: 'train', building: townhall, unitType: 'worker', trainTime: wDef.trainTime })
+          queuedSupply += wSupplyCost  // 更新队列 supply 计数
         }
       }
     }
 
-    // ===== 5. 有兵营 → 训练步兵（检查 supply）=====
+    // ===== 5. 有兵营 → 训练步兵（检查 supply 含训练队列）=====
     const barracks = units.find(
       (u) => u.team === team && u.type === 'barracks' && u.isBuilding && u.hp > 0
         && u.buildProgress >= 1,
@@ -192,12 +199,8 @@ export class SimpleAI {
       this.barracksBuilt = true
       const fDef = UNITS['footman']
       if (fDef && resources.canAfford(team, fDef.cost) && barracks.trainingQueue.length < 2) {
-        // 检查 supply
-        const fSupply = resources.computeSupply(team, [
-          ...units,
-          { team, type: 'footman', isBuilding: false, buildProgress: 1 } as Unit,
-        ])
-        if (fSupply.used <= fSupply.total) {
+        const fSupplyCost = fDef.supply
+        if (effectiveUsed + fSupplyCost <= supply.total) {
           resources.spend(team, fDef.cost)
           issueCommand([], { type: 'train', building: barracks, unitType: 'footman', trainTime: fDef.trainTime })
         }

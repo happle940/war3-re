@@ -1855,6 +1855,7 @@ export class Game {
       if (nonWorkers.length > 0) {
         issueCommand(nonWorkers, { type: 'move', target: nearestTree.mesh.position })
         this.planPathForUnits(nonWorkers, nearestTree.mesh.position)
+        this.suppressAggroFor(nonWorkers)
       }
     } else {
       issueCommand(controllable, { type: 'move', target: groundTarget })
@@ -3535,9 +3536,16 @@ export class Game {
     if (!def) return
     if (!this.resources.canAfford(0, def.cost)) return
 
-    // 检查人口上限
+    // 检查人口上限（含训练队列中的单位，防止超额训练）
     const supply = this.resources.computeSupply(0, this.units)
-    if (supply.used + def.supply > supply.total) return
+    let queuedSupply = 0
+    for (const u of this.units) {
+      if (u.team !== 0 || !u.isBuilding) continue
+      for (const item of u.trainingQueue) {
+        queuedSupply += UNITS[item.type]?.supply ?? 0
+      }
+    }
+    if (supply.used + queuedSupply + def.supply > supply.total) return
 
     this.resources.spend(0, def.cost)
     issueCommand([], { type: 'train', building, unitType, trainTime: def.trainTime })
