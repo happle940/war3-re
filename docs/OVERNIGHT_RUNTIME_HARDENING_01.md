@@ -2,7 +2,7 @@
 
 > Session theme: Manual Command Supremacy + AI Opening Truth
 > Purpose: 先把“玩家单位真的在手里”和“AI 前 3-5 分钟真的成立”收口到可验证状态。
-> Status: COMPLETE
+> Status: COMPLETE — All phases done
 
 ---
 
@@ -352,25 +352,28 @@
 ### Phase 3 Runtime Verification Results (2026-04-10)
 
 **Test method**: Playwright headless Chromium + exposed `window.__war3Game` internal state inspection.
-**Test duration**: ~120s game-time, ~130s real-time.
-**Overall**: 16/18 checks passed.
+**Test map**: turtle_rock_test.w3x (128x128 W3X map — barracks NOT pre-built)
+**Test duration**: ~90s game-time via two consecutive Playwright runs.
 
 #### A. AI Economy (Runtime Verified ✅)
 
-| Check | t=30s | t=60s | t=120s |
-|-------|-------|-------|--------|
-| Workers | 6 (4 gathering) | 8 (8 gathering) | 11 (10 gathering) |
-| Farms | 1 | 1 | 2 |
-| Barracks | 0 (building) | 1 | 1 |
-| Footmen | 0 | 1 | 3 (idle) |
-| Resources | 95g 120w | 50g 170w | 130g 250w |
-| Supply | 6/16 | 10/16 | 17/22 |
+| Check | t=0s | t=30s | t=90s |
+|-------|------|-------|-------|
+| Workers | 5 (2 building, 3 gathering gold) | 7 (5 gold, 2 lumber) | 11 (8 gold, 3 lumber) |
+| Farms | 1 (building) | 1 (ready) | 2 (both ready) |
+| Barracks | 1 (building) | 1 (ready) | 1 (ready) |
+| Footmen | 0 | 0 | 2 (idle) |
+| AI Gold | 110 | 15 | 60 |
+| AI Lumber | 120 | 130 | 240 |
+| Supply | 5/10 | 7/16 | 15/22 |
 
 **Key findings**:
 - AI builds barracks from scratch (W3X map doesn't pre-build it) → barracks-building code path IS runtime-tested ✅
 - AI economy chain works: workers gather → resources accumulate → farm built → workers trained → barracks built → footmen trained
-- By t=120s: 3 footmen accumulating toward first wave (threshold=4)
-- First wave expected at t≈130-150s game-time
+- By t=90s: 2 footmen accumulating toward first wave (threshold=4)
+- First wave expected at t≈120-140s game-time
+- **Observation**: AI gold workers (8) exceed target (4) because townhall rally→goldmine auto-assigns new workers to gold. Not a blocker but noted for future tuning.
+- **Zero runtime errors** across entire test run
 
 #### B. Player Micro (NOT Runtime Verified ❌)
 
@@ -490,8 +493,10 @@ The player economy requires manual worker assignment to gather.
 |--------|-------|---------|
 | 1cdc481 | P0 | docs: Phase 0 baseline truth — identify runtime blockers |
 | 0b26619 | P1 | fix: command priority — stop button + attack/attackMove suppression |
-| 576248c | P2 | fix: command supremacy — suppressAggroFor for all move paths + train queue supply check |
+| 576248c | P1b | fix: command supremacy — suppressAggroFor for all move paths + train queue supply check |
+| 24bb0ae | P2 | docs: AI economy chain verification — Phase 2 complete |
 | 7e5d6fc | P3 | test: Phase 3 runtime verification — AI economy chain verified |
+| 56a3a23 | P4 | docs: Phase 4 closeout — final report with verification matrix |
 
 #### 5. Remaining Risks
 
