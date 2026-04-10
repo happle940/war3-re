@@ -2,7 +2,7 @@
 
 > Session theme: Manual Command Supremacy + AI Opening Truth
 > Purpose: 先把“玩家单位真的在手里”和“AI 前 3-5 分钟真的成立”收口到可验证状态。
-> Status: Phase 3 COMPLETE → Phase 4 IN PROGRESS
+> Status: COMPLETE
 
 ---
 
@@ -434,6 +434,88 @@ The player economy requires manual worker assignment to gather.
 - 最终汇报可审
 - 最后一轮 build / tsc 通过
 - 最终 commit / push 完成
+
+### Final Report (2026-04-10)
+
+#### 1. Result
+
+**本轮目标是否达成**: 部分达成
+
+- **命令优先级修复**: ✅ 达成。修了 3 个真实 bug（stop 按钮、attack/attackMove suppression 泄漏、AI supply 超额训练）
+- **AI 开局经济**: ✅ 达成。Runtime 证明 AI 能在 120s 内完成 采金→伐木→农场→兵营→步兵→积累进攻 的完整经济链
+- **前 5 分钟 runtime truth**: ⚠️ 部分达成。AI 侧已 runtime 验证，玩家侧需要人手验证
+
+- `npm run build`: ✅ PASS
+- `npx tsc --noEmit -p tsconfig.app.json`: ✅ PASS
+
+#### 2. Runtime Fixes
+
+| Fix | Impact |
+|-----|--------|
+| Stop 按钮（命令卡）加 suppressAggroFor | 之前点击 UI "停止"按钮后单位会被 auto-aggro 立即抢回。现在与键盘 'S' 行为一致 |
+| attack/attackMove 清除 aggroSuppressUntil | 之前 move→stop（设了 suppression）后再 attackMove，旧 suppression 阻止自动交战，与 attackMove 语义矛盾 |
+| AI tick 重排：建造→分配 | 之前 assignIdleWorkers 先把所有空闲农民派去采集，tryBuildBuilding 找不到 builder，要拉采金农民（丢 carryAmount）|
+| AI/玩家训练检查含队列 supply | 之前 AI 同一 tick 内训练 worker + footman 都通过 supply 检查，实际超过人口上限 |
+| 暴露 Game 实例 | window.__war3Game 用于 Playwright runtime 验证 |
+
+#### 3. Verification
+
+| 类别 | 项目 | 状态 |
+|------|------|------|
+| **命令验证** | npm run build | ✅ PASS |
+| **命令验证** | npx tsc --noEmit | ✅ PASS |
+| **Runtime 验证** | AI 采金（t=30s 4人采集中）| ✅ Verified |
+| **Runtime 验证** | AI 伐木（workers 分配到 lumber）| ✅ Verified |
+| **Runtime 验证** | AI 建农场（t=30s 1 farm）| ✅ Verified |
+| **Runtime 验证** | AI 建兵营（t=46s 1 barracks）| ✅ Verified |
+| **Runtime 验证** | AI 训练步兵（t=60s 1, t=120s 3）| ✅ Verified |
+| **Runtime 验证** | AI 训练农民（5→11 over 120s）| ✅ Verified |
+| **Runtime 验证** | Game 稳定 120s 无错误 | ✅ Verified |
+| **结构检查** | move 撤退逻辑（Moving 不被 auto-aggro）| ✅ Code review |
+| **结构检查** | stop suppression（1.5s 窗口）| ✅ Code review |
+| **结构检查** | holdPosition（不追击，范围内打）| ✅ Code review |
+| **结构检查** | attackMove（清 suppression，沿途交战）| ✅ Code review |
+| **结构检查** | 恢复链（previousState clear on stop/hold）| ✅ Code review |
+| **未验证** | 玩家 move 撤退手感 | ❌ 需要人手 |
+| **未验证** | 玩家 stop 脱战手感 | ❌ 需要人手 |
+| **未验证** | 玩家 holdPosition 实战 | ❌ 需要人手 |
+| **未验证** | 玩家 attackMove 实战 | ❌ 需要人手 |
+| **未验证** | 玩家经济循环（采集→返回→建造→训练）| ❌ 需要人手 |
+| **未验证** | AI 第一波到达玩家基地 | ❌ 需等待更长时间或人手观察 |
+| **未验证** | 线上地址验证 | ❌ 需要人手打开 https://happle940.github.io/war3-re/ 试玩 |
+
+#### 4. Git Pushes
+
+| Commit | Phase | Message |
+|--------|-------|---------|
+| 1cdc481 | P0 | docs: Phase 0 baseline truth — identify runtime blockers |
+| 0b26619 | P1 | fix: command priority — stop button + attack/attackMove suppression |
+| 576248c | P2 | fix: command supremacy — suppressAggroFor for all move paths + train queue supply check |
+| 7e5d6fc | P3 | test: Phase 3 runtime verification — AI economy chain verified |
+
+#### 5. Remaining Risks
+
+1. **玩家命令优先级未人手验证**: 代码逻辑正确，stop/hold/move 的 suppression 机制完整，但"手感是否对"必须由人在浏览器里试玩确认。1.5s suppression 窗口可能太长或太短。
+
+2. **AI 第一波到达时间**: Runtime 验证到 t=120s 有 3 个步兵（阈值 4），预计 t≈130-150s 发出第一波。但未验证波次是否真的到达玩家基地并造成战斗。
+
+3. **W3X 地图加载后的经济**: 验证使用的是 W3X 测试地图，其出生点布局与程序化地图不同。需要确认两张地图的 AI 经济链都成立。
+
+4. **Supply 超额修复的边界**: 修复后 AI/player 训练检查含队列 supply，但未 runtime 测试"恰好卡在 supply 边界"的场景。
+
+#### 6. Next Theme
+
+**Runtime Hardening 02 — Human Playtest Verification**
+
+目标：让一个人真的打开浏览器，用 5 分钟完成以下验证：
+1. 右键分配农民采金/伐木
+2. 建造农场、兵营
+3. 训练步兵
+4. 交战中右键撤退 → 确认单位真的走开
+5. 交战中按 S → 确认单位真的停止
+6. 观察 AI 第一波到达
+
+这是收口 Stage 1（Unit Agency Truth）和 Stage 2（First 5 Minutes Playable）的最后一关——代码层面已经修好，但必须有人手确认。
 
 ---
 
