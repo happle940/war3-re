@@ -2803,13 +2803,15 @@ export class Game {
   // ==================== 装饰物 ====================
 
   private spawnTrees() {
-    // 共享几何体：双层树冠 + 树干
-    const crown1Geo = new THREE.ConeGeometry(0.45, 0.9, 6)
-    const crown2Geo = new THREE.ConeGeometry(0.3, 0.65, 6)
-    const trunkGeo = new THREE.CylinderGeometry(0.06, 0.1, 0.55, 5)
-    const crown1Mat = new THREE.MeshLambertMaterial({ color: 0x2d6b1e })
-    const crown2Mat = new THREE.MeshLambertMaterial({ color: 0x3a7d2a })
-    const trunkMat = new THREE.MeshLambertMaterial({ color: 0x5c3a1e })
+    // 共享几何体：三层暗色针叶树冠 + 树干（War3 风格）
+    const crown1Geo = new THREE.ConeGeometry(0.55, 1.1, 7)
+    const crown2Geo = new THREE.ConeGeometry(0.38, 0.85, 7)
+    const crown3Geo = new THREE.ConeGeometry(0.22, 0.65, 6)
+    const trunkGeo = new THREE.CylinderGeometry(0.06, 0.1, 0.7, 5)
+    const crown1Mat = new THREE.MeshLambertMaterial({ color: 0x1a3d10 })
+    const crown2Mat = new THREE.MeshLambertMaterial({ color: 0x224d15 })
+    const crown3Mat = new THREE.MeshLambertMaterial({ color: 0x1a3d10 })
+    const trunkMat = new THREE.MeshLambertMaterial({ color: 0x3d2210 })
     const rng = this.seededRandom(42)
 
     // ===== 玩家基地树环 =====
@@ -2845,13 +2847,16 @@ export class Game {
       const tree = new THREE.Group()
       tree.userData.isTree = true
       const c1 = new THREE.Mesh(crown1Geo, crown1Mat)
-      c1.position.y = 0.9
+      c1.position.y = 0.8
       tree.add(c1)
       const c2 = new THREE.Mesh(crown2Geo, crown2Mat)
       c2.position.y = 1.5
       tree.add(c2)
+      const c3 = new THREE.Mesh(crown3Geo, crown3Mat)
+      c3.position.y = 2.1
+      tree.add(c3)
       const trunk = new THREE.Mesh(trunkGeo, trunkMat)
-      trunk.position.y = 0.3
+      trunk.position.y = 0.35
       tree.add(trunk)
       tree.position.set(x + 0.5, h, z + 0.5)
       tree.scale.setScalar(scale)
@@ -2884,13 +2889,16 @@ export class Game {
       const tree = new THREE.Group()
       tree.userData.isTree = true
       const c1 = new THREE.Mesh(crown1Geo, crown1Mat)
-      c1.position.y = 0.9
+      c1.position.y = 0.8
       tree.add(c1)
       const c2 = new THREE.Mesh(crown2Geo, crown2Mat)
       c2.position.y = 1.5
       tree.add(c2)
+      const c3 = new THREE.Mesh(crown3Geo, crown3Mat)
+      c3.position.y = 2.1
+      tree.add(c3)
       const trunk = new THREE.Mesh(trunkGeo, trunkMat)
-      trunk.position.y = 0.3
+      trunk.position.y = 0.35
       tree.add(trunk)
       tree.position.set(x + 0.5, h, z + 0.5)
       tree.scale.setScalar(scale)
@@ -2916,13 +2924,16 @@ export class Game {
       const tree = new THREE.Group()
       tree.userData.isTree = true
       const c1 = new THREE.Mesh(crown1Geo, crown1Mat)
-      c1.position.y = 0.9
+      c1.position.y = 0.8
       tree.add(c1)
       const c2 = new THREE.Mesh(crown2Geo, crown2Mat)
       c2.position.y = 1.5
       tree.add(c2)
+      const c3 = new THREE.Mesh(crown3Geo, crown3Mat)
+      c3.position.y = 2.1
+      tree.add(c3)
       const trunk = new THREE.Mesh(trunkGeo, trunkMat)
-      trunk.position.y = 0.3
+      trunk.position.y = 0.35
       tree.add(trunk)
       tree.position.set(x + 0.5, h, z + 0.5)
       tree.scale.setScalar(scale)
@@ -3836,12 +3847,14 @@ export class Game {
   private spawnTreesOnTerrain(terrain: W3ETerrain, spawnPoints: [number, number][]) {
     const w = terrain.width
     const h = terrain.height
-    const crown1Geo = new THREE.ConeGeometry(0.45, 0.9, 6)
-    const crown2Geo = new THREE.ConeGeometry(0.3, 0.65, 6)
-    const trunkGeo = new THREE.CylinderGeometry(0.06, 0.1, 0.55, 5)
-    const crown1Mat = new THREE.MeshLambertMaterial({ color: 0x2d6b1e })
-    const crown2Mat = new THREE.MeshLambertMaterial({ color: 0x3a7d2a })
-    const trunkMat = new THREE.MeshLambertMaterial({ color: 0x5c3a1e })
+    const crown1Geo = new THREE.ConeGeometry(0.55, 1.1, 7)
+    const crown2Geo = new THREE.ConeGeometry(0.38, 0.85, 7)
+    const crown3Geo = new THREE.ConeGeometry(0.22, 0.65, 6)
+    const trunkGeo = new THREE.CylinderGeometry(0.06, 0.1, 0.7, 5)
+    const crown1Mat = new THREE.MeshLambertMaterial({ color: 0x1a3d10 })
+    const crown2Mat = new THREE.MeshLambertMaterial({ color: 0x224d15 })
+    const crown3Mat = new THREE.MeshLambertMaterial({ color: 0x1a3d10 })
+    const trunkMat = new THREE.MeshLambertMaterial({ color: 0x3d2210 })
     const rng = this.seededRandom(42)
     const avoidR = Game.SPAWN_AVOID_RADIUS
 
@@ -3871,13 +3884,16 @@ export class Game {
       const tree = new THREE.Group()
       tree.userData.isTree = true
       const c1 = new THREE.Mesh(crown1Geo, crown1Mat)
-      c1.position.y = 0.9
+      c1.position.y = 0.8
       tree.add(c1)
       const c2 = new THREE.Mesh(crown2Geo, crown2Mat)
       c2.position.y = 1.5
       tree.add(c2)
+      const c3 = new THREE.Mesh(crown3Geo, crown3Mat)
+      c3.position.y = 2.1
+      tree.add(c3)
       const trunk = new THREE.Mesh(trunkGeo, trunkMat)
-      trunk.position.y = 0.3
+      trunk.position.y = 0.35
       tree.add(trunk)
       tree.position.set(x + 0.5, groundH, z + 0.5)
       tree.scale.setScalar(scale)
