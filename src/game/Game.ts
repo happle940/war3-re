@@ -240,6 +240,8 @@ export class Game {
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, preserveDrawingBuffer: true })
     this.renderer.setSize(window.innerWidth, window.innerHeight)
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
+    this.renderer.shadowMap.enabled = true
+    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap
 
     // EffectComposer 后处理管线（War3 风格黑色描边）
     this.composer = new EffectComposer(this.renderer)
@@ -264,6 +266,10 @@ export class Game {
     this.mapRuntime = new MapRuntime(this.terrain)
     this.scene.add(this.terrain.mesh)
     this.scene.add(this.terrain.groundPlane)
+    this.terrain.mesh.traverse((child) => {
+      if (child instanceof THREE.Mesh) child.receiveShadow = true
+    })
+    this.terrain.groundPlane.receiveShadow = true
 
     this.cameraCtrl = new CameraController(this.camera, MAP_SIZE, MAP_SIZE)
 
@@ -280,6 +286,16 @@ export class Game {
     // 暖色阳光，从西南方斜照，产生自然阴影感
     const sun = new THREE.DirectionalLight(0xfff0dd, 1.0)
     sun.position.set(-30, 80, -20)
+    sun.castShadow = true
+    sun.shadow.mapSize.width = 2048
+    sun.shadow.mapSize.height = 2048
+    sun.shadow.camera.near = 1
+    sun.shadow.camera.far = 200
+    sun.shadow.camera.left = -50
+    sun.shadow.camera.right = 80
+    sun.shadow.camera.top = 80
+    sun.shadow.camera.bottom = -50
+    sun.shadow.bias = -0.001
     this.scene.add(sun)
     // 补光，从对侧打一点冷色
     const fill = new THREE.DirectionalLight(0x8899bb, 0.25)
@@ -2553,6 +2569,12 @@ export class Game {
       glow.position.set(0, 2.2, 0)
       group.add(glow)
     }
+    group.traverse((child) => {
+      if (child instanceof THREE.Mesh) {
+        child.castShadow = true
+        child.receiveShadow = true
+      }
+    })
     return group
   }
 
@@ -2834,6 +2856,7 @@ export class Game {
       tree.position.set(x + 0.5, h, z + 0.5)
       tree.scale.setScalar(scale)
       tree.rotation.y = rng() * Math.PI * 2
+      tree.traverse((c) => { if (c instanceof THREE.Mesh) c.castShadow = true })
       this.scene.add(tree)
       this.treeManager.register(tree, x, z, TREE_LUMBER)
     }
@@ -2872,6 +2895,7 @@ export class Game {
       tree.position.set(x + 0.5, h, z + 0.5)
       tree.scale.setScalar(scale)
       tree.rotation.y = rng() * Math.PI * 2
+      tree.traverse((c) => { if (c instanceof THREE.Mesh) c.castShadow = true })
       this.scene.add(tree)
       this.treeManager.register(tree, x, z, TREE_LUMBER)
     }
@@ -2903,6 +2927,7 @@ export class Game {
       tree.position.set(x + 0.5, h, z + 0.5)
       tree.scale.setScalar(scale)
       tree.rotation.y = rng() * Math.PI * 2
+      tree.traverse((c) => { if (c instanceof THREE.Mesh) c.castShadow = true })
       this.scene.add(tree)
       this.treeManager.register(tree, x, z, TREE_LUMBER)
     }
@@ -3857,6 +3882,7 @@ export class Game {
       tree.position.set(x + 0.5, groundH, z + 0.5)
       tree.scale.setScalar(scale)
       tree.rotation.y = rng() * Math.PI * 2
+      tree.traverse((c) => { if (c instanceof THREE.Mesh) c.castShadow = true })
       this.scene.add(tree)
       this.treeManager.register(tree, x, z, TREE_LUMBER)
     }
