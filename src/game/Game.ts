@@ -196,6 +196,9 @@ export class Game {
   // 移动指示器
   private moveIndicators: { mesh: THREE.Mesh; life: number }[] = []
 
+  // 命中冲击环
+  private impactRings: { mesh: THREE.Mesh; life: number; maxLife: number }[] = []
+
   // 队列移动指示器（持久，跟随选中单位的队列位置）
   private queueIndicators: THREE.Mesh[] = []
   private queueIndicatorGeo: THREE.PlaneGeometry | null = null
@@ -349,6 +352,7 @@ export class Game {
     this.updateHealthBars()
     this.updateSelectionRings()
     this.updateMoveIndicators(dt)
+    this.updateImpactRings(dt)
     this.updateGhostPlacement()
     this.handleDeadUnits()
     this.updateHUD(dt)
@@ -897,6 +901,9 @@ export class Game {
 
     // 受击闪烁（增强版：闪红再闪白）
     this.flashHit(target)
+
+    // 命中冲击环
+    this.spawnImpactRing(target.mesh.position)
 
     // 浮动伤害数字
     this.spawnDamageNumber(target, finalDamage)
@@ -2221,6 +2228,42 @@ export class Game {
         mat.dispose()
         this.moveIndicators.splice(i, 1)
       }
+    }
+  }
+
+  private spawnImpactRing(position: THREE.Vector3) {
+    const geo = new THREE.RingGeometry(0.0, 0.35, 16)
+    geo.rotateX(-Math.PI / 2)
+    const mat = new THREE.MeshBasicMaterial({
+      color: 0xffdd44,
+      transparent: true,
+      opacity: 0.85,
+      side: THREE.DoubleSide,
+      depthTest: false,
+    })
+    const ring = new THREE.Mesh(geo, mat)
+    ring.position.copy(position)
+    ring.position.y = 0.08
+    ring.renderOrder = 998
+    this.scene.add(ring)
+    this.impactRings.push({ mesh: ring, life: 0.28, maxLife: 0.28 })
+  }
+
+  private updateImpactRings(dt: number) {
+    for (let i = this.impactRings.length - 1; i >= 0; i--) {
+      const ir = this.impactRings[i]
+      ir.life -= dt
+      if (ir.life <= 0) {
+        this.scene.remove(ir.mesh)
+        disposeObject3DDeep(ir.mesh)
+        this.impactRings.splice(i, 1)
+        continue
+      }
+      const t = 1 - (ir.life / ir.maxLife)
+      const scale = 0.3 + t * 2.2
+      ir.mesh.scale.set(scale, 1, scale)
+      const mat = ir.mesh.material as THREE.MeshBasicMaterial
+      mat.opacity = 0.85 * (1 - t * t)
     }
   }
 
