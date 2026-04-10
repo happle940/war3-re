@@ -2918,10 +2918,11 @@ export class Game {
       if (!unit.isBuilding && getAssetStatus(unit.type) !== 'loaded') continue
       if (unit.isBuilding && getAssetStatus(unit.type) !== 'loaded') continue
 
-      // 保留旧位置/旋转/缩放
+      // 保留旧位置/旋转，但不复制 fallback 的 scale
+      // 新 glTF 的 scale 已由 AssetLoader 按 AssetCatalog 设置好，
+      // 复制旧 fallback scale 会覆盖正确的资产缩放导致单位"变小/消失"
       const pos = unit.mesh.position.clone()
       const rot = unit.mesh.rotation.clone()
-      const scl = unit.mesh.scale.clone()
 
       // 从 outlineObjects 中移除旧 mesh
       const oi = this.outlineObjects.indexOf(unit.mesh)
@@ -2935,7 +2936,12 @@ export class Game {
       unit.mesh = newVisual
       unit.mesh.position.copy(pos)
       unit.mesh.rotation.copy(rot)
-      unit.mesh.scale.copy(scl)
+      // scale：默认使用 glTF 自身 scale（来自 AssetCatalog），不复制 fallback
+      // 仅对建造中的建筑保留 buildProgress 缩放语义
+      if (unit.isBuilding && unit.buildProgress < 1) {
+        const buildScale = 0.3 + 0.7 * unit.buildProgress
+        unit.mesh.scale.setScalar(buildScale)
+      }
       this.scene.add(unit.mesh)
       this.outlineObjects.push(unit.mesh)
 
