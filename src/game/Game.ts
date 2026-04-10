@@ -4,7 +4,7 @@ import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js'
 import { OutlinePass } from 'three/examples/jsm/postprocessing/OutlinePass.js'
 import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js'
 import { CameraController } from './CameraController'
-import { loadAllAssets } from './AssetLoader'
+import { loadAllAssets, getLoadedModel } from './AssetLoader'
 import { createUnitVisual } from './UnitVisualFactory'
 import { createBuildingVisual } from './BuildingVisualFactory'
 import { Terrain, TileType } from '../map/Terrain'
@@ -2865,16 +2865,42 @@ export class Game {
 
   // ==================== 装饰物 ====================
 
+  // Fallback 树共享几何体（glTF 加载后不会被创建）
+  private static readonly TREE_CROWN1_GEO = new THREE.ConeGeometry(0.55, 1.1, 7)
+  private static readonly TREE_CROWN2_GEO = new THREE.ConeGeometry(0.38, 0.85, 7)
+  private static readonly TREE_CROWN3_GEO = new THREE.ConeGeometry(0.22, 0.65, 6)
+  private static readonly TREE_TRUNK_GEO = new THREE.CylinderGeometry(0.06, 0.1, 0.7, 5)
+  private static readonly TREE_CROWN1_MAT = new THREE.MeshLambertMaterial({ color: 0x1a3d10 })
+  private static readonly TREE_CROWN2_MAT = new THREE.MeshLambertMaterial({ color: 0x224d15 })
+  private static readonly TREE_CROWN3_MAT = new THREE.MeshLambertMaterial({ color: 0x1a3d10 })
+  private static readonly TREE_TRUNK_MAT = new THREE.MeshLambertMaterial({ color: 0x3d2210 })
+
+  /** 创建单棵树（glTF 优先，fallback 到程序几何体） */
+  private createSingleTree(): THREE.Group {
+    // 优先尝试 glTF
+    const gltf = getLoadedModel('pine_tree')
+    if (gltf) return gltf
+
+    // Fallback: 三层针叶树
+    const tree = new THREE.Group()
+    tree.userData.isTree = true
+    const c1 = new THREE.Mesh(Game.TREE_CROWN1_GEO, Game.TREE_CROWN1_MAT)
+    c1.position.y = 0.8
+    tree.add(c1)
+    const c2 = new THREE.Mesh(Game.TREE_CROWN2_GEO, Game.TREE_CROWN2_MAT)
+    c2.position.y = 1.5
+    tree.add(c2)
+    const c3 = new THREE.Mesh(Game.TREE_CROWN3_GEO, Game.TREE_CROWN3_MAT)
+    c3.position.y = 2.1
+    tree.add(c3)
+    const trunk = new THREE.Mesh(Game.TREE_TRUNK_GEO, Game.TREE_TRUNK_MAT)
+    trunk.position.y = 0.35
+    tree.add(trunk)
+    tree.traverse((c) => { if (c instanceof THREE.Mesh) c.castShadow = true })
+    return tree
+  }
+
   private spawnTrees() {
-    // 共享几何体：三层暗色针叶树冠 + 树干（War3 风格）
-    const crown1Geo = new THREE.ConeGeometry(0.55, 1.1, 7)
-    const crown2Geo = new THREE.ConeGeometry(0.38, 0.85, 7)
-    const crown3Geo = new THREE.ConeGeometry(0.22, 0.65, 6)
-    const trunkGeo = new THREE.CylinderGeometry(0.06, 0.1, 0.7, 5)
-    const crown1Mat = new THREE.MeshLambertMaterial({ color: 0x1a3d10 })
-    const crown2Mat = new THREE.MeshLambertMaterial({ color: 0x224d15 })
-    const crown3Mat = new THREE.MeshLambertMaterial({ color: 0x1a3d10 })
-    const trunkMat = new THREE.MeshLambertMaterial({ color: 0x3d2210 })
     const rng = this.seededRandom(42)
 
     // ===== 玩家基地树环 =====
@@ -2907,24 +2933,10 @@ export class Game {
         || tile === TileType.Stone || tile === TileType.DarkStone) continue
       const h = this.getWorldHeight(x, z)
       const scale = 0.8 + rng() * 0.8
-      const tree = new THREE.Group()
-      tree.userData.isTree = true
-      const c1 = new THREE.Mesh(crown1Geo, crown1Mat)
-      c1.position.y = 0.8
-      tree.add(c1)
-      const c2 = new THREE.Mesh(crown2Geo, crown2Mat)
-      c2.position.y = 1.5
-      tree.add(c2)
-      const c3 = new THREE.Mesh(crown3Geo, crown3Mat)
-      c3.position.y = 2.1
-      tree.add(c3)
-      const trunk = new THREE.Mesh(trunkGeo, trunkMat)
-      trunk.position.y = 0.35
-      tree.add(trunk)
+      const tree = this.createSingleTree()
       tree.position.set(x + 0.5, h, z + 0.5)
       tree.scale.setScalar(scale)
       tree.rotation.y = rng() * Math.PI * 2
-      tree.traverse((c) => { if (c instanceof THREE.Mesh) c.castShadow = true })
       this.scene.add(tree)
       this.treeManager.register(tree, x, z, TREE_LUMBER)
     }
@@ -2949,24 +2961,10 @@ export class Game {
         || tile === TileType.Stone || tile === TileType.DarkStone) continue
       const h = this.getWorldHeight(x, z)
       const scale = 0.8 + rng() * 0.8
-      const tree = new THREE.Group()
-      tree.userData.isTree = true
-      const c1 = new THREE.Mesh(crown1Geo, crown1Mat)
-      c1.position.y = 0.8
-      tree.add(c1)
-      const c2 = new THREE.Mesh(crown2Geo, crown2Mat)
-      c2.position.y = 1.5
-      tree.add(c2)
-      const c3 = new THREE.Mesh(crown3Geo, crown3Mat)
-      c3.position.y = 2.1
-      tree.add(c3)
-      const trunk = new THREE.Mesh(trunkGeo, trunkMat)
-      trunk.position.y = 0.35
-      tree.add(trunk)
+      const tree = this.createSingleTree()
       tree.position.set(x + 0.5, h, z + 0.5)
       tree.scale.setScalar(scale)
       tree.rotation.y = rng() * Math.PI * 2
-      tree.traverse((c) => { if (c instanceof THREE.Mesh) c.castShadow = true })
       this.scene.add(tree)
       this.treeManager.register(tree, x, z, TREE_LUMBER)
     }
@@ -2984,24 +2982,10 @@ export class Game {
 
       const h = this.getWorldHeight(x, z)
       const scale = 0.8 + rng() * 0.8
-      const tree = new THREE.Group()
-      tree.userData.isTree = true
-      const c1 = new THREE.Mesh(crown1Geo, crown1Mat)
-      c1.position.y = 0.8
-      tree.add(c1)
-      const c2 = new THREE.Mesh(crown2Geo, crown2Mat)
-      c2.position.y = 1.5
-      tree.add(c2)
-      const c3 = new THREE.Mesh(crown3Geo, crown3Mat)
-      c3.position.y = 2.1
-      tree.add(c3)
-      const trunk = new THREE.Mesh(trunkGeo, trunkMat)
-      trunk.position.y = 0.35
-      tree.add(trunk)
+      const tree = this.createSingleTree()
       tree.position.set(x + 0.5, h, z + 0.5)
       tree.scale.setScalar(scale)
       tree.rotation.y = rng() * Math.PI * 2
-      tree.traverse((c) => { if (c instanceof THREE.Mesh) c.castShadow = true })
       this.scene.add(tree)
       this.treeManager.register(tree, x, z, TREE_LUMBER)
     }
@@ -3910,14 +3894,6 @@ export class Game {
   private spawnTreesOnTerrain(terrain: W3ETerrain, spawnPoints: [number, number][]) {
     const w = terrain.width
     const h = terrain.height
-    const crown1Geo = new THREE.ConeGeometry(0.55, 1.1, 7)
-    const crown2Geo = new THREE.ConeGeometry(0.38, 0.85, 7)
-    const crown3Geo = new THREE.ConeGeometry(0.22, 0.65, 6)
-    const trunkGeo = new THREE.CylinderGeometry(0.06, 0.1, 0.7, 5)
-    const crown1Mat = new THREE.MeshLambertMaterial({ color: 0x1a3d10 })
-    const crown2Mat = new THREE.MeshLambertMaterial({ color: 0x224d15 })
-    const crown3Mat = new THREE.MeshLambertMaterial({ color: 0x1a3d10 })
-    const trunkMat = new THREE.MeshLambertMaterial({ color: 0x3d2210 })
     const rng = this.seededRandom(42)
     const avoidR = Game.SPAWN_AVOID_RADIUS
 
@@ -3944,24 +3920,10 @@ export class Game {
       const groundH = terrain.groundHeight[dataIdx] * 3.0  // 匹配 renderer 的 heightScale
 
       const scale = 0.8 + rng() * 0.8
-      const tree = new THREE.Group()
-      tree.userData.isTree = true
-      const c1 = new THREE.Mesh(crown1Geo, crown1Mat)
-      c1.position.y = 0.8
-      tree.add(c1)
-      const c2 = new THREE.Mesh(crown2Geo, crown2Mat)
-      c2.position.y = 1.5
-      tree.add(c2)
-      const c3 = new THREE.Mesh(crown3Geo, crown3Mat)
-      c3.position.y = 2.1
-      tree.add(c3)
-      const trunk = new THREE.Mesh(trunkGeo, trunkMat)
-      trunk.position.y = 0.35
-      tree.add(trunk)
+      const tree = this.createSingleTree()
       tree.position.set(x + 0.5, groundH, z + 0.5)
       tree.scale.setScalar(scale)
       tree.rotation.y = rng() * Math.PI * 2
-      tree.traverse((c) => { if (c instanceof THREE.Mesh) c.castShadow = true })
       this.scene.add(tree)
       this.treeManager.register(tree, x, z, TREE_LUMBER)
     }
