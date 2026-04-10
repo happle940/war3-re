@@ -946,11 +946,11 @@ export class Game {
   private updateAutoAggro() {
     for (const unit of this.units) {
       if (unit.isBuilding || unit.attackTarget) continue
-      // 只有 Idle / Moving / AttackMove 的单位才走自动 aggro
-      if (unit.state !== UnitState.Idle && unit.state !== UnitState.Moving
-        && unit.state !== UnitState.AttackMove) continue
-      // 玩家手动撤退 suppression 窗口：刚被玩家命令拉走的单位不会被 auto-aggro 抢回
-      if (unit.state === UnitState.Moving && this.gameTime < unit.aggroSuppressUntil) continue
+      // 只有 Idle / AttackMove 的单位才走自动 aggro
+      // Moving 单位不被 auto-aggro 打断——war3 行为：玩家显式移动优先级高于自动反击
+      if (unit.state !== UnitState.Idle && unit.state !== UnitState.AttackMove) continue
+      // 玩家手动 stop/move 后的 suppression 窗口：短时间内不会被 auto-aggro 抢回
+      if (this.gameTime < unit.aggroSuppressUntil) continue
 
       // 搜索最近的敌方单位
       let nearestEnemy: Unit | null = null

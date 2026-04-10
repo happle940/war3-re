@@ -147,7 +147,10 @@ export class SimpleAI {
 
     // ===== 2. Supply 不足 → 建农场（优先于其他建筑）=====
     const supplyHeadroom = supply.total - supply.used
-    if (supplyHeadroom < this.profile.farmSupplyThreshold && workerCount >= 2) {
+    const farmInProgress = units.some(
+      (u) => u.team === team && u.type === 'farm' && u.hp > 0 && u.buildProgress < 1,
+    )
+    if (supplyHeadroom < this.profile.farmSupplyThreshold && workerCount >= 2 && !farmInProgress) {
       const farmDef = BUILDINGS['farm']
       if (farmDef && resources.canAfford(team, farmDef.cost)) {
         this.tryBuildBuilding('farm', townhall, myIdleWorkers())
