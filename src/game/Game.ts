@@ -4,6 +4,9 @@ import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js'
 import { OutlinePass } from 'three/examples/jsm/postprocessing/OutlinePass.js'
 import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js'
 import { CameraController } from './CameraController'
+import { loadAllAssets } from './AssetLoader'
+import { createUnitVisual } from './UnitVisualFactory'
+import { createBuildingVisual } from './BuildingVisualFactory'
 import { Terrain, TileType } from '../map/Terrain'
 import { W3XTerrainRenderer } from '../map/W3XTerrainRenderer'
 import { MapRuntime } from '../map/MapRuntime'
@@ -321,6 +324,12 @@ export class Game {
     this.createAI()
     this.phase.set(Phase.Playing)
     window.addEventListener('resize', () => this.onResize())
+
+    // 异步加载资产（不阻塞游戏启动，fallback 自动生效）
+    loadAllAssets().then((statuses) => {
+      const loaded = [...statuses.values()].filter(s => s === 'loaded').length
+      console.log(`[AssetLoader] ${loaded}/${statuses.size} assets loaded`)
+    })
   }
 
   start() {
@@ -2695,7 +2704,7 @@ export class Game {
   }
 
   private spawnUnit(type: string, team: number, x: number, z: number): Unit {
-    const mesh = this.createUnitMesh(type, team)
+    const mesh = createUnitVisual(type, team)
     const def = UNITS[type]
     const h = this.getWorldHeight(x, z)
     mesh.position.set(x + 0.5, h, z + 0.5)
@@ -2738,7 +2747,7 @@ export class Game {
   }
 
   private spawnBuilding(type: string, team: number, x: number, z: number): Unit {
-    const mesh = this.createUnitMesh(type, team)
+    const mesh = createBuildingVisual(type, team)
     const def = BUILDINGS[type]
     const h = this.getWorldHeight(x, z)
     mesh.position.set(x + 0.5, h, z + 0.5)

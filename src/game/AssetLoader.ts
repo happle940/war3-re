@@ -1,0 +1,69 @@
+/**
+ * AssetLoader — 统一管理 glTF 加载与缓存
+ *
+ * 设计原则：
+ * - 异步加载，不阻塞游戏启动
+ * - 加载失败 → 静默 fallback，不崩溃
+ * - 缓存 loaded scene，clone 使用
+ * - 暴露 loadAll() 供 Game 启动时调用
+ * - 暴露 get() 供 factory 查询已加载模型
+ */
+
+import * as THREE from 'three'
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
+import { getAllAssetEntries, type AssetEntry } from './AssetCatalog'
+
+export type AssetStatus = 'pending' | 'loading' | 'loaded' | 'failed'
+
+export interface LoadedAsset {
+  entry: AssetEntry
+  scene: THREE.Group
+  status: AssetStatus
+}
+
+const cache = new Map<string, LoadedAsset>()
+const gltfLoader = new GLTFLoader()
+
+async function loadOne(entry: AssetEntry): Promise<void> {
+  if (cache.has(entry.key)) return
+
+  cache.set(entry.key, { entry, scene: new THREE.Group(), status: 'loading' })
+
+  try {
+    const gltf = await gltfLoader.loadAsync(entry.path)
+    const scene = gltf.scene
+    scene.scale.setScalar(entry.scale)
+    scene.position.y = entry.offsetY
+
+    scene.traverse((child) => {
+      if (child instanceof THREE.Mesh) {
+        child.castShadow = true
+        child.receiveShadow = true
+      }
+    })
+
+    cache.set(entry.key, { entry, scene, status: 'loaded' })
+  } catch {
+    cache.set(entry.key, { entry, scene: new THREE.Group(), status: 'failed' })
+  }
+}
+
+export async function loadAllAssets(): Promise<Map<string, AssetStatus>> {
+  const all = getAllAssetEntries()
+  await Promise.all(all.map(loadOne))
+  const result = new Map<string, AssetStatus>()
+  for (const [key, asset] of cache) {
+    result.set(key, asset.status)
+  }
+  return result
+}
+
+export function getLoadedModel(key: string): THREE.Group | null {
+  const asset = cache.get(key)
+  if (!asset || asset.status !== 'loaded') return null
+  return asset.scene.clone()
+}
+
+export function getAssetStatus(key: string): AssetStatus {
+  return cache.get(key)?.status ?? 'pending'
+}
