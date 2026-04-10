@@ -74,6 +74,10 @@ html, body {
   filter: brightness(1.3);
 }
 
+.resource .gold-icon { color: #ffdd44; }
+.resource .wood-icon { color: #88cc55; }
+.resource .food-icon { color: #ff9944; }
+
 #game-time {
   font-size: 14px;
   color: #8a8a78;

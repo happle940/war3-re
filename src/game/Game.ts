@@ -550,6 +550,9 @@ export class Game {
     unit.mesh.scale.setScalar(1.12)
     setTimeout(() => { if (unit.mesh) unit.mesh.scale.setScalar(1.0) }, 120)
 
+    // 完工冲击环
+    this.spawnImpactRing(unit.mesh.position)
+
     // Brightness flash on main mesh: emissive brief bump
     const mesh0 = unit.mesh.children[0] as THREE.Mesh | undefined
     if (mesh0) {
