@@ -4,7 +4,7 @@ import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js'
 import { OutlinePass } from 'three/examples/jsm/postprocessing/OutlinePass.js'
 import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js'
 import { CameraController } from './CameraController'
-import { loadAllAssets, getLoadedModel } from './AssetLoader'
+import { loadAllAssets, getLoadedModel, getAssetStatus } from './AssetLoader'
 import { createUnitVisual } from './UnitVisualFactory'
 import { createBuildingVisual } from './BuildingVisualFactory'
 import { Terrain, TileType } from '../map/Terrain'
@@ -329,6 +329,8 @@ export class Game {
     loadAllAssets().then((statuses) => {
       const loaded = [...statuses.values()].filter(s => s === 'loaded').length
       console.log(`[AssetLoader] ${loaded}/${statuses.size} assets loaded`)
+      // 加载完成后回填：把已有的 fallback 实例替换为 glTF
+      if (loaded > 0) this.refreshVisualsAfterAssetLoad()
     })
   }
 
@@ -2898,6 +2900,79 @@ export class Game {
     tree.add(trunk)
     tree.traverse((c) => { if (c instanceof THREE.Mesh) c.castShadow = true })
     return tree
+  }
+
+  /**
+   * 资产异步加载完成后，把场景中已有的 fallback 实例替换为 glTF 模型。
+   * 保留位置/旋转/缩放/游戏语义，只替换 mesh 子树。
+   */
+  private refreshVisualsAfterAssetLoad() {
+    // 替换单位和建筑
+    for (const unit of this.units) {
+      const newVisual = unit.isBuilding
+        ? createBuildingVisual(unit.type, unit.team)
+        : createUnitVisual(unit.type, unit.team)
+      // 如果 factory 返回的还是 fallback（没有 glTF），跳过
+      // 检测方式：新视觉没有 children 且不是 glTF 实例 → 实际上 factory 有 fallback 所以总有 children
+      // 用 getAssetStatus 判断更可靠
+      if (!unit.isBuilding && getAssetStatus(unit.type) !== 'loaded') continue
+      if (unit.isBuilding && getAssetStatus(unit.type) !== 'loaded') continue
+
+      // 保留旧位置/旋转/缩放
+      const pos = unit.mesh.position.clone()
+      const rot = unit.mesh.rotation.clone()
+      const scl = unit.mesh.scale.clone()
+
+      // 从 outlineObjects 中移除旧 mesh
+      const oi = this.outlineObjects.indexOf(unit.mesh)
+      if (oi >= 0) this.outlineObjects.splice(oi, 1)
+
+      // 从 scene 中移除旧 mesh（不 dispose children，由新 mesh 替代）
+      this.scene.remove(unit.mesh)
+      disposeObject3DDeep(unit.mesh)
+
+      // 设置新 mesh
+      unit.mesh = newVisual
+      unit.mesh.position.copy(pos)
+      unit.mesh.rotation.copy(rot)
+      unit.mesh.scale.copy(scl)
+      this.scene.add(unit.mesh)
+      this.outlineObjects.push(unit.mesh)
+
+      // 更新血条位置（下一帧 updateHealthBars 会处理）
+      // 重建血条（因为旧血条引用了旧的 parent）
+      const bars = this.healthBars.get(unit)
+      if (bars) {
+        disposeObject3DDeep(bars.bg.parent!)
+        this.healthBars.delete(unit)
+        this.createHealthBar(unit)
+      }
+    }
+
+    // 替换树木
+    this.refreshTreeVisuals()
+  }
+
+  /** 刷新所有树木视觉（如果 pine_tree glTF 已加载） */
+  private refreshTreeVisuals() {
+    if (getAssetStatus('pine_tree') !== 'loaded') return
+    const trees = this.treeManager.entries
+    for (const entry of trees) {
+      const oldMesh = entry.mesh
+      const pos = oldMesh.position.clone()
+      const rot = oldMesh.rotation.clone()
+      const scl = oldMesh.scale.clone()
+
+      const newTree = this.createSingleTree()
+      newTree.position.copy(pos)
+      newTree.rotation.copy(rot)
+      newTree.scale.copy(scl)
+
+      this.scene.remove(oldMesh)
+      disposeObject3DDeep(oldMesh)
+      this.scene.add(newTree)
+      entry.mesh = newTree
+    }
   }
 
   private spawnTrees() {

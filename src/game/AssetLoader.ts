@@ -58,10 +58,21 @@ export async function loadAllAssets(): Promise<Map<string, AssetStatus>> {
   return result
 }
 
+/**
+ * 获取已加载模型的独立克隆。
+ * 对每个 Mesh 的材质做 .clone()，避免多实例共享材质导致串色。
+ */
 export function getLoadedModel(key: string): THREE.Group | null {
   const asset = cache.get(key)
   if (!asset || asset.status !== 'loaded') return null
-  return asset.scene.clone()
+  const clone = asset.scene.clone()
+  // 深拷贝材质：每个实例独立，不会互相污染
+  clone.traverse((child) => {
+    if (child instanceof THREE.Mesh && child.material) {
+      child.material = (child.material as THREE.Material).clone()
+    }
+  })
+  return clone
 }
 
 export function getAssetStatus(key: string): AssetStatus {
