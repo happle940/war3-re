@@ -98,7 +98,27 @@ Non-goals：
 - `npm run build` ✅
 - `npx tsc --noEmit -p tsconfig.app.json` ✅
 
-(后续 phase 逐个追加)
+### Phase 1 (covers Phase 2 & 3)
+- `npm run build` ✅
+- `npx tsc --noEmit -p tsconfig.app.json` ✅
+- 新文件: AssetCatalog.ts, AssetLoader.ts, UnitVisualFactory.ts, BuildingVisualFactory.ts
+- Game.ts spawnUnit/spawnBuilding → 调用 factory
+
+### Phase 4
+- `npm run build` ✅
+- `npx tsc --noEmit -p tsconfig.app.json` ✅
+- spawnTrees 重构为 createSingleTree()，支持 glTF/programmatic fallback
+- 树几何体提取为 static readonly 共享资源
+
+### Phase 5
+- goldmine 已在 Phase 1 中纳入 BuildingVisualFactory
+- 原创代理方案：
+  - 岩石基座（0x6a6050）
+  - 金色晶体簇（OctahedronGeometry，0xffdd00 emissive）
+  - 发光点光源（PointLight 0xffaa00）
+  - 可读的资源点语义
+- glTF 路径: `assets/models/buildings/goldmine.glb`
+- 无 glTF 时使用 createProxyGoldmine fallback
 
 ---
 
