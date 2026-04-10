@@ -41,3 +41,34 @@ npm run build
 
 - 当前项目是纯前端静态站点，适合 GitHub Pages
 - 线上版本适合做试玩、归档和 milestone 回看
+
+## 观看 glm 会话
+
+如果你想在终端里实时旁观 `Claude Code / glm` 的执行过程，而不是只看最终汇报，可以用：
+
+```bash
+./scripts/glm-watch.sh start
+```
+
+它会：
+- 在 `tmux` 里启动一个可持续的 `claude` 会话
+- 默认使用 `--permission-mode bypassPermissions --effort high`
+- 自动把终端输出写入 `logs/`
+
+常用命令：
+
+```bash
+./scripts/glm-watch.sh attach   # 进入实时终端画面
+./scripts/glm-watch.sh tail     # 只看最新日志
+./scripts/glm-watch.sh status   # 看当前状态 + 最近输出
+./scripts/glm-watch.sh capture  # 打印更多 pane 历史
+./scripts/glm-watch.sh stop     # 结束会话
+```
+
+可选覆盖：
+
+```bash
+GLM_EFFORT=medium ./scripts/glm-watch.sh start
+GLM_SESSION_NAME=my-run ./scripts/glm-watch.sh start
+GLM_COMMAND='claude --permission-mode bypassPermissions --effort high' ./scripts/glm-watch.sh start
+```
