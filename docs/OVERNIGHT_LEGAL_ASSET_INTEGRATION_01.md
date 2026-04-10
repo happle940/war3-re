@@ -120,14 +120,80 @@ Non-goals：
 - glTF 路径: `assets/models/buildings/goldmine.glb`
 - 无 glTF 时使用 createProxyGoldmine fallback
 
+### Phase 6
+- `npm run build` ✅
+- `npx tsc --noEmit -p tsconfig.app.json` ✅
+- Playwright smoke ✅:
+  - Canvas 渲染: RGBA(179,179,157,255) 非黑
+  - Game loop 推进: 00:02 → 00:04 (3s)
+  - HUD 正常: gold=500
+  - Zero console errors
+  - AssetLoader 缺失文件不崩溃，fallback 正常
+
 ---
 
 ## Decisions Taken Without User Confirmation
 
-(Phase 进行中记录)
+1. **工厂模式而非内联改造**：新建独立 factory 文件而非在 Game.ts 内部重构。理由：Game.ts 已经 3800+ 行，不继续膨胀。
+2. **静态共享树几何体**：fallback 树几何体作为 Game 类的 static readonly 属性，避免每棵树重建。当 glTF 可用时这些不会被创建。
+3. **goldmine 不找外部素材**：保持当前原创代理设计（岩+晶体+发光），纳入 factory 架构。
+4. **异步不阻塞**：`loadAllAssets()` 返回 Promise 但不 await — 游戏立即用 fallback 启动，资产后台加载。
 
 ---
 
 ## Morning Handoff
 
-(Phase 8 完成后填写)
+### Result
+
+**目标达成。** 资产替换通道已建立：
+
+- `npm run build` ✅ 通过
+- `npx tsc --noEmit -p tsconfig.app.json` ✅ 通过
+- Playwright runtime ✅ 无错误、canvas 渲染、fallback 正常
+
+### Asset Mapping
+
+| Key | glTF Path | 状态 | 说明 |
+|-----|-----------|------|------|
+| worker | `assets/models/units/worker.glb` | 骨架+fallback | 放入 glB 即替换 |
+| footman | `assets/models/units/footman.glb` | 骨架+fallback | 放入 glB 即替换 |
+| townhall | `assets/models/buildings/townhall.glb` | 骨架+fallback | 放入 glB 即替换 |
+| barracks | `assets/models/buildings/barracks.glb` | 骨架+fallback | 放入 glB 即替换 |
+| farm | `assets/models/buildings/farm.glb` | 骨架+fallback | 放入 glB 即替换 |
+| tower | `assets/models/buildings/tower.glb` | 骨架+fallback | 放入 glB 即替换 |
+| goldmine | `assets/models/buildings/goldmine.glb` | 骨架+fallback | 原创代理方案已就位 |
+| pine_tree | `assets/models/nature/pine_tree.glb` | 骨架+fallback | 放入 glB 即替换全部树木 |
+
+**如何使用：** 把对应 `.glb` 文件放入 `public/assets/models/` 下的对应子目录，刷新页面即生效。
+
+### Files Changed
+
+| 文件 | 职责 | 状态 |
+|------|------|------|
+| `src/game/AssetCatalog.ts` | 资产 key/path/scale 注册表 | 新增 |
+| `src/game/AssetLoader.ts` | glTF 异步加载 + 缓存 + fallback 标记 | 新增 |
+| `src/game/UnitVisualFactory.ts` | 单位视觉创建（glTF/fallback） | 新增 |
+| `src/game/BuildingVisualFactory.ts` | 建筑视觉创建（glTF/fallback） | 新增 |
+| `src/game/Game.ts` | spawnUnit/spawnBuilding 调用 factory，spawnTrees 使用 createSingleTree | 修改 |
+| `public/assets/models/` | 资产目录结构（空，待放入 glTF） | 新增 |
+| `docs/OVERNIGHT_LEGAL_ASSET_INTEGRATION_01.md` | 执行文档 | 新增 |
+
+### Git Pushes
+
+| Commit | Phase | Message |
+|--------|-------|---------|
+| `4ead9e8` | Phase 0 | `assets: Phase 0 — baseline audit, asset directory structure, execution doc` |
+| `5acdc60` | Phase 1 | `assets: Phase 1 — AssetLoader foundation + UnitVisualFactory + BuildingVisualFactory with glTF/fallback` |
+| `b712788` | Phase 4 | `assets: Phase 4 — trees refactored to use createSingleTree with glTF/fallback` |
+| `7f63666` | Phase 5 | `assets: Phase 5 — goldmine strategy documented, already in factory/fallback architecture` |
+
+### Remaining Risks
+
+1. **glTF 材质/缩放不匹配**：放入 glB 后可能需要调整 `AssetCatalog.ts` 中的 scale/offsetY
+2. **团队色**：当前依赖材质 name === 'team_color'，不同资产命名可能不同
+3. **动画**：当前不加载/播放动画，只显示 T-pose 或默认姿态
+4. **性能**：大量树木如果用 glTF clone 可能比共享几何体慢
+
+### Next Theme
+
+**下载 Quaternius 资产并实际接入** — 把下载的 glTF 放入 `public/assets/models/`，调整 scale/offsetY/team_color 材质映射，让人眼确认替换效果。
