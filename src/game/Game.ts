@@ -3455,7 +3455,9 @@ export class Game {
       buttons.push({
         label: '停止', cost: '—',
         onClick: () => {
-          issueCommand(this.selectedUnits.filter((u) => u.team === 0 && !u.isBuilding), { type: 'stop' })
+          const sel = this.selectedUnits.filter((u) => u.team === 0 && !u.isBuilding)
+          issueCommand(sel, { type: 'stop' })
+          this.suppressAggroFor(sel)
         },
         hotkey: 'S',
       })

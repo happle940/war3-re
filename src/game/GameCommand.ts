@@ -64,6 +64,7 @@ export function issueCommand(units: Unit[], cmd: GameCommand) {
         u.previousWaypoints = []
         u.previousMoveQueue = []
         u.previousAttackMoveTarget = null
+        u.aggroSuppressUntil = 0  // attack is offensive intent — clear suppression
       }
       break
 
@@ -182,6 +183,7 @@ export function issueCommand(units: Unit[], cmd: GameCommand) {
         u.previousWaypoints = []
         u.previousMoveQueue = []
         u.previousAttackMoveTarget = null
+        u.aggroSuppressUntil = 0  // attackMove must auto-engage — clear suppression
       }
       break
 

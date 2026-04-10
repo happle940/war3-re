@@ -24,7 +24,7 @@ session_exists() {
 
 print_help() {
   cat <<USAGE
-Usage: scripts/glm-watch.sh <start|attach|tail|status|capture|stop>
+Usage: scripts/glm-watch.sh <start|attach|tail|status|capture|send|stop>
 
 Commands:
   start    Start a new tmux-backed Claude Code session with logging
@@ -32,6 +32,7 @@ Commands:
   tail     Tail the latest glm log file
   status   Show session info and recent pane output
   capture  Print more pane history to stdout
+  send     Send a prompt into the running Claude Code session
   stop     Stop the running tmux session
 
 Environment overrides:
@@ -125,6 +126,29 @@ capture_full() {
   tmux -S "$SOCKET" capture-pane -p -J -t "$SESSION:0.0" -S -300
 }
 
+send_text() {
+  if ! session_exists; then
+    echo "Session '$SESSION' is not running. Start one with: $0 start"
+    exit 1
+  fi
+
+  local payload
+  if [[ $# -gt 0 ]]; then
+    payload="$*"
+  else
+    payload="$(cat)"
+  fi
+
+  if [[ -z "$payload" ]]; then
+    echo "Nothing to send."
+    exit 1
+  fi
+
+  tmux -S "$SOCKET" send-keys -t "$SESSION:0.0" -l -- "$payload"
+  tmux -S "$SOCKET" send-keys -t "$SESSION:0.0" C-m
+  echo "Sent prompt to session '$SESSION'."
+}
+
 stop_session() {
   if ! session_exists; then
     echo "Session '$SESSION' is not running."
@@ -141,6 +165,7 @@ case "$cmd" in
   tail) tail_log ;;
   status) capture_status ;;
   capture) capture_full ;;
+  send) shift; send_text "$@" ;;
   stop) stop_session ;;
   help|-h|--help) print_help ;;
   *)

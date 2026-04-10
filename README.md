@@ -62,6 +62,7 @@ npm run build
 ./scripts/glm-watch.sh tail     # 只看最新日志
 ./scripts/glm-watch.sh status   # 看当前状态 + 最近输出
 ./scripts/glm-watch.sh capture  # 打印更多 pane 历史
+./scripts/glm-watch.sh send "继续接手..."  # 往运行中的会话发 prompt
 ./scripts/glm-watch.sh stop     # 结束会话
 ```
 
