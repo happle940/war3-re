@@ -1,4 +1,8 @@
 import * as THREE from 'three'
+import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js'
+import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js'
+import { OutlinePass } from 'three/examples/jsm/postprocessing/OutlinePass.js'
+import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js'
 import { CameraController } from './CameraController'
 import { Terrain, TileType } from '../map/Terrain'
 import { W3XTerrainRenderer } from '../map/W3XTerrainRenderer'
@@ -126,6 +130,9 @@ export class Game {
   private scene: THREE.Scene
   private camera: THREE.PerspectiveCamera
   private renderer: THREE.WebGLRenderer
+  private composer!: EffectComposer
+  private outlinePass!: OutlinePass
+  private outlineObjects: THREE.Object3D[] = []
   private cameraCtrl!: CameraController
   private terrain!: Terrain
   private mapRuntime!: MapRuntime  // 统一的地图查询入口
@@ -234,6 +241,24 @@ export class Game {
     this.renderer.setSize(window.innerWidth, window.innerHeight)
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
 
+    // EffectComposer 后处理管线（War3 风格黑色描边）
+    this.composer = new EffectComposer(this.renderer)
+    this.composer.addPass(new RenderPass(this.scene, this.camera))
+    this.outlinePass = new OutlinePass(
+      new THREE.Vector2(window.innerWidth, window.innerHeight),
+      this.scene,
+      this.camera,
+    )
+    this.outlinePass.edgeStrength = 3.5
+    this.outlinePass.edgeGlow = 0.0
+    this.outlinePass.edgeThickness = 1.5
+    this.outlinePass.pulsePeriod = 0
+    this.outlinePass.visibleEdgeColor.set('#000000')
+    this.outlinePass.hiddenEdgeColor.set('#000000')
+    this.outlinePass.selectedObjects = this.outlineObjects
+    this.composer.addPass(this.outlinePass)
+    this.composer.addPass(new OutputPass())
+
     const MAP_SIZE = 64
     this.terrain = new Terrain(MAP_SIZE, MAP_SIZE)
     this.mapRuntime = new MapRuntime(this.terrain)
@@ -314,7 +339,7 @@ export class Game {
   }
 
   private render() {
-    this.renderer.render(this.scene, this.camera)
+    this.composer.render()
   }
 
   // ==================== 单位AI ====================
@@ -1119,6 +1144,9 @@ export class Game {
       if (unit.isBuilding) {
         this.unmarkBuildingOccupancy(unit)
       }
+      // 从描边列表移除
+      const oi = this.outlineObjects.indexOf(unit.mesh)
+      if (oi >= 0) this.outlineObjects.splice(oi, 1)
       // 移除模型（deep dispose）
       disposeObject3DDeep(unit.mesh)
     }
@@ -2596,6 +2624,7 @@ export class Game {
     const h = this.getWorldHeight(x, z)
     mesh.position.set(x + 0.5, h, z + 0.5)
     this.scene.add(mesh)
+    this.outlineObjects.push(mesh)
 
     const unit: Unit = {
       mesh, type, team,
@@ -2638,6 +2667,7 @@ export class Game {
     const h = this.getWorldHeight(x, z)
     mesh.position.set(x + 0.5, h, z + 0.5)
     this.scene.add(mesh)
+    this.outlineObjects.push(mesh)
 
     const unit: Unit = {
       mesh, type, team,
@@ -3633,6 +3663,8 @@ export class Game {
 
   private onResize() {
     this.renderer.setSize(window.innerWidth, window.innerHeight)
+    this.composer.setSize(window.innerWidth, window.innerHeight)
+    this.outlinePass.resolution.set(window.innerWidth, window.innerHeight)
     this.cameraCtrl.update(0)
   }
 
@@ -3717,6 +3749,7 @@ export class Game {
       disposeObject3DDeep(unit.mesh)
     }
     this.units = []
+    this.outlineObjects = []
     this.selectionModel.clear()
     for (const ring of this.selectionRings) {
       ring.geometry.dispose()
