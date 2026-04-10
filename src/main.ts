@@ -4,6 +4,9 @@ import { parseW3X, loadMapFromURL } from './map/W3XParser'
 const game = new Game()
 game.start()
 
+// Dev mode: expose game instance for runtime testing
+;(window as any).__war3Game = game
+
 // FPS 计数器
 let frameCount = 0
 let lastFpsTime = performance.now()

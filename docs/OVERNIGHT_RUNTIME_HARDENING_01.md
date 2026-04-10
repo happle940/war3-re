@@ -2,7 +2,7 @@
 
 > Session theme: Manual Command Supremacy + AI Opening Truth
 > Purpose: 先把“玩家单位真的在手里”和“AI 前 3-5 分钟真的成立”收口到可验证状态。
-> Status: Phase 1 COMPLETE → Phase 2 IN PROGRESS
+> Status: Phase 2 COMPLETE → Phase 3 IN PROGRESS
 
 ---
 
@@ -248,6 +248,62 @@
 - AI 经济与出兵主路径收口
 - build / tsc 通过
 - commit / push 完成
+
+### Phase 2 Results (2026-04-10)
+
+**build / tsc**: PASS
+
+**Code changes:**
+- Updated AI doc comment to match actual tick order (build → assign → train)
+- No logic changes needed — reordering and queue accounting already in place from prior work
+
+**Code-level verification of AI economy chain:**
+
+1. **Tick order** ✅
+   - Farm build check (priority 1): triggers when supply headroom < threshold, uses idle workers first
+   - Barracks build check (priority 2): only if no existing barracks and none in progress
+   - Worker assignment (priority 3): remaining idle workers → gold/lumber distribution
+   - Worker training (priority 4): supply check includes queued units
+   - Footman training (priority 5): supply check includes queued units
+   - Attack wave (priority 6): accumulation + dispatch
+   - Rally point (priority 7): auto-set to goldmine
+
+2. **Gold/lumber distribution** ✅
+   - `assignIdleWorkers` distributes up to `targetGoldWorkers` (4) to gold, rest to lumber
+   - Incremental counting prevents all workers going to gold
+   - Fallback: if no trees, try gold mine
+
+3. **Farm/supply rhythm** ✅
+   - `farmInProgress` check prevents duplicate farm builds
+   - `queuedSupply` tracks training queue supply usage
+   - `effectiveUsed = supply.used + queuedSupply` for accurate decisions
+   - Base supply: 10 (from townhall) + farm bonus (+6 each)
+   - AI starts 5/10, builds farm when headroom < 4 → should build farm around tick 2
+
+4. **Barracks/footman** ✅
+   - Pre-built barracks at start (barracks-building code path untested but logic correct)
+   - `barracksInProgress` check prevents duplicate builds
+   - Footman training gates: resources + supply (with queue) + queue length < 2
+   - First footman queued tick 1, completes ~16s later
+
+5. **First wave projection** ✅
+   - Wave size: 4 footmen (standard profile)
+   - Footman cost: 135g, train time: 16s
+   - With 4 gold workers (~8g/s income), first wave expected at t≈70-80s
+   - Attack target: enemy barracks → townhall → any enemy
+   - AttackMove ensures troops engage along the way
+
+6. **Pathing sanity** ✅
+   - AI workers at (48-52, 53), goldmine at (45, 51): path goes west through x≥45 (outside tree range x=40-44)
+   - East trees at (54-58, 48-58): accessible from worker positions, no barracks blocking
+   - Build candidates generated around townhall (51, 51): valid positions at (46,46), (55,46), etc.
+   - Trees block pathing but don't obstruct critical AI paths
+
+**Verification status:**
+- Command verification (build + tsc): ✅ PASS
+- Code path verification (logic trace): ✅ All 6 economy paths verified
+- Runtime verification (actual gameplay): ❌ NOT YET — requires human playtest or automated test
+- AI barracks rebuild path: ⚠️ Code-correct but never runtime-tested (pre-built barracks always present)
 
 ---
 
