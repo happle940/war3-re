@@ -73,3 +73,27 @@ GLM_EFFORT=medium ./scripts/glm-watch.sh start
 GLM_SESSION_NAME=my-run ./scripts/glm-watch.sh start
 GLM_COMMAND='claude --permission-mode bypassPermissions --effort high' ./scripts/glm-watch.sh start
 ```
+
+### 本地低 token 监控
+
+如果你不想让模型自己定期检查进度，可以启用本地 watcher。它会：
+- 每 5 分钟检查一次 `glm-watch`
+- 写状态到 `logs/glm-watch-monitor.json`
+- 发现“已完成”或“疑似卡住”时发 macOS 通知
+
+推荐方式：启动本地后台 daemon（继承当前终端权限，避免 macOS 对 `Documents/` 的后台访问限制）
+
+```bash
+./scripts/glm-watch-daemon.sh start
+./scripts/glm-watch-daemon.sh status
+./scripts/glm-watch-daemon.sh stop
+```
+
+手动检查一次：
+
+```bash
+./scripts/glm-watch-monitor.sh check
+./scripts/glm-watch-monitor.sh status
+```
+
+仓库里也保留了 `launchd` 安装脚本，但在 `Documents/` 目录下的项目上，macOS 后台权限可能导致它无法稳定访问工作区；默认更推荐上面的 daemon 方案。

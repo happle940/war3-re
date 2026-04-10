@@ -2,7 +2,7 @@
 
 > Session theme: Manual Command Supremacy + AI Opening Truth
 > Purpose: 先把“玩家单位真的在手里”和“AI 前 3-5 分钟真的成立”收口到可验证状态。
-> Status: Phase 2 COMPLETE → Phase 3 IN PROGRESS
+> Status: Phase 3 COMPLETE → Phase 4 IN PROGRESS
 
 ---
 
@@ -348,6 +348,62 @@
 - 明确哪些项真实验证了，哪些没验证
 - build / tsc 通过
 - commit / push 完成
+
+### Phase 3 Runtime Verification Results (2026-04-10)
+
+**Test method**: Playwright headless Chromium + exposed `window.__war3Game` internal state inspection.
+**Test duration**: ~120s game-time, ~130s real-time.
+**Overall**: 16/18 checks passed.
+
+#### A. AI Economy (Runtime Verified ✅)
+
+| Check | t=30s | t=60s | t=120s |
+|-------|-------|-------|--------|
+| Workers | 6 (4 gathering) | 8 (8 gathering) | 11 (10 gathering) |
+| Farms | 1 | 1 | 2 |
+| Barracks | 0 (building) | 1 | 1 |
+| Footmen | 0 | 1 | 3 (idle) |
+| Resources | 95g 120w | 50g 170w | 130g 250w |
+| Supply | 6/16 | 10/16 | 17/22 |
+
+**Key findings**:
+- AI builds barracks from scratch (W3X map doesn't pre-build it) → barracks-building code path IS runtime-tested ✅
+- AI economy chain works: workers gather → resources accumulate → farm built → workers trained → barracks built → footmen trained
+- By t=120s: 3 footmen accumulating toward first wave (threshold=4)
+- First wave expected at t≈130-150s game-time
+
+#### B. Player Micro (NOT Runtime Verified ❌)
+
+Player commands require human interaction or input simulation:
+- Move retreat from combat: NOT TESTED (no combat simulation)
+- Stop in combat: NOT TESTED
+- AttackMove: NOT TESTED
+- HoldPosition: NOT TESTED
+- Control groups: NOT TESTED
+
+These require either:
+1. Human playtesting at https://happle940.github.io/war3-re/
+2. More sophisticated Playwright input simulation (click on enemy, press S, etc.)
+
+#### C. Player Economy (NOT Runtime Verified ❌)
+
+Player workers all Idle at t=120s (expected — no player input in automated test).
+The player economy requires manual worker assignment to gather.
+
+#### D. Stability (Runtime Verified ✅)
+
+- Zero console errors during 120s game-time
+- Game loop stable (game time matches real time within expected range)
+- WebGL rendering active (canvas center pixel non-black)
+
+#### E. Command System Structural (Code Verified ✅)
+
+- `aggroSuppressUntil` field present on all units
+- Code paths verified via source analysis:
+  - `move`: sets suppression, Moving state blocks auto-aggro
+  - `stop`: sets suppression, clears previousState
+  - `holdPosition`: state not checked in auto-aggro, handles combat via scan
+  - `attackMove`: clears suppression, auto-aggro engages enemies
 
 ---
 

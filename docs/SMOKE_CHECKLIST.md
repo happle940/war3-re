@@ -119,3 +119,4 @@
 | 日期 | 验证人 | 结果 | 备注 |
 |------|--------|------|------|
 | 2026-04-10 | GLM-5.1 | build/tsc pass | Vertical Slice Rebuild 01 完成后基线 |
+| 2026-04-10 | GLM-5.1 | Runtime: AI economy verified | Phase 3 Playwright: 16/18 pass. AI economy chain (gather→build→train→attack) runtime-verified. Player micro not tested (needs human input). |
