@@ -149,6 +149,7 @@ export class Game {
   /** Quick access to selected units (delegates to SelectionModel) */
   private get selectedUnits(): readonly Unit[] { return this.selectionModel.units }
   private selectionRings: THREE.Mesh[] = []
+  private selectionRingPhase = 0
   private healthBars = new Map<Unit, { bg: THREE.Mesh; fill: THREE.Mesh }>()
 
   // 资源（通过 TeamResources 管理）
@@ -2082,12 +2083,19 @@ export class Game {
   }
 
   private updateSelectionRings() {
+    this.selectionRingPhase += 0.05  // ~3 rad/s → ~0.5Hz pulse
+    const pulse = 0.85 + 0.15 * Math.sin(this.selectionRingPhase)
+    const opacityPulse = 0.75 + 0.13 * Math.sin(this.selectionRingPhase)
+
     for (let i = 0; i < this.selectedUnits.length; i++) {
       const ring = this.selectionRings[i]
       if (ring) {
         ring.position.x = this.selectedUnits[i].mesh.position.x
         ring.position.z = this.selectedUnits[i].mesh.position.z
         ring.position.y = this.selectedUnits[i].mesh.position.y + 0.05
+        ring.scale.set(pulse, 1, pulse)
+        const mat = ring.material as THREE.MeshBasicMaterial
+        mat.opacity = opacityPulse
       }
     }
     // 同时更新队列移动指示器
