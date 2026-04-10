@@ -19,20 +19,37 @@ export function createBuildingVisual(type: string, team: number): THREE.Group {
   // 优先尝试 glTF
   const gltf = getLoadedModel(type)
   if (gltf) {
-    return applyTeamColorGLTF(gltf, team)
+    return applyTeamColorGLTF(gltf, team, type)
   }
 
   // Fallback: 程序几何体
   return createProxyBuilding(type, team)
 }
 
-function applyTeamColorGLTF(group: THREE.Group, team: number): THREE.Group {
+/**
+ * 材质名 → 团队色槽映射
+ * key = asset type, value = 需要被替换为团队色的材质名列表
+ */
+const TEAM_COLOR_SLOTS: Record<string, string[]> = {
+  townhall: ['team_color', 'TeamColor', 'Main'],
+  barracks: ['team_color', 'TeamColor'],
+  farm: ['team_color', 'TeamColor'],
+  tower: ['team_color', 'TeamColor'],
+}
+
+function applyTeamColorGLTF(group: THREE.Group, team: number, type: string): THREE.Group {
   const color = TEAM_COLORS[team]
+  const slots = TEAM_COLOR_SLOTS[type] ?? ['team_color', 'TeamColor']
+  const slotSet = new Set(slots)
+
   group.traverse((child) => {
     if (child instanceof THREE.Mesh && child.material) {
-      const mat = child.material as THREE.MeshStandardMaterial
-      if (mat.name === 'team_color' || mat.name === 'TeamColor') {
-        mat.color.setHex(color)
+      const mats = Array.isArray(child.material) ? child.material : [child.material]
+      for (const mat of mats) {
+        const stdMat = mat as THREE.MeshStandardMaterial
+        if (slotSet.has(stdMat.name)) {
+          stdMat.color.setHex(color)
+        }
       }
     }
   })

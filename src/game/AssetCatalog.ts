@@ -24,10 +24,10 @@ export interface AssetEntry {
 
 const CATALOG: AssetEntry[] = [
   // ===== 单位 =====
-  { key: 'worker',   kind: 'unit',     path: 'assets/models/units/worker.glb',     scale: 1.0, offsetY: 0 },
+  { key: 'worker',   kind: 'unit',     path: 'assets/models/units/worker.glb',     scale: 0.50, offsetY: 0 },
   { key: 'footman',  kind: 'unit',     path: 'assets/models/units/footman.glb',    scale: 1.0, offsetY: 0 },
   // ===== 建筑 =====
-  { key: 'townhall', kind: 'building', path: 'assets/models/buildings/townhall.glb', scale: 1.0, offsetY: 0 },
+  { key: 'townhall', kind: 'building', path: 'assets/models/buildings/townhall.glb', scale: 1.4, offsetY: 0 },
   { key: 'barracks', kind: 'building', path: 'assets/models/buildings/barracks.glb', scale: 1.0, offsetY: 0 },
   { key: 'farm',     kind: 'building', path: 'assets/models/buildings/farm.glb',     scale: 1.0, offsetY: 0 },
   { key: 'tower',    kind: 'building', path: 'assets/models/buildings/tower.glb',    scale: 1.0, offsetY: 0 },

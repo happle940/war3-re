@@ -23,7 +23,7 @@ export function createUnitVisual(type: string, team: number): THREE.Group {
   // 优先尝试 glTF
   const gltf = getLoadedModel(type)
   if (gltf) {
-    return applyTeamColorGLTF(gltf, team)
+    return applyTeamColorGLTF(gltf, team, type)
   }
 
   // Fallback: 程序几何体
@@ -31,17 +31,30 @@ export function createUnitVisual(type: string, team: number): THREE.Group {
 }
 
 /**
+ * 材质名 → 团队色槽映射
+ * key = asset type, value = 需要被替换为团队色的材质名列表
+ */
+const TEAM_COLOR_SLOTS: Record<string, string[]> = {
+  worker: ['team_color', 'TeamColor', 'Red'],
+  footman: ['team_color', 'TeamColor'],
+}
+
+/**
  * 对 glTF 模型应用团队色（查找可替换材质并设置 color）
  */
-function applyTeamColorGLTF(group: THREE.Group, team: number): THREE.Group {
+function applyTeamColorGLTF(group: THREE.Group, team: number, type: string): THREE.Group {
   const color = TEAM_COLORS[team]
-  // 遍历所有 mesh，如果有名为 "team_color" 的材质则替换
-  // 如果没有，不强制替换 — 保持原始材质
+  const slots = TEAM_COLOR_SLOTS[type] ?? ['team_color', 'TeamColor']
+  const slotSet = new Set(slots)
+
   group.traverse((child) => {
     if (child instanceof THREE.Mesh && child.material) {
-      const mat = child.material as THREE.MeshStandardMaterial
-      if (mat.name === 'team_color' || mat.name === 'TeamColor') {
-        mat.color.setHex(color)
+      const mats = Array.isArray(child.material) ? child.material : [child.material]
+      for (const mat of mats) {
+        const stdMat = mat as THREE.MeshStandardMaterial
+        if (slotSet.has(stdMat.name)) {
+          stdMat.color.setHex(color)
+        }
       }
     }
   })
