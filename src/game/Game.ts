@@ -1837,12 +1837,28 @@ export class Game {
     this.selectionRings.push(ring)
 
     // 选中闪光反馈
-    const mesh0 = unit.mesh.children[0] as THREE.Mesh | undefined
-    if (mesh0) {
-      const mat = mesh0.material as THREE.MeshLambertMaterial
-      const origColor = mat.color.getHex()
-      mat.color.setHex(0xffffff)
-      setTimeout(() => { if (mat) mat.color.setHex(origColor) }, 100)
+    const flashMats: Array<{ color: THREE.Color; orig: number }> = []
+    unit.mesh.traverse((child) => {
+      if (flashMats.length > 0) return
+      if (!(child instanceof THREE.Mesh)) return
+      const materials = Array.isArray(child.material) ? child.material : [child.material]
+      for (const mat of materials) {
+        const maybeColored = mat as THREE.Material & { color?: THREE.Color }
+        if (maybeColored.color && typeof maybeColored.color.getHex === 'function') {
+          flashMats.push({ color: maybeColored.color, orig: maybeColored.color.getHex() })
+          break
+        }
+      }
+    })
+    for (const entry of flashMats) {
+      entry.color.setHex(0xffffff)
+    }
+    if (flashMats.length > 0) {
+      setTimeout(() => {
+        for (const entry of flashMats) {
+          entry.color.setHex(entry.orig)
+        }
+      }, 100)
     }
   }
 
@@ -3969,19 +3985,27 @@ export class Game {
     // 按出生点放置建筑和单位
     for (const player of mapData.info.players) {
       // war3 世界坐标 → tile 坐标
-      const px = player.startX / 128
-      const pz = player.startY / 128
+      const px = Math.round(player.startX / 128)
+      const pz = Math.round(player.startY / 128)
       const team = player.id
 
+      // 以出生点为 Town Hall 中心，套用与默认开局一致的 WC3-like 空间语法：
+      // TH(4x4) 为基地核心，金矿在 NE，兵营在 SW，worker 在 TH 南侧一字排开。
+      const townhallX = px - 2
+      const townhallZ = pz - 2
+
       // 主基地
-      this.spawnBuilding('townhall', team, px - 1, pz - 1)
+      this.spawnBuilding('townhall', team, townhallX, townhallZ)
 
-      // 金矿（放在基地旁边）
-      this.spawnBuilding('goldmine', -1, px + 3, pz)
+      // 金矿：NE，保持与默认开局相同的 3-4 tile 级别短路径语法
+      this.spawnBuilding('goldmine', -1, townhallX + 5, townhallZ - 4)
 
-      // 5个农民
+      // 兵营：SW 出口，形成军事区/出兵方向
+      this.spawnBuilding('barracks', team, townhallX - 5, townhallZ + 5)
+
+      // 5个农民：在 TH 南侧一字排开，避免出生在 blocker 内
       for (let i = 0; i < 5; i++) {
-        this.spawnUnit('worker', team, px - 3 + i, pz + 2)
+        this.spawnUnit('worker', team, townhallX + i, townhallZ - 1)
       }
     }
   }
