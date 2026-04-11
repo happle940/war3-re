@@ -80,9 +80,35 @@
 
 ---
 
+## 自动化 Runtime Truth 覆盖
+
+以下项目由 `tests/first-five-minutes.spec.ts` 自动验证（Playwright）：
+
+- [x] 玩家基地存在：townhall + barracks + goldmine + 5 workers（t=0）
+- [x] AI 基地存在：townhall + barracks + goldmine + 5 workers（t=0）
+- [x] AI 农民自动进入采集状态（15s 内有 gather state）
+- [x] AI 资源收入可观测（30s 内 gold/lumber 变化）
+- [x] AI 建造农场（supply 不足时自动建）
+- [x] AI 兵营存活且完整
+- [x] AI 训练 footman（90s 内有 footman 或训练队列）
+- [x] AI 训练 worker（90s 内 worker 数量 >= 4）
+- [x] AI 资源被消费（90s 内 gold/lumber 低于初始值）
+- [x] AI 积累 footmen 达到攻击阈值或攻击波已发出（150s）
+
+## 仍未被自动化覆盖（需人工验证）
+
+- [ ] 玩家手动操作的采集/建造/训练完整流程
+- [ ] 命令覆盖 / 中断行为
+- [ ] auto-aggro 命令恢复
+- [ ] 队列系统完整行为
+- [ ] 战斗循环（伤害数字、护甲减伤）
+- [ ] 视觉可读性（worker、建筑辨识度）
+- [ ] 布局语法（基地空间关系、路径可通性）
+
 ## 验证记录
 
 | 日期 | 验证人 | 结果 | 备注 |
 |------|--------|------|------|
+| 2026-04-11 | GLM-5.1 | Runtime Truth 01 | first-five-minutes.spec.ts: AI economy/build/train/attack automated. Player manual loop not yet covered. |
 | 2026-04-11 | GLM-5.1 | pending | Order System Beta + Gameplay Alpha 完成后待验证 |
 | 2026-04-10 | GLM-5.1 | Partial: AI economy ✅, Player micro ❌ | Runtime Hardening Phase 3: AI gather/build/train verified via Playwright. Player commands structurally verified but not runtime-tested. |
