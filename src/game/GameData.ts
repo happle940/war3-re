@@ -31,6 +31,10 @@ export interface BuildingDef {
   description: string
   trains?: string[]       // 可训练的单位类型
   buildable?: string[]    // 可建造的建筑类型（仅农民）
+  // Static defense weapon stats (non-zero only for combat buildings like towers)
+  attackDamage?: number
+  attackRange?: number    // 0=melee (not meaningful for buildings)
+  attackCooldown?: number // seconds between attacks
 }
 
 export const BUILDINGS: Record<string, BuildingDef> = {
@@ -63,6 +67,9 @@ export const BUILDINGS: Record<string, BuildingDef> = {
     cost: { gold: 70, lumber: 50 },
     buildTime: 18, hp: 300, supply: 0, size: 2,
     description: '防御塔',
+    attackDamage: 14,
+    attackRange: 7.0,
+    attackCooldown: 1.5,
   },
   goldmine: {
     key: 'goldmine',

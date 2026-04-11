@@ -373,6 +373,7 @@ export class Game {
     this.ai.update(dt)
     this.updateUnits(dt)
     this.updateCombat(dt)
+    this.updateStaticDefense(dt)
     this.updateAutoAggro()
     this.updateHealthBars()
     this.updateSelectionRings()
@@ -779,6 +780,71 @@ export class Game {
           unit.attackTimer = unit.attackCooldown
           this.dealDamage(unit, target)
         }
+      }
+    }
+  }
+
+  // ==================== 静态防御（箭塔）====================
+
+  /**
+   * Static defense combat update for completed towers.
+   *
+   * Towers are buildings with non-zero attackDamage. They auto-acquire
+   * enemy units in range, attack on cooldown, and never chase.
+   * Under-construction towers (buildProgress < 1) are skipped.
+   */
+  private updateStaticDefense(dt: number) {
+    for (const unit of this.units) {
+      // Only process completed buildings with a weapon
+      if (!unit.isBuilding) continue
+      if (unit.attackDamage <= 0) continue
+      if (unit.buildProgress < 1) continue
+      if (unit.hp <= 0) continue
+
+      // Validate existing target
+      const target = unit.attackTarget
+      if (target) {
+        if (target.hp <= 0 || !this.units.includes(target)) {
+          unit.attackTarget = null
+        }
+      }
+
+      // Acquire target if none
+      if (!unit.attackTarget) {
+        let nearest: Unit | null = null
+        let nearDist = unit.attackRange
+        for (const other of this.units) {
+          if (other.team === unit.team || other.hp <= 0) continue
+          if (other.type === 'goldmine') continue
+          if (other.isBuilding) continue // towers target units only
+          const d = unit.mesh.position.distanceTo(other.mesh.position)
+          if (d < nearDist) { nearDist = d; nearest = other }
+        }
+        if (nearest) unit.attackTarget = nearest
+      }
+
+      // Attack if target is in range
+      const currentTarget = unit.attackTarget
+      if (!currentTarget) continue
+
+      const dist = unit.mesh.position.distanceTo(currentTarget.mesh.position)
+      if (dist > unit.attackRange) {
+        // Target moved out of range — drop it, will reacquire next frame
+        unit.attackTarget = null
+        continue
+      }
+
+      // Face target
+      unit.mesh.rotation.y = Math.atan2(
+        currentTarget.mesh.position.x - unit.mesh.position.x,
+        currentTarget.mesh.position.z - unit.mesh.position.z,
+      )
+
+      // Attack on cooldown
+      unit.attackTimer -= dt
+      if (unit.attackTimer <= 0) {
+        unit.attackTimer = unit.attackCooldown
+        this.dealDamage(unit, currentTarget)
       }
     }
   }
@@ -2890,7 +2956,7 @@ export class Game {
       gatherType: null, carryAmount: 0, gatherTimer: 0,
       resourceTarget: null,
       attackTimer: 0, attackTarget: null,
-      attackDamage: 0, attackRange: 0, attackCooldown: 2, armor: def?.key === 'tower' ? 0 : 2,
+      attackDamage: def?.attackDamage ?? 0, attackRange: def?.attackRange ?? 0, attackCooldown: def?.attackCooldown ?? 2, armor: def?.key === 'tower' ? 0 : 2,
       buildProgress: 1, builder: null, buildTarget: null,
       trainingQueue: [],
       remainingGold: type === 'goldmine' ? GOLDMINE_GOLD : 0,
