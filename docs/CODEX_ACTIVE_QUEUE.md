@@ -67,9 +67,10 @@ GLM owns:
 | C12 — M1 Candidate Audit | done | 2026-04-11 | Latest code commit `14bd7ba` is locally verified and GitHub Actions green; M1 is ready for user gate. |
 | C13 — M1 Result And M2 System Replan | done | 2026-04-11 | User selected `pass with visual debt`; next phase reframed from visual pass to War3 core systems alignment. |
 | C14 — Construction Lifecycle Pack Takeover | done | 2026-04-11 | GLM stalled without file changes; Codex implemented and verified resume/cancel/refund/builder cleanup directly. |
-| C15 — M2 Systems Architecture Slice | active | 2026-04-11 | Keep M2 source-of-truth docs synced with completed packs and add combat-control as the final objective contract before the M2 user gate. |
+| C15 — M2 Systems Architecture Slice | done | 2026-04-11 | M2 source-of-truth docs synced with completed packs and combat-control contract accepted into the M2 baseline. |
 | C16 — Review GLM Combat Control Contract | done | 2026-04-11 | GLM drafted the test file but it initially failed 8/8; Codex took over, exposed the real command dispatcher for runtime tests, fixed HoldPosition state restoration, and verified 20/20 affected tests. |
-| C17 — Dispatch M2 Gate Packet | ready | 2026-04-11 | Send prepared Task 16 to GLM after Task 15 is committed and CI status is checked. |
+| C17 — Dispatch M2 Gate Packet | done | 2026-04-11 | GLM added `npm run test:m2` and `docs/M2_GATE_PACKET.zh-CN.md`; Codex reran `npm run test:m2` locally, 32/32 passed. |
+| C18 — War3 Rule System Roadmap | done | 2026-04-11 | Converted the user's bug list into a durable S1-S7 system roadmap so future work is contract-first, not patch-first. |
 
 ## Task Cards
 

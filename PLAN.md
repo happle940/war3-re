@@ -16,8 +16,9 @@ Read these in order before starting any significant work:
 6. `/Users/zhaocong/Documents/war3-re/docs/HUMAN_DECISION_GATES.md`
 7. `/Users/zhaocong/Documents/war3-re/docs/PROJECT_MILESTONES.zh-CN.md`
 8. `/Users/zhaocong/Documents/war3-re/docs/WAR3_SYSTEM_ALIGNMENT_01.md`
-9. `/Users/zhaocong/Documents/war3-re/docs/WAR3_BENCHMARK_RESEARCH_01.md`
-10. `/Users/zhaocong/Documents/war3-re/docs/CODEX_HANDOFF_2026_04_11.md`
+9. `/Users/zhaocong/Documents/war3-re/docs/WAR3_RULE_SYSTEM_ROADMAP.zh-CN.md`
+10. `/Users/zhaocong/Documents/war3-re/docs/WAR3_BENCHMARK_RESEARCH_01.md`
+11. `/Users/zhaocong/Documents/war3-re/docs/CODEX_HANDOFF_2026_04_11.md`
 
 Execution docs under `docs/OVERNIGHT_*.md` are historical task records or scoped work packets. They do not override this plan or the experience contract.
 
@@ -36,7 +37,7 @@ The target is not a literal asset clone. The target is a legally safe, Warcraft 
 
 Current stage:
 
-**M2 War3 Core Systems Alignment In Progress**
+**M2 War3 Core Systems Alignment Ready For User Gate**
 
 What this means:
 
@@ -44,9 +45,10 @@ What this means:
 - Core RTS systems exist: selection, commands, resources, build, train, combat, AI, map loading, GitHub Pages.
 - Several earlier fake-green validations have been replaced with real runtime assertions.
 - Worker and key-building readability have stronger proxy implementations, but still require human approval on the live build.
-- The project passed the first user playability gate, but it is still not a convincing Warcraft III-like slice because several reusable RTS systems are still being hardened.
-- M2 objective packs completed so far: construction lifecycle, static defense combat, command-card disabled reasons, and unit presence baseline.
-- M2 objective pack currently in progress: combat-control contract, especially manual move/stop/hold/attack-move behavior during auto-aggro.
+- The project passed the first user playability gate, but it is still not a convincing Warcraft III-like slice because visual and scale debt remain.
+- M2 objective packs completed so far: construction lifecycle, static defense combat, command-card disabled reasons, unit presence baseline, and combat-control contract.
+- M2 has a consolidated regression entrypoint: `npm run test:m2`.
+- M2 is ready for user gate review, not yet user-approved.
 
 ## 3. Solved vs Not Solved
 
@@ -110,6 +112,10 @@ Examples:
 - supply exists, but disabled command feedback is weak
 - movement exists, but unit collision/presence is weak
 - placement exists, but cancel/refund rules are missing
+
+The system roadmap that converts these issues into reusable RTS rule work lives here:
+
+- `/Users/zhaocong/Documents/war3-re/docs/WAR3_RULE_SYSTEM_ROADMAP.zh-CN.md`
 
 ## 5. Non-Negotiable Experience Contracts
 
