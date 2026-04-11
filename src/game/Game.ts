@@ -4025,8 +4025,12 @@ export class Game {
     const bpKey = primary && primary.buildProgress < 1
       ? Math.floor(primary.buildProgress * 100)
       : (primary ? 100 : -1)
+    const res = this.resources.get(0)
+    const supply = this.resources.computeSupply(0, this.units)
+    const queuedSupply = this.getQueuedSupply(0)
+    const primaryQueueKey = primary ? primary.trainingQueue.map(item => `${item.type}:${Math.ceil(item.remaining * 10)}`).join('|') : ''
     const selKey = primary
-      ? `${primary.type}:${primary.team}:${bpKey}`
+      ? `${primary.type}:${primary.team}:${bpKey}:${res.gold}:${res.lumber}:${supply.used}:${supply.total}:${queuedSupply}:${primaryQueueKey}`
       : ''
     if (selKey === this._lastCmdKey) return
     this._lastCmdKey = selKey
@@ -4044,7 +4048,7 @@ export class Game {
     }
 
     // 收集要显示的按钮
-    const buttons: { label: string; cost: string; onClick: () => void; hotkey?: string }[] = []
+    const buttons: { label: string; cost: string; onClick: () => void; hotkey?: string; enabled?: boolean; disabledReason?: string }[] = []
 
     // 农民：显示可建造的建筑
     if (primary.type === 'worker') {
@@ -4052,11 +4056,14 @@ export class Game {
         const def = BUILDINGS[bKey]
         if (!def) continue
         const capturedKey = bKey
+        const availability = this.getBuildAvailability(capturedKey, 0)
         buttons.push({
           label: def.name,
           cost: `${def.cost.gold}g ${def.cost.lumber}w`,
+          enabled: availability.ok,
+          disabledReason: availability.reason,
           onClick: () => {
-            if (this.resources.canAfford(0, def.cost)) {
+            if (this.getBuildAvailability(capturedKey, 0).ok) {
               this.enterPlacementMode(capturedKey)
             }
           },
@@ -4113,9 +4120,12 @@ export class Game {
         const uDef = UNITS[uKey]
         if (!uDef) continue
         const capturedUKey = uKey
+        const availability = this.getTrainAvailability(capturedUKey, 0)
         buttons.push({
           label: uDef.name,
           cost: `${uDef.cost.gold}g`,
+          enabled: availability.ok,
+          disabledReason: availability.reason,
           onClick: () => {
             // 多建筑训练：依次为每个建筑排队（直到资源不足）
             for (const b of sameTypeBuildings) {
@@ -4135,7 +4145,7 @@ export class Game {
     // 先渲染已填充的按钮（最多8个）
     for (let i = 0; i < Math.min(buttons.length, 8); i++) {
       const b = buttons[i]
-      this.addCommandButton(b.label, b.cost, b.onClick, b.hotkey)
+      this.addCommandButton(b.label, b.cost, b.onClick, b.hotkey, b.enabled ?? true, b.disabledReason ?? '')
     }
     // 剩余位置用空插槽补齐
     for (let i = buttons.length; i < 8; i++) {
@@ -4145,17 +4155,64 @@ export class Game {
     }
   }
 
-  private addCommandButton(label: string, cost: string, onClick: () => void, hotkey?: string) {
+  private addCommandButton(label: string, cost: string, onClick: () => void, hotkey?: string, enabled = true, disabledReason = '') {
     const btn = document.createElement('button')
+    if (!enabled) {
+      btn.disabled = true
+      btn.dataset.disabledReason = disabledReason
+      btn.title = disabledReason
+      btn.classList.add('cmd-disabled')
+    }
     btn.innerHTML =
       (hotkey ? `<span class="btn-hotkey">${hotkey}</span>` : '') +
       `<span class="btn-label">${label}</span>` +
-      `<span class="btn-cost">${cost}</span>`
+      `<span class="btn-cost">${cost}</span>` +
+      (disabledReason ? `<span class="btn-reason">${disabledReason}</span>` : '')
     btn.addEventListener('click', onClick)
     this.elCommandCard.appendChild(btn)
   }
 
   // ==================== 训练 ====================
+
+  private getQueuedSupply(team: number): number {
+    let queuedSupply = 0
+    for (const u of this.units) {
+      if (u.team !== team || !u.isBuilding) continue
+      for (const item of u.trainingQueue) {
+        queuedSupply += UNITS[item.type]?.supply ?? 0
+      }
+    }
+    return queuedSupply
+  }
+
+  private getCostBlockReason(team: number, cost: { gold: number; lumber: number }): string {
+    const res = this.resources.get(team)
+    const reasons: string[] = []
+    if (res.gold < cost.gold) reasons.push('黄金不足')
+    if (res.lumber < cost.lumber) reasons.push('木材不足')
+    return reasons.join(' / ')
+  }
+
+  private getBuildAvailability(buildingType: string, team: number): { ok: boolean; reason: string } {
+    const def = BUILDINGS[buildingType]
+    if (!def) return { ok: false, reason: '不可用' }
+    const reason = this.getCostBlockReason(team, def.cost)
+    return reason ? { ok: false, reason } : { ok: true, reason: '' }
+  }
+
+  private getTrainAvailability(unitType: string, team: number): { ok: boolean; reason: string } {
+    const def = UNITS[unitType]
+    if (!def) return { ok: false, reason: '不可用' }
+    const resourceReason = this.getCostBlockReason(team, def.cost)
+    if (resourceReason) return { ok: false, reason: resourceReason }
+
+    const supply = this.resources.computeSupply(team, this.units)
+    const queuedSupply = this.getQueuedSupply(team)
+    if (supply.used + queuedSupply + def.supply > supply.total) {
+      return { ok: false, reason: '人口不足' }
+    }
+    return { ok: true, reason: '' }
+  }
 
   private trainUnit(building: Unit, unitType: string) {
     const def = UNITS[unitType]
@@ -4164,13 +4221,7 @@ export class Game {
 
     // 检查人口上限（含训练队列中的单位，防止超额训练）
     const supply = this.resources.computeSupply(0, this.units)
-    let queuedSupply = 0
-    for (const u of this.units) {
-      if (u.team !== 0 || !u.isBuilding) continue
-      for (const item of u.trainingQueue) {
-        queuedSupply += UNITS[item.type]?.supply ?? 0
-      }
-    }
+    const queuedSupply = this.getQueuedSupply(0)
     if (supply.used + queuedSupply + def.supply > supply.total) return
 
     this.resources.spend(0, def.cost)
