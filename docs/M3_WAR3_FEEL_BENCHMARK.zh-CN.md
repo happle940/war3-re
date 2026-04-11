@@ -236,8 +236,9 @@ War3 世界编辑器中（参考 WC3 Gym）：
 
 #### T1: 建筑尺寸比例调整
 
-- 修改 `GameData.ts` 中 Farm `size` 从 2 降为 1.5 或增加 Tower 的 `size` 区分
-- 调整 proxy mesh 几何体尺寸，使 Farm mesh 更小、Tower mesh 更宽
+- 保持 Farm `GameData.size = 2`，不要在当前 footprint 系统里引入 1.5 这种半 tile 占地
+- 先只调整 proxy mesh 几何体尺寸，使 Farm 视觉更紧凑、Tower 视觉底座更宽
+- 如果以后要区分视觉体量和寻路占地，应先引入独立字段：`visualScale` / `footprintSize` / `pathingBuffer`
 - **验证**：ratio assertion — Farm mesh width / TH mesh width < 0.45
 - **风险**：低，纯数值调整
 
