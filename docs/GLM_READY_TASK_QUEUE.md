@@ -37,7 +37,7 @@ Current queue state:
 | Task 09 — Death/Cleanup Contract Pack | completed | Codex takeover | 2026-04-11 | GLM stalled in broad exploration; Codex completed core pack directly. `death-cleanup-regression.spec.ts` 5/5 green. |
 | Task 10 — Placement Controller Development Slice | completed | GLM + Codex review | 2026-04-11 | Accepted at commit `14bd7ba`; Codex reran build, app typecheck, and 17 affected runtime tests locally. GitHub Actions for this commit was still in progress at acceptance update time. |
 | Task 11 — Construction Lifecycle Contract Pack | completed | Codex takeover | 2026-04-11 | GLM stalled in broad exploration; Codex implemented resumable construction, cancel, refund, footprint release, HUD cleanup, builder cleanup, and runtime proof. |
-| Task 12 — Static Defense Combat Contract Pack | completed | GLM | 2026-04-11 | Accepted at commit `24eeea1`; 7/7 static defense tests + 5/5 death cleanup + 7/7 command regression passed. |
+| Task 12 — Static Defense Combat Contract Pack | completed | GLM + Codex review | 2026-04-11 | Accepted at commit `24eeea1`; 7/7 static defense tests + 5/5 death cleanup + 7/7 command regression passed. Codex integrated the spec into `test:runtime`. |
 | Task 13 — Command Disabled Reasons Pack | ready | GLM | 2026-04-11 | Supply/resource blocked commands must explain failure instead of silently doing nothing. |
 | Task 14 — Unit Collision Presence Pack | ready | GLM | 2026-04-11 | Add small-unit physical presence and anti-stacking after order/construction semantics stabilize. |
 | Task 08 — Game.ts Module Extraction Slice | ready | Codex dispatch | 2026-04-11 | Defer until death/cleanup and HUD cache gaps are covered. |

@@ -65,6 +65,7 @@
 ## 战斗循环
 
 - [ ] 步兵攻击敌方 → 正确追踪并攻击
+- [ ] 完成箭塔后，敌方单位进入范围 → 箭塔自动攻击
 - [ ] 超出追击范围 → 放弃追击
 - [ ] 目标死亡 → 攻击者恢复原命令或转 Idle
 - [ ] 攻击移动 → 沿途遇敌交战，战后继续前进
@@ -220,6 +221,19 @@
 - [x] 资源目标失效后，采集状态恢复路径清空 `resourceTarget` 且不崩溃
 - [x] 强制死亡/清理场景无严重 console error
 
+### 静态防御自动化覆盖
+
+以下项目由 `tests/static-defense-regression.spec.ts` 自动验证（Playwright）：
+
+- [x] 完成箭塔会在范围内自动获取敌方单位
+- [x] 完成箭塔会按冷却造成伤害
+- [x] 建造中的箭塔不会攻击
+- [x] 箭塔不会攻击友军
+- [x] 箭塔攻击时不会移动或追击
+- [x] 目标死亡后，箭塔会清理旧 `attackTarget` 并重新获取新目标
+- [x] 箭塔忽略金矿/建筑类非移动目标
+- [x] 箭塔战斗模拟无严重 console error
+
 ## 仍未被自动化覆盖（需人工验证）
 
 - [ ] 玩家手动操作的采集/建造/训练完整流程
@@ -232,6 +246,7 @@
 
 | 日期 | 验证人 | 结果 | 备注 |
 |------|--------|------|------|
+| 2026-04-11 | GLM-5.1 + Codex | Static Defense Regression | `static-defense-regression.spec.ts`: 7 tests green from GLM. Codex review integrated the spec into `npm run test:runtime` and added `npm run test:static-defense`. |
 | 2026-04-11 | Codex | Construction Lifecycle Regression | `construction-lifecycle-regression.spec.ts`: 6 tests green. Added resumable construction, under-construction cancel, deterministic 75% refund, footprint release, selected-building HUD cleanup, and builder cleanup. Added the spec to `npm run test:runtime`. |
 | 2026-04-11 | Codex | Death/Cleanup Regression | `death-cleanup-regression.spec.ts`: 5 tests green. Selection/ring/healthbar/outline cleanup, attack target cleanup, building footprint release, builder cleanup, and invalid resource target recovery are now runtime-proven. Added the spec to `npm run test:runtime`. |
 | 2026-04-11 | Codex | Building Agency Regression | `building-agency-regression.spec.ts`: 5 tests green. Fixed `building.builder` never being set and `findNearestIdlePeasant()` considering dead workers during fallback. Added the spec to `npm run test:runtime`. |
