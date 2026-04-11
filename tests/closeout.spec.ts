@@ -89,8 +89,16 @@ async function waitForGame(page: Page) {
     )
   }
 
-  // One animation frame settle
-  await page.waitForTimeout(1000)
+  // The app asynchronously loads the W3X test map after constructing the
+  // initial procedural scene. Wait for that transition to finish so tests do
+  // not select units that are immediately disposed by loadMap().
+  await page.waitForFunction(() => {
+    const status = document.getElementById('map-status')?.textContent ?? ''
+    return !status.includes('正在加载')
+  }, { timeout: 15000 })
+
+  // One animation frame settle after any map replacement.
+  await page.waitForTimeout(500)
 }
 
 /**

@@ -3,6 +3,22 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd -- "$SCRIPT_DIR/.." && pwd)"
+LOCK_DIR="${WAR3_RUNTIME_LOCK_DIR:-${TMPDIR:-/tmp}/war3-re-runtime-tests.lockdir}"
+
+# If a runtime test runner holds the lock, do not kill its browser/server from
+# another terminal/agent. The runner sets WAR3_RUNTIME_LOCK_HELD=1 for its own
+# cleanup path.
+if [[ "${WAR3_RUNTIME_LOCK_HELD:-0}" != "1" && "${FORCE_RUNTIME_CLEANUP:-0}" != "1" ]]; then
+  if [[ -d "$LOCK_DIR" ]]; then
+    holder_pid="$(cat "$LOCK_DIR/pid" 2>/dev/null || true)"
+    if [[ -n "$holder_pid" ]] && kill -0 "$holder_pid" 2>/dev/null; then
+      echo "Runtime test lock active; cleanup skipped."
+      exit 0
+    fi
+    echo "Removing stale runtime test lock."
+    rm -rf "$LOCK_DIR"
+  fi
+fi
 
 # Stop local dev/preview servers and Playwright runs launched from this repo.
 pkill -f "$ROOT_DIR/node_modules/.bin/vite" 2>/dev/null || true

@@ -213,9 +213,7 @@ Run these commands:
 ./scripts/cleanup-local-runtime.sh
 npm run build
 npx tsc --noEmit -p tsconfig.app.json
-npx vite preview --host 127.0.0.1 --port 4173 &
-npx playwright test tests/command-regression.spec.ts --reporter=list
-./scripts/cleanup-local-runtime.sh
+./scripts/run-runtime-tests.sh tests/command-regression.spec.ts --reporter=list
 ```
 
 Before committing, verify:
@@ -253,4 +251,3 @@ Report:
 4. Verification results
 5. Commit hash
 6. Remaining unproven command behaviors
-

@@ -234,6 +234,14 @@ Required command:
 
 This is mandatory because leftover local Chrome tabs, Vite servers, Playwright workers, and Chromium headless processes can make the user's machine noticeably slower.
 
+Runtime Playwright suites must use the locked runner:
+
+```bash
+./scripts/run-runtime-tests.sh <spec files> --reporter=list
+```
+
+The runner serializes local browser tests across Codex and `glm`. This prevents one agent's cleanup step from killing the other agent's active Playwright or Vite preview process.
+
 Do not leave these running unless the user explicitly asks to keep a local server or browser open:
 
 - `npm run dev`
