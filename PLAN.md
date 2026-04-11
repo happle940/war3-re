@@ -14,8 +14,9 @@ Read these in order before starting any significant work:
 4. `/Users/zhaocong/Documents/war3-re/docs/CODEX_ACTIVE_QUEUE.md`
 5. `/Users/zhaocong/Documents/war3-re/docs/GLM_READY_TASK_QUEUE.md`
 6. `/Users/zhaocong/Documents/war3-re/docs/HUMAN_DECISION_GATES.md`
-7. `/Users/zhaocong/Documents/war3-re/docs/WAR3_BENCHMARK_RESEARCH_01.md`
-8. `/Users/zhaocong/Documents/war3-re/docs/CODEX_HANDOFF_2026_04_11.md`
+7. `/Users/zhaocong/Documents/war3-re/docs/PROJECT_MILESTONES.zh-CN.md`
+8. `/Users/zhaocong/Documents/war3-re/docs/WAR3_BENCHMARK_RESEARCH_01.md`
+9. `/Users/zhaocong/Documents/war3-re/docs/CODEX_HANDOFF_2026_04_11.md`
 
 Execution docs under `docs/OVERNIGHT_*.md` are historical task records or scoped work packets. They do not override this plan or the experience contract.
 
@@ -259,6 +260,7 @@ Do not maintain long inline queues in `PLAN.md`; they become stale. The live que
 - Codex queue: `/Users/zhaocong/Documents/war3-re/docs/CODEX_ACTIVE_QUEUE.md`
 - GLM queue: `/Users/zhaocong/Documents/war3-re/docs/GLM_READY_TASK_QUEUE.md`
 - Human gates: `/Users/zhaocong/Documents/war3-re/docs/HUMAN_DECISION_GATES.md`
+- User-facing Chinese milestones: `/Users/zhaocong/Documents/war3-re/docs/PROJECT_MILESTONES.zh-CN.md`
 
 Operating rule:
 
