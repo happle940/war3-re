@@ -929,22 +929,41 @@ export class Game {
     if (bars) {
       const borderObj = bars.bg.parent?.children[0]
       if (borderObj instanceof THREE.Mesh) {
-        const borderMat = borderObj.material as THREE.MeshBasicMaterial
-        const origBorder = borderMat.color.getHex()
-        borderMat.color.setHex(0xffffff)
-        setTimeout(() => { borderMat.color.setHex(origBorder) }, 150)
+        const borderMat = borderObj.material as THREE.MeshBasicMaterial | undefined
+        if (borderMat && 'color' in borderMat && borderMat.color) {
+          const origBorder = borderMat.color.getHex()
+          borderMat.color.setHex(0xffffff)
+          setTimeout(() => { borderMat.color.setHex(origBorder) }, 150)
+        }
       }
     }
   }
 
   /** 受击闪白效果（war3 风格：白色闪烁，短暂明显） */
   private flashHit(unit: Unit) {
-    const mesh0 = unit.mesh.children[0] as THREE.Mesh | undefined
-    if (!mesh0) return
-    const mat = mesh0.material as THREE.MeshLambertMaterial
-    const origColor = mat.color.getHex()
-    mat.color.setHex(0xffffff)
-    setTimeout(() => { if (mat) mat.color.setHex(origColor) }, 80)
+    const flashMats: Array<{ color: THREE.Color; orig: number }> = []
+
+    unit.mesh.traverse((obj) => {
+      if (!(obj instanceof THREE.Mesh)) return
+      const materials = Array.isArray(obj.material) ? obj.material : [obj.material]
+      for (const mat of materials) {
+        if (!mat) continue
+        const colored = mat as THREE.Material & { color?: THREE.Color }
+        if (colored.color && typeof colored.color.getHex === 'function') {
+          flashMats.push({ color: colored.color, orig: colored.color.getHex() })
+        }
+      }
+    })
+
+    if (flashMats.length === 0) return
+    for (const entry of flashMats) {
+      entry.color.setHex(0xffffff)
+    }
+    setTimeout(() => {
+      for (const entry of flashMats) {
+        entry.color.setHex(entry.orig)
+      }
+    }, 80)
   }
 
   /** 浮动伤害数字（war3 风格：黄底黑边，上飘淡出） */

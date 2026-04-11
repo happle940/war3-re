@@ -31,7 +31,7 @@ Current queue state:
 | Task 02 — Unit Visibility Contract Pack | completed | Codex | 2026-04-11 | Added visibility runtime pack and fixed W3X camera reset; `npm run test:runtime` passed 33/33. |
 | Task 04 — Selection/Input Contract Pack | completed | GLM + Codex review | 2026-04-11 | Accepted at commit `96d9d4a`; Codex integrated it into `test:runtime`. |
 | Task 05 — Pathing/Footprint Contract Pack | completed | GLM + Codex review | 2026-04-11 | Accepted at commit `edd0bde`; Codex tightened blocked-start proof and integrated spec into `test:runtime`. |
-| Task 06 — AI First Five Minutes Deepening | in_progress | GLM | 2026-04-11 | Dispatched after Task 05 acceptance; extends AI smoke into real economy robustness. |
+| Task 06 — AI First Five Minutes Deepening | completed | GLM + Codex review | 2026-04-11 | Added AI economy regression pack; Codex tightened weak assertions, fixed flashHit crash, and integrated into `test:runtime`. |
 | Task 07 — Asset Pipeline Contract Pack | ready | Codex dispatch | 2026-04-11 | Useful after worker visibility contract proves current failure mode. |
 | Task 03 — Building Placement Agency Pack | ready | Codex dispatch | 2026-04-11 | Lower priority because initial selected-worker fix already exists. |
 | Task 08 — Game.ts Module Extraction Slice | ready | Codex dispatch | 2026-04-11 | Only after gameplay contracts are better covered. |
@@ -329,13 +329,32 @@ Implement Pathing/Footprint Contract Pack. Build runtime tests for spawn blocker
 
 ### Task 06 — AI First Five Minutes Deepening
 
-Status: `in_progress`.
+Status: `completed`.
 
-Owner: GLM.
+Owner: GLM + Codex review.
 
 Started: 2026-04-11.
 
-Priority reason: M1 still needs stronger proof that the AI can sustain the first playable loop, recover from disruption, and launch pressure without economy/pathing stalls.
+Completed: 2026-04-11.
+
+Final review status: accepted after Codex tightened the proof and fixed one runtime crash exposed by the long AI simulation.
+
+Result:
+
+- Added `tests/ai-economy-regression.spec.ts`.
+- Fixed AI attack-wave deadlock where `attackWaveSent` could remain true forever after the first wave.
+- Fixed `flashHit()` so glTF/nested/multi-material visuals do not crash when taking damage.
+- Integrated AI regression into `npm run test:runtime`.
+
+Codex reran:
+
+```bash
+npm run build
+npx tsc --noEmit -p tsconfig.app.json
+./scripts/run-runtime-tests.sh tests/ai-economy-regression.spec.ts --reporter=list
+```
+
+Result: 9/9 passed.
 
 Goal: move from “AI does something” to “AI can sustain a playable first five minutes”.
 

@@ -153,6 +153,20 @@
 - [x] findPath: blocked goal 自动重定向到最近可达位置；blocked start 返回 null
 - [x] 启动无严重控制台错误
 
+### AI 开局经济/进攻自动化覆盖
+
+以下项目由 `tests/ai-economy-regression.spec.ts` 自动验证（Playwright）：
+
+- [x] 30 秒内 AI 同时有采金与伐木农民
+- [x] AI 农民不会全部永久分配到金矿，金/木分配保持有界
+- [x] AI 在人口阻塞前完成至少一个农场
+- [x] AI 训练 worker/footman 时 `used + queued <= total`
+- [x] 第一波进攻真实发出，且存在 attackMove/向玩家半场推进证据
+- [x] 第一波后可发起第二波，`waveCount >= 2`，不再永久卡在 `attackWaveSent=true`
+- [x] 早期损失 1 个 AI 农民后，AI 仍能继续采集/生产
+- [x] AI 建筑放置失败不会产生无限建筑 spam
+- [x] 5 分钟 AI 模拟无严重 console error
+
 ## 仍未被自动化覆盖（需人工验证）
 
 - [ ] 玩家手动操作的采集/建造/训练完整流程
@@ -165,6 +179,7 @@
 
 | 日期 | 验证人 | 结果 | 备注 |
 |------|--------|------|------|
+| 2026-04-11 | GLM-5.1 + Codex | AI Economy Regression | `ai-economy-regression.spec.ts`: 9 tests green. Found and fixed AI second-wave deadlock plus `flashHit()` crash on nested/glTF materials. Codex tightened farm, queued-supply, first-wave, and second-wave assertions. |
 | 2026-04-11 | GLM-5.1 + Codex | Pathing/Footprint Regression | `pathing-footprint-regression.spec.ts`: 6 tests green. Codex tightened the PathFinder blocked-start assertion to test `findPath` directly instead of accepting `planPath` fallback. |
 | 2026-04-11 | Codex | Runtime Full Pack | `npm run test:runtime`: 45 tests green. Includes closeout, command, first-five, resource/supply, unit visibility, selection/input, pathing/footprint. |
 | 2026-04-11 | GLM-5.1 + Codex | Selection/Input Regression | `selection-input-regression.spec.ts`: 6 tests green. Box select, right-drag guard, Shift+append via mouseup modifier state, Tab subgroup rings, control group rings. Codex added the spec to `npm run test:runtime`. |

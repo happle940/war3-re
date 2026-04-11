@@ -74,12 +74,14 @@ export class SimpleAI {
   private tickTimer = 0
   private attackWaveSent = false
   private attackWaveSize = 4  // 积累多少步兵后进攻
+  private attackWaveSentTick = -999  // tick counter when last wave was sent
 
   // 经济策略参数（从 profile 初始化）
   private targetGoldWorkers: number
   private maxWorkers: number
   private barracksBuilt = false   // 是否已造兵营
   private waveCount = 0           // 已发起的进攻波次
+  private tickCount = 0           // 内部 tick 计数器（≈ game seconds）
 
   constructor(ctx: AIContext, profileIndex: number = 0) {
     this.ctx = ctx
@@ -100,13 +102,16 @@ export class SimpleAI {
   /** 重置 AI 状态（地图切换时） */
   reset() {
     this.tickTimer = 0
+    this.tickCount = 0
     this.attackWaveSent = false
+    this.attackWaveSentTick = -999
     this.barracksBuilt = false
     this.waveCount = 0
     this.attackWaveSize = 4
   }
 
   private tick() {
+    this.tickCount++
     const { team, units, resources } = this.ctx
 
     // 辅助：获取我方某类单位
@@ -228,18 +233,25 @@ export class SimpleAI {
           this.ctx.planPath(f, target.mesh.position)
         }
         this.attackWaveSent = true
+        this.attackWaveSentTick = this.tickCount
         this.waveCount++
       }
     }
 
     // 进攻波次恢复：全灭或剩余少量且积累足够新兵 → 允许下一波
     if (this.attackWaveSent) {
+      const ticksSinceWave = this.tickCount - this.attackWaveSentTick
       // 全灭 → 立即重置
       if (allFootmen.length === 0) {
         this.attackWaveSent = false
       }
       // 残存少且新兵积累够了 → 也允许下一波（避免单个幸存者卡死进攻）
       else if (allFootmen.length <= 2 && idleFootmen.length >= this.attackWaveSize) {
+        this.attackWaveSent = false
+      }
+      // 超时重置：波次发出超过 60s（≈ 60 ticks）且有新步兵空闲 → 允许下一波
+      // 解决所有步兵都在 AttackMove 状态而无法触发重置的死锁
+      else if (ticksSinceWave >= 60 && idleFootmen.length >= this.attackWaveSize) {
         this.attackWaveSent = false
       }
       // aggressive profile：只要新兵够就继续发波
