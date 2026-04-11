@@ -165,62 +165,100 @@ function createProxyTownhall(group: THREE.Group, color: number) {
 }
 
 function createProxyBarracks(group: THREE.Group, color: number) {
-  // size=3: mid-size production building
+  // size=3: mid-size production building — wide body, big open gate, military motifs
   const stonework = new THREE.Mesh(
-    new THREE.BoxGeometry(2.6, 0.3, 2.4),
+    new THREE.BoxGeometry(2.8, 0.35, 2.6),
     new THREE.MeshLambertMaterial({ color: 0x707060 }),
   )
-  stonework.position.y = 0.15
+  stonework.position.y = 0.175
   group.add(stonework)
 
   const base = new THREE.Mesh(
-    new THREE.BoxGeometry(2.4, 0.9, 2.2),
+    new THREE.BoxGeometry(2.6, 1.1, 2.4),
     new THREE.MeshLambertMaterial({ color: 0x604020 }),
   )
-  base.position.y = 0.75
+  base.position.y = 0.9
   group.add(base)
 
-  const doorSpace = new THREE.Mesh(
-    new THREE.BoxGeometry(0.7, 0.8, 0.06),
-    new THREE.MeshLambertMaterial({ color: 0x1a1208 }),
+  // Wide military gate — primary production cue
+  const gateFrame = new THREE.Mesh(
+    new THREE.BoxGeometry(1.2, 1.1, 0.08),
+    new THREE.MeshLambertMaterial({ color: 0x2a1a0a }),
   )
-  doorSpace.position.set(0, 0.55, 1.13)
-  group.add(doorSpace)
+  gateFrame.position.set(0, 0.7, 1.22)
+  group.add(gateFrame)
 
-  const roof = new THREE.Mesh(
-    new THREE.ConeGeometry(1.9, 1.1, 4),
+  // Gate arch (semicircle above gate)
+  const gateArch = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.6, 0.6, 0.08, 12, 1, false, 0, Math.PI),
     new THREE.MeshLambertMaterial({ color: 0x5c3a1e }),
   )
-  roof.position.y = 1.8
+  gateArch.position.set(0, 1.25, 1.22)
+  gateArch.rotation.z = Math.PI / 2
+  gateArch.rotation.y = Math.PI / 2
+  group.add(gateArch)
+
+  // Shield emblem on facade — cross shape, team color
+  const shieldH = new THREE.Mesh(
+    new THREE.BoxGeometry(0.5, 0.12, 0.06),
+    new THREE.MeshLambertMaterial({ color }),
+  )
+  shieldH.position.set(0, 1.45, 1.24)
+  group.add(shieldH)
+  const shieldV = new THREE.Mesh(
+    new THREE.BoxGeometry(0.12, 0.5, 0.06),
+    new THREE.MeshLambertMaterial({ color }),
+  )
+  shieldV.position.set(0, 1.45, 1.24)
+  group.add(shieldV)
+
+  // Roof
+  const roof = new THREE.Mesh(
+    new THREE.ConeGeometry(2.0, 1.3, 4),
+    new THREE.MeshLambertMaterial({ color: 0x5c3a1e }),
+  )
+  roof.position.y = 2.1
   roof.rotation.y = Math.PI / 4
   group.add(roof)
 
-  const weaponRack = new THREE.Mesh(
-    new THREE.BoxGeometry(0.06, 1.0, 0.06),
-    new THREE.MeshLambertMaterial({ color: 0x5c3a1e }),
-  )
-  weaponRack.position.set(0.85, 0.5, 1.13)
-  group.add(weaponRack)
+  // Crossed swords above gate — production identity
+  const swordMat = new THREE.MeshLambertMaterial({ color: 0xcccccc })
+  const swordL = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.6, 0.04), swordMat)
+  swordL.position.set(-0.15, 1.0, 1.26)
+  swordL.rotation.z = 0.3
+  group.add(swordL)
+  const swordR = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.6, 0.04), swordMat)
+  swordR.position.set(0.15, 1.0, 1.26)
+  swordR.rotation.z = -0.3
+  group.add(swordR)
 
-  const sword1 = new THREE.Mesh(
-    new THREE.BoxGeometry(0.04, 0.5, 0.04),
-    new THREE.MeshLambertMaterial({ color: 0xcccccc }),
+  // Anvil outside gate — crafting/production cue
+  const anvilBase = new THREE.Mesh(
+    new THREE.BoxGeometry(0.4, 0.25, 0.35),
+    new THREE.MeshLambertMaterial({ color: 0x555555 }),
   )
-  sword1.position.set(0.85, 0.7, 1.2)
-  group.add(sword1)
+  anvilBase.position.set(1.0, 0.125, 1.4)
+  group.add(anvilBase)
+  const anvilTop = new THREE.Mesh(
+    new THREE.BoxGeometry(0.5, 0.1, 0.4),
+    new THREE.MeshLambertMaterial({ color: 0x666666 }),
+  )
+  anvilTop.position.set(1.0, 0.3, 1.4)
+  group.add(anvilTop)
 
+  // Team color banner — bigger, on side
   const pole = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.03, 0.03, 1.2, 4),
+    new THREE.CylinderGeometry(0.04, 0.04, 1.5, 4),
     new THREE.MeshLambertMaterial({ color: 0x888888 }),
   )
-  pole.position.set(-0.8, 1.5, 0.7)
+  pole.position.set(-1.2, 1.7, 0.8)
   group.add(pole)
 
   const flag = new THREE.Mesh(
-    new THREE.PlaneGeometry(0.45, 0.3),
+    new THREE.PlaneGeometry(0.6, 0.4),
     new THREE.MeshLambertMaterial({ color, side: THREE.DoubleSide }),
   )
-  flag.position.set(-0.8, 2.0, 0.7)
+  flag.position.set(-1.2, 2.3, 0.8)
   group.add(flag)
 }
 
@@ -241,51 +279,79 @@ function createProxyFarm(group: THREE.Group) {
 }
 
 function createProxyTower(group: THREE.Group, color: number) {
-  // size=2: narrow but not invisible
+  // size=2: tall narrow silhouette — defense/watchtower identity
+  // Taller body (2.4) for skyline visibility at RTS distance
   const base = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.52, 0.62, 1.8, 8),
+    new THREE.CylinderGeometry(0.50, 0.62, 2.4, 8),
     new THREE.MeshLambertMaterial({ color: 0x808070 }),
   )
-  base.position.y = 0.9
+  base.position.y = 1.2
   group.add(base)
 
+  // Team color band — horizontal stripe, primary team identity at distance
+  const band = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.54, 0.54, 0.25, 8),
+    new THREE.MeshLambertMaterial({ color }),
+  )
+  band.position.y = 1.8
+  group.add(band)
+
+  // Wider platform top
   const top = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.62, 0.54, 0.3, 8),
+    new THREE.CylinderGeometry(0.64, 0.54, 0.3, 8),
     new THREE.MeshLambertMaterial({ color: 0x707060 }),
   )
-  top.position.y = 1.95
+  top.position.y = 2.55
   group.add(top)
 
+  // Bigger merlons — readable crenellations
   for (let i = 0; i < 4; i++) {
     const merlon = new THREE.Mesh(
-      new THREE.BoxGeometry(0.15, 0.18, 0.15),
+      new THREE.BoxGeometry(0.22, 0.24, 0.22),
       new THREE.MeshLambertMaterial({ color: 0x707060 }),
     )
     const angle = (i / 4) * Math.PI * 2
-    merlon.position.set(Math.sin(angle) * 0.52, 2.18, Math.cos(angle) * 0.52)
+    merlon.position.set(Math.sin(angle) * 0.55, 2.82, Math.cos(angle) * 0.55)
     group.add(merlon)
   }
 
+  // Arrow slits — dark vertical lines on 4 sides, military defense cue
+  const slitMat = new THREE.MeshLambertMaterial({ color: 0x222222, emissive: 0x110800 })
+  for (let i = 0; i < 4; i++) {
+    const angle = (i / 4) * Math.PI * 2 + Math.PI / 4 // offset from merlons
+    const slit = new THREE.Mesh(
+      new THREE.BoxGeometry(0.04, 0.35, 0.12),
+      slitMat,
+    )
+    const r = 0.53
+    slit.position.set(Math.sin(angle) * r, 1.4, Math.cos(angle) * r)
+    slit.rotation.y = -angle
+    group.add(slit)
+  }
+
+  // Spire — taller for skyline
   const spire = new THREE.Mesh(
-    new THREE.ConeGeometry(0.35, 0.6, 8),
+    new THREE.ConeGeometry(0.35, 0.8, 8),
     new THREE.MeshLambertMaterial({ color: 0x555555 }),
   )
-  spire.position.y = 2.5
+  spire.position.y = 3.1
   group.add(spire)
 
+  // Team color flag — bigger for visibility
   const towerFlag = new THREE.Mesh(
-    new THREE.PlaneGeometry(0.25, 0.18),
+    new THREE.PlaneGeometry(0.35, 0.25),
     new THREE.MeshLambertMaterial({ color, side: THREE.DoubleSide }),
   )
-  towerFlag.position.set(0, 2.7, 0)
+  towerFlag.position.set(0.15, 3.35, 0)
   group.add(towerFlag)
 }
 
 /**
  * 金矿：原创代理方案
  * - 岩石基座
- * - 金色晶体簇
- * - 发光点光源
+ * - 金色晶体簇（加大、加高）
+ * - 金色底环（资源池语义）
+ * - 强发光点光源
  * - 可读的资源点语义
  */
 function createProxyGoldmine(group: THREE.Group) {
@@ -310,34 +376,63 @@ function createProxyGoldmine(group: THREE.Group) {
   bump2.position.set(1.0, 0.8, -0.8)
   group.add(bump2)
 
-  const crystal1 = new THREE.Mesh(
-    new THREE.OctahedronGeometry(0.5, 0),
-    new THREE.MeshLambertMaterial({ color: 0xffdd00, emissive: 0xaa8800 }),
+  // Golden base ring — gold pooling around rock, resource identity
+  const ring = new THREE.Mesh(
+    new THREE.TorusGeometry(1.3, 0.12, 6, 16),
+    new THREE.MeshLambertMaterial({ color: 0xffcc00, emissive: 0x886600 }),
   )
-  crystal1.position.set(0, 1.8, 0)
-  crystal1.scale.set(1, 1.5, 1)
+  ring.position.y = 0.15
+  ring.rotation.x = Math.PI / 2
+  group.add(ring)
+
+  // Main crystal — taller (scale y=2.0) for skyline visibility
+  const crystal1 = new THREE.Mesh(
+    new THREE.OctahedronGeometry(0.55, 0),
+    new THREE.MeshLambertMaterial({ color: 0xffdd00, emissive: 0xcc9900 }),
+  )
+  crystal1.position.set(0, 2.0, 0)
+  crystal1.scale.set(1, 2.0, 1)
   group.add(crystal1)
 
-  const crystalMat = new THREE.MeshLambertMaterial({ color: 0xffcc00, emissive: 0x775500 })
-  const crystal2 = new THREE.Mesh(new THREE.OctahedronGeometry(0.28, 0), crystalMat)
-  crystal2.position.set(0.9, 1.3, 0.6)
-  crystal2.scale.set(1, 1.3, 1)
+  // Secondary crystals — brighter emissive
+  const crystalMat = new THREE.MeshLambertMaterial({ color: 0xffcc00, emissive: 0x997700 })
+  const crystal2 = new THREE.Mesh(new THREE.OctahedronGeometry(0.32, 0), crystalMat)
+  crystal2.position.set(0.9, 1.4, 0.6)
+  crystal2.scale.set(1, 1.5, 1)
   group.add(crystal2)
 
-  const crystal3 = new THREE.Mesh(new THREE.OctahedronGeometry(0.24, 0), crystalMat)
-  crystal3.position.set(-0.7, 1.2, -0.8)
-  crystal3.scale.set(1, 1.2, 1)
+  const crystal3 = new THREE.Mesh(new THREE.OctahedronGeometry(0.28, 0), crystalMat)
+  crystal3.position.set(-0.7, 1.3, -0.8)
+  crystal3.scale.set(1, 1.4, 1)
   group.add(crystal3)
 
-  const crystal4 = new THREE.Mesh(new THREE.OctahedronGeometry(0.2, 0), crystalMat)
-  crystal4.position.set(-0.4, 1.5, 0.9)
+  const crystal4 = new THREE.Mesh(new THREE.OctahedronGeometry(0.24, 0), crystalMat)
+  crystal4.position.set(-0.4, 1.6, 0.9)
+  crystal4.scale.set(1, 1.3, 1)
   group.add(crystal4)
 
-  const crystal5 = new THREE.Mesh(new THREE.OctahedronGeometry(0.18, 0), crystalMat)
-  crystal5.position.set(0.5, 1.0, -1.0)
+  const crystal5 = new THREE.Mesh(new THREE.OctahedronGeometry(0.22, 0), crystalMat)
+  crystal5.position.set(0.5, 1.1, -1.0)
+  crystal5.scale.set(1, 1.3, 1)
   group.add(crystal5)
 
-  const glow = new THREE.PointLight(0xffaa00, 1.5, 8)
-  glow.position.set(0, 2.2, 0)
+  // Extra small crystal for denser cluster
+  const crystal6 = new THREE.Mesh(new THREE.OctahedronGeometry(0.18, 0), crystalMat)
+  crystal6.position.set(0.3, 1.8, -0.5)
+  crystal6.scale.set(1, 1.2, 1)
+  group.add(crystal6)
+
+  // Sparkle points — small bright spheres at crystal tips
+  const sparkleMat = new THREE.MeshBasicMaterial({ color: 0xffffaa })
+  const sparkle1 = new THREE.Mesh(new THREE.SphereGeometry(0.06, 4, 4), sparkleMat)
+  sparkle1.position.set(0, 3.1, 0)
+  group.add(sparkle1)
+  const sparkle2 = new THREE.Mesh(new THREE.SphereGeometry(0.04, 4, 4), sparkleMat)
+  sparkle2.position.set(0.9, 2.0, 0.6)
+  group.add(sparkle2)
+
+  // Stronger golden point light — wider range for RTS visibility
+  const glow = new THREE.PointLight(0xffaa00, 2.5, 12)
+  glow.position.set(0, 2.5, 0)
   group.add(glow)
 }

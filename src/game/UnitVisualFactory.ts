@@ -68,104 +68,132 @@ function applyTeamColorGLTF(group: THREE.Group, team: number, type: string): THR
  * 设计目标：在默认 RTS 镜头（FOV 45, distance 24）下一眼可辨
  *
  * 关键尺寸：
- * - 总高 ~1.4 单位（比 fallback 的 0.86 大 60%+）
- * - 身体最宽处 ~0.9 单位（远距离仍可见）
+ * - 总高 ~1.85 单位（默认测试地图相机下仍有足够屏幕面积）
+ * - 身体最宽处 ~1.0 单位（远距离仍可见，1 tile 间距内不互相吞没）
  * - 团队色占比 >50%（蓝/红是远距离辨识第一要素）
  * - 清晰剪影：圆头 + 宽肩工具包 + 窄腰 = 不是建筑/不是兵
  */
 function createRTSWorkerProxy(team: number): THREE.Group {
   const group = new THREE.Group()
   const color = TEAM_COLORS[team]
+  group.userData.healthBarY = 2.15
+
+  // WC3-like baked contact shadow. Real shadows are camera/lighting dependent;
+  // this keeps the worker anchored and visible on bright sand tiles.
+  const contactShadow = new THREE.Mesh(
+    new THREE.CircleGeometry(0.48, 18),
+    new THREE.MeshBasicMaterial({
+      color: 0x000000,
+      transparent: true,
+      opacity: 0.28,
+      depthWrite: false,
+    }),
+  )
+  contactShadow.rotation.x = -Math.PI / 2
+  contactShadow.position.y = 0.015
+  group.add(contactShadow)
 
   // === 腿部（深色短裤感，区分上下半身）===
   const legL = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.12, 0.14, 0.35, 6),
+    new THREE.CylinderGeometry(0.14, 0.16, 0.42, 6),
     new THREE.MeshLambertMaterial({ color: 0x4a3518 }),
   )
-  legL.position.set(-0.1, 0.175, 0)
+  legL.position.set(-0.13, 0.24, 0)
   group.add(legL)
 
   const legR = legL.clone()
-  legR.position.set(0.1, 0.175, 0)
+  legR.position.set(0.13, 0.24, 0)
   group.add(legR)
 
-  // === 身体（宽圆柱，暖色工作服）===
+  // === 身体（更宽更亮的工作服，避免在树影和暗地面里丢失）===
   const body = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.25, 0.30, 0.55, 8),
-    new THREE.MeshLambertMaterial({ color: 0xa07840 }),
+    new THREE.CylinderGeometry(0.32, 0.40, 0.72, 8),
+    new THREE.MeshLambertMaterial({ color: 0xb88a48 }),
   )
-  body.position.y = 0.625
+  body.position.y = 0.78
   group.add(body)
 
   // === 团队色大胸标（正面 + 背面，远距离可见）===
   const tabardFront = new THREE.Mesh(
-    new THREE.BoxGeometry(0.42, 0.35, 0.04),
+    new THREE.BoxGeometry(0.58, 0.50, 0.05),
     new THREE.MeshLambertMaterial({ color }),
   )
-  tabardFront.position.set(0, 0.7, 0.26)
+  tabardFront.position.set(0, 0.84, 0.34)
   group.add(tabardFront)
 
   const tabardBack = new THREE.Mesh(
-    new THREE.BoxGeometry(0.42, 0.35, 0.04),
+    new THREE.BoxGeometry(0.58, 0.50, 0.05),
     new THREE.MeshLambertMaterial({ color }),
   )
-  tabardBack.position.set(0, 0.7, -0.26)
+  tabardBack.position.set(0, 0.84, -0.34)
   group.add(tabardBack)
+
+  // === 侧肩队伍色块：从 RTS 斜上方看时比正面胸标更稳定 ===
+  const shoulderL = new THREE.Mesh(
+    new THREE.BoxGeometry(0.18, 0.20, 0.44),
+    new THREE.MeshLambertMaterial({ color }),
+  )
+  shoulderL.position.set(-0.38, 1.02, 0)
+  group.add(shoulderL)
+
+  const shoulderR = shoulderL.clone()
+  shoulderR.position.x = 0.38
+  group.add(shoulderR)
 
   // === 团队色宽腰带 ===
   const belt = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.31, 0.31, 0.10, 8),
+    new THREE.CylinderGeometry(0.41, 0.41, 0.12, 8),
     new THREE.MeshLambertMaterial({ color }),
   )
-  belt.position.y = 0.55
+  belt.position.y = 0.58
   group.add(belt)
 
   // === 头（更大更圆，肤色）===
   const head = new THREE.Mesh(
-    new THREE.SphereGeometry(0.19, 10, 8),
+    new THREE.SphereGeometry(0.24, 12, 8),
     new THREE.MeshLambertMaterial({ color: 0xddc8a0 }),
   )
-  head.position.y = 1.08
+  head.position.y = 1.34
   group.add(head)
 
   // === 团队色帽子（宽沿帽，远距离看得出是帽子）===
   // 帽沿
   const brim = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.24, 0.24, 0.03, 10),
+    new THREE.CylinderGeometry(0.36, 0.36, 0.04, 12),
     new THREE.MeshLambertMaterial({ color }),
   )
-  brim.position.y = 1.18
+  brim.position.y = 1.52
   group.add(brim)
   // 帽顶
   const hatTop = new THREE.Mesh(
-    new THREE.ConeGeometry(0.17, 0.22, 8),
+    new THREE.ConeGeometry(0.25, 0.34, 10),
     new THREE.MeshLambertMaterial({ color }),
   )
-  hatTop.position.y = 1.30
+  hatTop.position.y = 1.71
   group.add(hatTop)
 
   // === 背包/工具（背影辨识特征：worker 背着东西）===
   const backpack = new THREE.Mesh(
-    new THREE.BoxGeometry(0.28, 0.30, 0.18),
+    new THREE.BoxGeometry(0.40, 0.44, 0.26),
     new THREE.MeshLambertMaterial({ color: 0x6b4e1f }),
   )
-  backpack.position.set(0, 0.75, -0.22)
+  backpack.position.set(0, 0.88, -0.36)
   group.add(backpack)
 
   // === 镐（侧面伸出的工具，剪影辨识）===
   const pickShaft = new THREE.Mesh(
-    new THREE.BoxGeometry(0.06, 0.60, 0.06),
+    new THREE.BoxGeometry(0.07, 0.86, 0.07),
     new THREE.MeshLambertMaterial({ color: 0x8b6914 }),
   )
-  pickShaft.position.set(0.30, 0.80, 0)
+  pickShaft.position.set(0.48, 0.96, 0)
   pickShaft.rotation.z = -0.3
   group.add(pickShaft)
 
   const pickHead = new THREE.Mesh(
-    new THREE.BoxGeometry(0.20, 0.08, 0.08),
+    new THREE.BoxGeometry(0.32, 0.10, 0.10),
     new THREE.MeshLambertMaterial({ color: 0x999999 }),
   )
-  pickHead.position.set(0.38, 1.10, 0)
+  pickHead.position.set(0.60, 1.38, 0)
   group.add(pickHead)
 
   // 开启阴影

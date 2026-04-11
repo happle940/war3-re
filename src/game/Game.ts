@@ -1083,7 +1083,7 @@ export class Game {
     group.add(fill)
 
     // 定位在单位头顶
-    const yPos = unit.isBuilding ? (BUILDINGS[unit.type]?.size ?? 1) * 0.5 + 0.5 : 1.6
+    const yPos = this.getHealthBarHeight(unit)
     group.position.copy(unit.mesh.position)
     group.position.y += yPos
 
@@ -1101,7 +1101,7 @@ export class Game {
       }
 
       const pct = Math.max(0, unit.hp / unit.maxHp)
-      const yPos = unit.isBuilding ? (BUILDINGS[unit.type]?.size ?? 1) * 0.5 + 0.5 : 1.6
+      const yPos = this.getHealthBarHeight(unit)
 
       // 位置跟随单位
       bars.bg.parent!.position.copy(unit.mesh.position)
@@ -1124,6 +1124,15 @@ export class Game {
       this.scene.remove(bars.bg.parent!)
       this.healthBars.delete(u)
     }
+  }
+
+  private getHealthBarHeight(unit: Unit): number {
+    if (unit.isBuilding) {
+      return (BUILDINGS[unit.type]?.size ?? 1) * 0.5 + 0.5
+    }
+
+    const visualHeight = unit.mesh.userData.healthBarY
+    return typeof visualHeight === 'number' ? visualHeight : 1.6
   }
 
   // ==================== 死亡处理 ====================
