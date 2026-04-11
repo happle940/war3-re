@@ -138,6 +138,86 @@ Allowed M1 outcomes:
 - `pass with visual debt`: move to M2 and track debt.
 - `fail`: convert failure into Codex/GLM tasks and repeat only the failed slice, not the whole milestone.
 
+### M1 decision packet draft
+
+This packet is what Codex should present when M1 entry criteria are green. Do not ask the user to run it until current GLM work is accepted, CI is green for the target commit, and local runtime leftovers are cleaned.
+
+Live URL:
+
+- https://happle940.github.io/war3-re/
+
+Local fallback:
+
+```bash
+npm install
+npm run dev
+```
+
+Basic controls to test:
+
+- Left click selects one unit or building.
+- Left drag box-selects units.
+- Shift + left click or Shift + box-select appends to the current selection.
+- Right click ground moves selected units.
+- Right click goldmine sends workers to gather gold.
+- Right click trees sends workers to gather lumber.
+- Select worker, click a build button, then left click ground to place a building.
+- `A` then left click ground performs attack-move.
+- `S` stops selected units.
+- `H` holds selected units.
+- `Ctrl+1..9` saves a control group; `1..9` recalls it.
+- `Tab` cycles subgroup selection.
+- Select a completed production building, then `Y` sets rally point mode.
+- Right click or `Esc` cancels placement, rally, or attack-move mode.
+
+Objective entry criteria before user playtest:
+
+- `npm run build` passes on the final target commit.
+- `npx tsc --noEmit -p tsconfig.app.json` passes on the final target commit.
+- `npm run test:runtime` passes on the final target commit.
+- GitHub Actions deploy workflow is green for the same commit that Pages serves.
+- GLM's active placement-controller extraction is either accepted and verified or explicitly deferred with no dirty code.
+- No Vite, Playwright, Chromium, or `chrome-headless-shell` process is left running locally.
+
+Automated proof already expected in M1:
+
+- `tests/command-regression.spec.ts`: move, stop, hold, attack-move, queue, and override contracts.
+- `tests/resource-supply-regression.spec.ts`: resource spending, supply cap, training, and AI spending contracts.
+- `tests/unit-visibility-regression.spec.ts`: worker visibility and post-refresh scale/readability measurements.
+- `tests/selection-input-regression.spec.ts`: box select, Shift append, Tab subgroup, and control group selection rings.
+- `tests/pathing-footprint-regression.spec.ts`: blocked starts, building footprints, and pathing semantics.
+- `tests/ai-economy-regression.spec.ts`: AI opening economy and production behavior.
+- `tests/asset-pipeline-regression.spec.ts`: asset refresh, material isolation, and scale preservation.
+- `tests/building-agency-regression.spec.ts`: selected worker owns building placement and fallback builder rules.
+- `tests/death-cleanup-regression.spec.ts`: dead unit/building references, footprints, builders, and targets are cleaned.
+
+Human playtest script, 10-20 minutes:
+
+1. Open the live URL in a normal browser tab, not while local Playwright/Vite tests are running.
+2. At default camera, confirm whether worker bodies are visible without relying on health bars.
+3. Select one worker, order gold, order lumber, then interrupt with a move command. Judge whether control feels immediate.
+4. Select a specific worker, place one building, and verify that same worker goes to build it.
+5. Box-select workers, append with Shift, save a control group, recall it, and cycle with Tab.
+6. Train units, attack-move toward the enemy side, then manually pull a fighting unit back with right click.
+7. Let the AI run until the first pressure wave or until it obviously stalls.
+
+Only ask the user these M1 questions:
+
+1. Can you see workers and identify core buildings at default camera distance?
+2. Do selection, movement, stop, attack-move, and build placement feel obedient?
+3. Can you gather, build, train, and fight for 5-10 minutes without a blocking bug?
+4. Does the AI create enough pressure to test the loop?
+5. Does the base layout feel basically playable, even if not yet beautiful?
+6. Choose one outcome: `pass`, `pass with visual debt`, `fail controls`, `fail visibility`, `fail economy`, `fail AI`, `fail scale/layout`.
+
+Failure routing:
+
+- `fail controls`: Codex owns command/input diagnosis; GLM gets one bounded regression/fix task after contract definition.
+- `fail visibility`: Codex owns visual/readability fix because human perception is the source of truth.
+- `fail economy`: GLM can own resource/supply/AI deterministic fixes with runtime tests.
+- `fail AI`: GLM can own AI opening/wave repair if the expected behavior is specific.
+- `fail scale/layout`: Codex owns benchmark and acceptance criteria; GLM can implement bounded footprint/layout changes.
+
 ## M2 — Warcraft-Like Feel Vertical Slice
 
 Status: `planned`.

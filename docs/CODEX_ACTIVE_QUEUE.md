@@ -62,7 +62,9 @@ GLM owns:
 | C07 — CI Node 24 Migration | done | 2026-04-11 | Workflow now opts JavaScript actions and app verification into Node 24. |
 | C08 — Game.ts Risk Map | done | 2026-04-11 | Added responsibility zones, coverage gaps, no-go zones, and safe extraction order. |
 | C09 — Continuous Execution Loop Hardening | done | 2026-04-11 | Root-cause fix for Codex stopping: operating model now requires next-task selection, GLM stall handling, and non-conflicting Codex work while GLM runs. |
-| C10 — M1 Gate Packet Prep | ready | 2026-04-11 | Next Codex-owned work after cleanup contracts: prepare the first playable slice decision packet and identify remaining objective blockers before asking the user to play. |
+| C10 — M1 Gate Packet Prep | done | 2026-04-11 | Prepared concrete M1 playtest packet, controls, objective entry criteria, automated proof list, and failure routing. |
+| C11 — Review GLM Placement Controller Slice | watch | 2026-04-11 | GLM Task 10 is in progress. Codex must review file scope, behavior preservation, verification, and commit before accepting. |
+| C12 — M1 Candidate Audit | ready | 2026-04-11 | After GLM Task 10 is accepted or deferred, produce the final M1 candidate status: CI/deploy, runtime pack, local cleanup, remaining blockers. |
 
 ## Task Cards
 
@@ -303,7 +305,7 @@ Closeout:
 
 ### C10 — M1 Gate Packet Prep
 
-Status: `ready`.
+Status: `done`.
 
 Goal: prepare the large milestone packet for `M1 — First Playable RTS Slice` so the user is only asked to judge the project at a meaningful node.
 
@@ -320,6 +322,74 @@ Done when:
 - Remaining objective blockers are listed separately from human visual/taste questions.
 - The user checklist is concrete and limited to 5-7 questions.
 - Live URL and expected controls are included.
+
+Verification:
+
+```bash
+git diff --check
+```
+
+Closeout:
+
+- Added a concrete M1 decision packet to `docs/HUMAN_DECISION_GATES.md`.
+- Added live URL, local fallback, controls, objective entry criteria, automated proof list, human playtest script, 6 user questions, and failure routing.
+- Updated `README.md` with live URL and basic controls.
+
+### C11 — Review GLM Placement Controller Slice
+
+Status: `watch`.
+
+Trigger: GLM Task 10 completes or stops.
+
+Goal: accept or reject the `PlacementController` extraction based on behavior preservation and verification, not report tone.
+
+Review checklist:
+
+- Dirty files are limited to GLM allowed scope.
+- `PlacementController` only owns placement mode, workers, and ghost mesh lifecycle.
+- `enterPlacementMode()`, `exitPlacementMode()`, and `placeBuilding()` behavior is preserved.
+- No raycasting, resource spending, spawning, command issuing, path planning, camera, terrain, asset, or AI behavior was moved.
+- Selected worker still owns the building order.
+- Placement cancel still removes ghost mesh and clears mode/workers.
+- Build, app typecheck, and affected runtime packs pass.
+- Local browser/runtime leftovers are cleaned.
+
+Required verification:
+
+```bash
+npm run build
+npx tsc --noEmit -p tsconfig.app.json
+./scripts/run-runtime-tests.sh tests/building-agency-regression.spec.ts tests/selection-input-regression.spec.ts tests/pathing-footprint-regression.spec.ts --reporter=list
+```
+
+Allowed follow-up files:
+
+- `docs/GLM_READY_TASK_QUEUE.md`
+- `docs/GAME_TS_RISK_MAP.md`
+- GLM-touched files only if Codex needs a narrow correction.
+
+### C12 — M1 Candidate Audit
+
+Status: `ready`.
+
+Goal: decide whether the project is ready to present the M1 milestone packet to the user, or whether objective blockers remain.
+
+Prerequisites:
+
+- GLM Task 10 is accepted, rejected, or deferred with clean working tree.
+- Latest target commit is known.
+
+Audit steps:
+
+1. Check `git status --short --branch`.
+2. Check GitHub Actions for the target commit.
+3. Run or confirm `npm run build`.
+4. Run or confirm `npx tsc --noEmit -p tsconfig.app.json`.
+5. Run or confirm `npm run test:runtime`.
+6. Run `./scripts/cleanup-local-runtime.sh`.
+7. Check no local Vite, Playwright, Chromium, or `chrome-headless-shell` process remains.
+8. If all green, present the M1 packet from `docs/HUMAN_DECISION_GATES.md`.
+9. If not green, convert failures into Codex/GLM queue tasks before asking the user to play.
 
 Verification:
 
