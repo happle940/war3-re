@@ -129,6 +129,8 @@ Codex/GLM 先确认：
 
 状态：计划中。
 
+比例/布局基准规格：[M3_WAR3_FEEL_BENCHMARK.zh-CN.md](M3_WAR3_FEEL_BENCHMARK.zh-CN.md)
+
 ### 这个里程碑要回答的问题
 
 它是否开始像一个有 War3 味的 RTS 战场，而不是网页原型？
