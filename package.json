@@ -25,7 +25,8 @@
     "test:death-cleanup": "./scripts/run-runtime-tests.sh tests/death-cleanup-regression.spec.ts --reporter=list",
     "test:construction": "./scripts/run-runtime-tests.sh tests/construction-lifecycle-regression.spec.ts --reporter=list",
     "test:static-defense": "./scripts/run-runtime-tests.sh tests/static-defense-regression.spec.ts --reporter=list",
-    "test:combat-control": "./scripts/run-runtime-tests.sh tests/combat-control-regression.spec.ts --reporter=list"
+    "test:combat-control": "./scripts/run-runtime-tests.sh tests/combat-control-regression.spec.ts --reporter=list",
+    "test:m2": "./scripts/run-runtime-tests.sh tests/construction-lifecycle-regression.spec.ts tests/static-defense-regression.spec.ts tests/command-card-state-regression.spec.ts tests/unit-presence-regression.spec.ts tests/combat-control-regression.spec.ts --reporter=list"
   },
   "dependencies": {
     "jszip": "^3.10.1",

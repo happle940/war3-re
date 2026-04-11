@@ -25,7 +25,7 @@ Before every user milestone, Codex must prepare:
 |---|---|---:|---|---|
 | M0 — Project Operating Foundation | done | no | repo, deploy, CI runtime gate, Codex queue, GLM queue | none |
 | M1 — First Playable RTS Slice | done | yes | readable base, command ownership, gather/build/train/combat, first AI pressure all runtime-proven | Passed with visual debt. |
-| M2 — War3 Core Systems Alignment | in progress | yes | construction lifecycle, tower combat, command disabled reasons, cancellation, collision baseline, and combat-control semantics runtime-proven | Does the game now obey Warcraft-like RTS rules instead of isolated commands? |
+| M2 — War3 Core Systems Alignment | ready for Codex review | yes | construction lifecycle, tower combat, command disabled reasons, cancellation, collision baseline, and combat-control semantics runtime-proven | Does the game now obey Warcraft-like RTS rules instead of isolated commands? |
 | M3 — Warcraft-Like Feel Vertical Slice | planned | yes | M2 passed; scale, camera, terrain grammar, visual direction prepared | Does it feel close enough to the intended Warcraft-like direction? |
 | M4 — Human vs AI Alpha Match | planned | yes | one complete 10-15 minute match loop with win/loss and AI recovery | Is the core game loop worth balancing/content expansion? |
 | M5 — Content And Identity Direction | planned | yes | technical gameplay alpha stable; legal art/style options prepared | Which content/art direction should become the product identity? |
@@ -228,7 +228,7 @@ Failure routing:
 
 ## M2 — War3 Core Systems Alignment
 
-Status: `next`.
+Status: `ready for Codex review`.
 
 Why this milestone exists:
 
@@ -247,6 +247,29 @@ M2 turns isolated verbs into RTS systems:
 M2 user question:
 
 > Does the live build now obey the kind of RTS rules a Warcraft III player expects, even if the art is still proxy?
+
+### Automated entry criteria
+
+Run before asking the user:
+
+```bash
+npm run build
+npx tsc --noEmit -p tsconfig.app.json
+npm run test:m2
+./scripts/cleanup-local-runtime.sh
+```
+
+`npm run test:m2` runs exactly the five M2-relevant regression specs:
+
+| Spec | M2 subsystem | Tests |
+|------|-------------|-------|
+| `tests/construction-lifecycle-regression.spec.ts` | M2.1 Construction lifecycle | 6 tests: stop leaves resumable, worker resumes, cancel removes + releases occupancy, deterministic refund + no double refund, cancel clears selected HUD, cancel clears builder state |
+| `tests/static-defense-regression.spec.ts` | M2.2 Static defense combat | 7 tests: completed tower damages enemy, under-construction does not attack, no friendly fire, no chase movement, target death → clear + reacquire, ignores buildings/goldmine, no severe errors |
+| `tests/command-card-state-regression.spec.ts` | M2.3 Command-card disabled reasons | 7 tests: supply-capped shows reason + no spend, gold-insufficient shows reason + no queue, lumber-insufficient shows reason + no placement, sufficient commands enabled + queues normally, supply refresh after farm completes, resource refresh without reselection, no severe errors |
+| `tests/unit-presence-regression.spec.ts` | M2.4 Unit collision baseline | 4 tests: starting workers outside blockers + not stacked, exact overlap separates deterministically, group movement ends separated, gold gatherers do not collapse into one point |
+| `tests/combat-control-regression.spec.ts` | M2.5 Combat-control contract | 8 tests: move overrides attacking + suppression window, suppression expiry allows re-aggro, attack-move does not suppress, stop clears previousState chain, hold position acquires in range + no chase, manual move clears stale previousState, attack command clears suppression, Moving units not interrupted by auto-aggro |
+
+Total: 32 automated assertions. All must pass.
 
 Before asking the user, Codex and GLM must complete:
 
@@ -284,6 +307,10 @@ Before asking the user, Codex and GLM must complete:
 - Hold position uses local acquisition and does not chase outside hold range.
 
 M2 user decision packet:
+
+See `docs/M2_GATE_PACKET.zh-CN.md` for the full 10-15 minute manual check script.
+
+Summary:
 
 1. Can interrupted construction be resumed naturally?
 2. Can construction be canceled without weird resource/unit state?
@@ -431,7 +458,7 @@ Before M7:
 
 Current next user milestone: `M2 — War3 Core Systems Alignment`.
 
-Status: `objective work in progress`.
+Status: `ready for Codex review`.
 
 Last completed user gate: `M1 — First Playable RTS Slice`.
 
