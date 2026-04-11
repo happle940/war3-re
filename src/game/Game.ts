@@ -2433,103 +2433,95 @@ export class Game {
       shieldRim.position.set(-0.38, 0.55, 0)
       group.add(shieldRim)
     } else if (type === 'townhall') {
-      // 城镇大厅：更宏伟的石基 + 木墙 + 大型四坡顶 + 双旗 + 大门
-      // 底层石基
+      // 城镇大厅：size=4 的锚定建筑，视觉上要大于所有其他建筑
       const stone = new THREE.Mesh(
-        new THREE.BoxGeometry(2.8, 0.6, 2.8),
+        new THREE.BoxGeometry(3.6, 0.6, 3.6),
         new THREE.MeshLambertMaterial({ color: 0x808070 }),
       )
       stone.position.y = 0.3
       group.add(stone)
-      // 主墙体
       const walls = new THREE.Mesh(
-        new THREE.BoxGeometry(2.6, 1.1, 2.6),
+        new THREE.BoxGeometry(3.4, 1.2, 3.4),
         new THREE.MeshLambertMaterial({ color: 0xa08050 }),
       )
-      walls.position.y = 1.05
+      walls.position.y = 1.1
       group.add(walls)
-      // 木横梁（深色装饰）
       const beam = new THREE.Mesh(
-        new THREE.BoxGeometry(2.7, 0.08, 2.7),
+        new THREE.BoxGeometry(3.5, 0.08, 3.5),
         new THREE.MeshLambertMaterial({ color: 0x5c3a1e }),
       )
       beam.position.y = 0.65
       group.add(beam)
-      // 四坡屋顶（更高更醒目）
       const roof = new THREE.Mesh(
-        new THREE.ConeGeometry(2.1, 1.4, 4),
+        new THREE.ConeGeometry(2.6, 1.6, 4),
         new THREE.MeshLambertMaterial({ color: 0x8b4513 }),
       )
-      roof.position.y = 2.2
+      roof.position.y = 2.5
       roof.rotation.y = Math.PI / 4
       group.add(roof)
-      // 旗杆（更高）
       const pole = new THREE.Mesh(
         new THREE.CylinderGeometry(0.04, 0.04, 2.5, 4),
         new THREE.MeshLambertMaterial({ color: 0x888888 }),
       )
-      pole.position.set(1.1, 2.5, 0)
+      pole.position.set(1.4, 2.8, 0)
       group.add(pole)
-      // 团队色旗帜（更大）
       const flag = new THREE.Mesh(
         new THREE.PlaneGeometry(0.6, 0.4),
         new THREE.MeshLambertMaterial({ color, side: THREE.DoubleSide }),
       )
-      flag.position.set(1.4, 3.5, 0)
+      flag.position.set(1.7, 3.8, 0)
       group.add(flag)
-      // 大门（拱形暗示）
       const door = new THREE.Mesh(
-        new THREE.BoxGeometry(0.7, 0.9, 0.06),
+        new THREE.BoxGeometry(0.8, 1.0, 0.06),
         new THREE.MeshLambertMaterial({ color: 0x5c3a1e }),
       )
-      door.position.set(0, 0.65, 1.33)
+      door.position.set(0, 0.7, 1.73)
       group.add(door)
       // 门上拱形装饰
       const doorArch = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.35, 0.35, 0.06, 8, 1, false, 0, Math.PI),
+        new THREE.CylinderGeometry(0.4, 0.4, 0.06, 8, 1, false, 0, Math.PI),
         new THREE.MeshLambertMaterial({ color: 0x706050 }),
       )
-      doorArch.position.set(0, 1.1, 1.33)
+      doorArch.position.set(0, 1.2, 1.73)
       doorArch.rotation.z = Math.PI / 2
       doorArch.rotation.y = Math.PI / 2
       group.add(doorArch)
       // 窗户暗示（两侧各一个）
       const winMat = new THREE.MeshLambertMaterial({ color: 0xddc880, emissive: 0x332200 })
-      const win1 = new THREE.Mesh(new THREE.PlaneGeometry(0.3, 0.3), winMat)
-      win1.position.set(0.8, 1.1, 1.31)
+      const win1 = new THREE.Mesh(new THREE.PlaneGeometry(0.35, 0.35), winMat)
+      win1.position.set(1.0, 1.15, 1.73)
       group.add(win1)
-      const win2 = new THREE.Mesh(new THREE.PlaneGeometry(0.3, 0.3), winMat)
-      win2.position.set(-0.8, 1.1, 1.31)
+      const win2 = new THREE.Mesh(new THREE.PlaneGeometry(0.35, 0.35), winMat)
+      win2.position.set(-1.0, 1.15, 1.73)
       group.add(win2)
     } else if (type === 'barracks') {
-      // 兵营：更明显的军事用途 + 武器架 + 团队色旗帜 + 训练场暗示
-      // 石基
+      // 兵营：size=3 生产建筑
       const stonework = new THREE.Mesh(
-        new THREE.BoxGeometry(2.2, 0.3, 2.0),
+        new THREE.BoxGeometry(2.6, 0.3, 2.4),
         new THREE.MeshLambertMaterial({ color: 0x707060 }),
       )
       stonework.position.y = 0.15
       group.add(stonework)
       // 主墙体
       const base = new THREE.Mesh(
-        new THREE.BoxGeometry(2.0, 0.9, 1.8),
+        new THREE.BoxGeometry(2.4, 0.9, 2.2),
         new THREE.MeshLambertMaterial({ color: 0x604020 }),
       )
       base.position.y = 0.75
       group.add(base)
       // 门口开口（暗色凹陷）
       const doorSpace = new THREE.Mesh(
-        new THREE.BoxGeometry(0.6, 0.7, 0.06),
+        new THREE.BoxGeometry(0.7, 0.8, 0.06),
         new THREE.MeshLambertMaterial({ color: 0x1a1208 }),
       )
-      doorSpace.position.set(0, 0.55, 0.93)
+      doorSpace.position.set(0, 0.55, 1.13)
       group.add(doorSpace)
-      // 屋顶（更尖）
+      // 屋顶
       const roof = new THREE.Mesh(
-        new THREE.ConeGeometry(1.6, 1.0, 4),
+        new THREE.ConeGeometry(1.9, 1.1, 4),
         new THREE.MeshLambertMaterial({ color: 0x5c3a1e }),
       )
-      roof.position.y = 1.7
+      roof.position.y = 1.8
       roof.rotation.y = Math.PI / 4
       group.add(roof)
       // 武器架（门口旁竖杆）
@@ -2537,14 +2529,14 @@ export class Game {
         new THREE.BoxGeometry(0.06, 1.0, 0.06),
         new THREE.MeshLambertMaterial({ color: 0x5c3a1e }),
       )
-      weaponRack.position.set(0.7, 0.5, 0.93)
+      weaponRack.position.set(0.85, 0.5, 1.13)
       group.add(weaponRack)
       // 挂着的剑（武器架上）
       const sword1 = new THREE.Mesh(
         new THREE.BoxGeometry(0.04, 0.5, 0.04),
         new THREE.MeshLambertMaterial({ color: 0xcccccc }),
       )
-      sword1.position.set(0.7, 0.7, 1.0)
+      sword1.position.set(0.85, 0.7, 1.2)
       group.add(sword1)
       // 旗杆 + 团队色旗
       const pole = new THREE.Mesh(
@@ -2574,16 +2566,16 @@ export class Game {
       roof.position.y = 0.7
       group.add(roof)
     } else if (type === 'tower') {
-      // 箭塔：石质 + 城垛 + 团队色旗帜
+      // 箭塔：size=2，窄但可见
       const base = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.38, 0.48, 1.8, 8),
+        new THREE.CylinderGeometry(0.52, 0.62, 1.8, 8),
         new THREE.MeshLambertMaterial({ color: 0x808070 }),
       )
       base.position.y = 0.9
       group.add(base)
       // 城垛顶部
       const top = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.48, 0.4, 0.3, 8),
+        new THREE.CylinderGeometry(0.62, 0.54, 0.3, 8),
         new THREE.MeshLambertMaterial({ color: 0x707060 }),
       )
       top.position.y = 1.95
@@ -2595,12 +2587,12 @@ export class Game {
           new THREE.MeshLambertMaterial({ color: 0x707060 }),
         )
         const angle = (i / 4) * Math.PI * 2
-        merlon.position.set(Math.sin(angle) * 0.38, 2.18, Math.cos(angle) * 0.38)
+        merlon.position.set(Math.sin(angle) * 0.52, 2.18, Math.cos(angle) * 0.52)
         group.add(merlon)
       }
       // 尖顶
       const spire = new THREE.Mesh(
-        new THREE.ConeGeometry(0.3, 0.6, 8),
+        new THREE.ConeGeometry(0.35, 0.6, 8),
         new THREE.MeshLambertMaterial({ color: 0x555555 }),
       )
       spire.position.y = 2.5
