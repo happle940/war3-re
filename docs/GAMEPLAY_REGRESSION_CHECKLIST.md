@@ -150,7 +150,7 @@
 - [x] 建筑运行时占地面积与 BUILDINGS[type].size 一致（内部全占，外部无泄漏）
 - [x] PlacementValidator 拒绝重叠、允许相邻/对角放置
 - [x] Worker → 金矿/树木 planPath 返回有效路径（非退化 null）
-- [x] findPath: blocked goal 自动重定向到最近可达位置；blocked start 返回直线 fallback
+- [x] findPath: blocked goal 自动重定向到最近可达位置；blocked start 返回 null
 - [x] 启动无严重控制台错误
 
 ## 仍未被自动化覆盖（需人工验证）
@@ -165,8 +165,8 @@
 
 | 日期 | 验证人 | 结果 | 备注 |
 |------|--------|------|------|
-| 2026-04-11 | GLM-5.1 | Pathing/Footprint Regression | `pathing-footprint-regression.spec.ts`: 6 tests green. No bugs found — pure regression protection for occupancy, footprint, pathing contracts. |
-| 2026-04-11 | Codex | Runtime Full Pack | `npm run test:runtime`: 39 tests green. Includes closeout, command, first-five, resource/supply, unit visibility, selection/input. |
+| 2026-04-11 | GLM-5.1 + Codex | Pathing/Footprint Regression | `pathing-footprint-regression.spec.ts`: 6 tests green. Codex tightened the PathFinder blocked-start assertion to test `findPath` directly instead of accepting `planPath` fallback. |
+| 2026-04-11 | Codex | Runtime Full Pack | `npm run test:runtime`: 45 tests green. Includes closeout, command, first-five, resource/supply, unit visibility, selection/input, pathing/footprint. |
 | 2026-04-11 | GLM-5.1 + Codex | Selection/Input Regression | `selection-input-regression.spec.ts`: 6 tests green. Box select, right-drag guard, Shift+append via mouseup modifier state, Tab subgroup rings, control group rings. Codex added the spec to `npm run test:runtime`. |
 | 2026-04-11 | Codex | Unit Visibility Regression | `unit-visibility-regression.spec.ts`: 2 tests green. Fixed W3X map-load camera reset that left player workers offscreen. |
 | 2026-04-11 | GLM-5.1 | Resource/Supply Regression | resource-supply-regression.spec.ts: 9 tests green. Supply, training, resource flow, AI spending contracts proven. |

@@ -14,6 +14,7 @@
  *  6. No severe console errors on startup
  */
 import { test, expect, type Page } from '@playwright/test'
+import { findPath } from '../src/game/PathFinder'
 
 const BASE = 'http://127.0.0.1:4173'
 
@@ -475,107 +476,27 @@ test.describe('Pathing/Footprint Contract', () => {
   // ----------------------------------------------------------
   // 5. PathFinder blocked-target and blocked-start contracts
   // ----------------------------------------------------------
-  test('findPath: blocked goal redirects, blocked start returns null', async ({ page }) => {
-    await waitForGame(page)
+  test('findPath: blocked goal redirects, blocked start returns null', async () => {
+    const blocked = new Set<string>(['5,5', '1,1'])
+    const grid = {
+      width: 10,
+      height: 10,
+      isInside: (tx: number, tz: number) => tx >= 0 && tz >= 0 && tx < 10 && tz < 10,
+      isBlocked: (tx: number, tz: number) => blocked.has(`${tx},${tz}`),
+    }
 
-    const result = await page.evaluate(() => {
-      const g = (window as any).__war3Game
-      if (!g) return null
+    const pathToBlockedGoal = findPath(2, 2, 5, 5, grid as any)
+    expect(pathToBlockedGoal, 'walkable start to blocked goal should redirect to adjacent walkable tile').not.toBeNull()
+    expect(pathToBlockedGoal!.length).toBeGreaterThan(0)
 
-      const pathingGrid = g.pathingGrid
+    const last = pathToBlockedGoal![pathToBlockedGoal!.length - 1]
+    expect(grid.isBlocked(last[0], last[1]), `final redirected tile ${last.join(',')} must be walkable`).toBe(false)
+    expect(last, 'redirected final tile should be near the blocked goal').not.toEqual([5, 5])
+    expect(Math.abs(last[0] - 5)).toBeLessThanOrEqual(5)
+    expect(Math.abs(last[1] - 5)).toBeLessThanOrEqual(5)
 
-      // Find a walkable tile and an occupied tile
-      let walkableTile: [number, number] | null = null
-      let occupiedTile: [number, number] | null = null
-
-      // Player TH is at anchor (10,12), size=4 → occupies tiles (10-13, 12-15)
-      // Check tiles near player base
-      for (let tx = 5; tx < 25; tx++) {
-        for (let tz = 5; tz < 25; tz++) {
-          if (!pathingGrid.isInside(tx, tz)) continue
-          if (!walkableTile && !pathingGrid.isBlocked(tx, tz)) {
-            walkableTile = [tx, tz]
-          }
-          if (!occupiedTile && pathingGrid.isOccupied(tx, tz) && pathingGrid.isTerrainWalkable(tx, tz)) {
-            occupiedTile = [tx, tz]
-          }
-          if (walkableTile && occupiedTile) break
-        }
-        if (walkableTile && occupiedTile) break
-      }
-
-      if (!walkableTile || !occupiedTile) {
-        return { ok: false, reason: `walkable=${!!walkableTile} occupied=${!!occupiedTile}` }
-      }
-
-      // Test A: walkable start → occupied goal → should return non-null path
-      const sp = g.spawnUnit('footman', 0, walkableTile[0], walkableTile[1])
-      const V3 = sp.mesh.position.constructor
-
-      // planPath to occupied tile
-      const goalWorld = new V3(occupiedTile[0] + 0.5, 0, occupiedTile[1] + 0.5)
-      const pathToBlocked = g.planPath(sp, goalWorld)
-
-      const footmanStartTx = Math.floor(sp.mesh.position.x)
-      const footmanStartTz = Math.floor(sp.mesh.position.z)
-
-      // Verify footman is on a walkable tile
-      const startBlocked = pathingGrid.isBlocked(footmanStartTx, footmanStartTz)
-
-      // Test B: spawn on a blocked tile (manually move unit into occupied area)
-      // This tests the blocked-start contract.
-      // We can't spawn there, so we manually set position.
-      const sp2 = g.spawnUnit('footman', 0, walkableTile[0] + 10, walkableTile[1])
-      // Move to an occupied tile manually
-      sp2.mesh.position.x = occupiedTile[0] + 0.5
-      sp2.mesh.position.z = occupiedTile[1] + 0.5
-      const blockedStartTx = Math.floor(sp2.mesh.position.x)
-      const blockedStartTz = Math.floor(sp2.mesh.position.z)
-      const blocked2 = pathingGrid.isBlocked(blockedStartTx, blockedStartTz)
-
-      const pathFromBlocked = g.planPath(sp2, new V3(walkableTile[0] + 0.5, 0, walkableTile[1] + 0.5))
-
-      // Clean up
-      g.units.splice(g.units.indexOf(sp), 1)
-      g.units.splice(g.units.indexOf(sp2), 1)
-      g.scene.remove(sp.mesh)
-      g.scene.remove(sp2.mesh)
-
-      return {
-        ok: true,
-        walkableTile, occupiedTile,
-        startBlocked,
-        pathToBlockedResult: pathToBlocked,
-        pathToBlockedHasMoveTarget: sp.moveTarget !== null || sp.waypoints.length > 0,
-        blocked2,
-        pathFromBlockedResult: pathFromBlocked,
-        pathFromBlockedHasMoveTarget: sp2.moveTarget !== null || sp2.waypoints.length > 0,
-      }
-    })
-
-    if (!result || !result.ok) await diagnose(page, 't5-no-game')
-    expect(result).not.toBeNull()
-    expect(result!.ok).toBe(true)
-
-    // Test A: walkable start → blocked goal
-    expect(result!.startBlocked, 'Footman start should be walkable').toBe(false)
-    expect(
-      result!.pathToBlockedHasMoveTarget,
-      `Path to blocked goal (${result!.occupiedTile}) should produce moveTarget from planPath`,
-    ).toBe(true)
-
-    // Test B: blocked start → walkable goal
-    expect(result!.blocked2, 'Manually placed footman should be on blocked tile').toBe(true)
-    // planPath on blocked start calls findPath which returns null for blocked start
-    // This means planPath falls through to fallback: unit.moveTarget = target.clone()
-    // This is the documented behavior: blocked start gets null from findPath,
-    // planPath does a straight-line fallback.
-    // The contract we test: planPath returns true (has moveTarget via fallback)
-    // and we document that this is the fallback behavior.
-    expect(
-      result!.pathFromBlockedResult,
-      'planPath from blocked start should return true (fallback straight line)',
-    ).toBe(true)
+    const pathFromBlockedStart = findPath(1, 1, 2, 2, grid as any)
+    expect(pathFromBlockedStart, 'blocked start must return null so callers cannot mistake it for a valid path').toBeNull()
   })
 
   // ----------------------------------------------------------
