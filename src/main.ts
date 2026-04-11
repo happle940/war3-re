@@ -29,7 +29,8 @@ const mapStatus = document.getElementById('map-status')!
 ;(async () => {
   try {
     mapStatus.textContent = '正在加载测试地图...'
-    const parsed = await loadMapFromURL('/maps/turtle_rock_test.w3x')
+    const base = import.meta.env.BASE_URL || '/'
+    const parsed = await loadMapFromURL(`${base}maps/turtle_rock_test.w3x`)
     game.loadMap(parsed)
     mapStatus.textContent = `已加载: 测试地图 (${parsed.terrain.width}x${parsed.terrain.height})`
     console.log('Test map loaded:', parsed.terrain.width, 'x', parsed.terrain.height)
