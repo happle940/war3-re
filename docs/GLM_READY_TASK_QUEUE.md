@@ -35,7 +35,7 @@ Current queue state:
 | Task 07 — Asset Pipeline Contract Pack | completed | GLM + Codex takeover | 2026-04-11 | Accepted after Codex takeover. Asset pipeline runtime spec green; fixed `Material[]` clone and attack animation scale reset. |
 | Task 03 — Building Placement Agency Pack | completed | Codex takeover | 2026-04-11 | GLM stalled in exploration; Codex completed at commit `6290f90`. Runtime pack 57/57 passed locally. |
 | Task 09 — Death/Cleanup Contract Pack | completed | Codex takeover | 2026-04-11 | GLM stalled in broad exploration; Codex completed core pack directly. `death-cleanup-regression.spec.ts` 5/5 green. |
-| Task 10 — Placement Controller Development Slice | ready | Codex dispatch | 2026-04-11 | Development task, not test-only: extract placement mode/build placement into a bounded controller after Task09 or when Codex owns cleanup. |
+| Task 10 — Placement Controller Development Slice | in_progress | GLM | 2026-04-11 | Development task, not test-only. Dispatched after death cleanup acceptance; strict micro-slice, no behavior changes. |
 | Task 08 — Game.ts Module Extraction Slice | ready | Codex dispatch | 2026-04-11 | Defer until death/cleanup and HUD cache gaps are covered. |
 
 ## Dispatch Rules
@@ -366,7 +366,11 @@ Implement Death/Cleanup Contract Pack. Use deterministic Playwright runtime test
 
 ### Task 10 — Placement Controller Development Slice
 
-Status: `ready`.
+Status: `in_progress`.
+
+Owner: GLM.
+
+Started: 2026-04-11.
 
 Goal: reduce `Game.ts` coupling by moving placement-mode state and build placement operations into a bounded controller without changing behavior.
 
