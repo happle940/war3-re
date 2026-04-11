@@ -208,6 +208,9 @@
 - [x] 选中未完成建筑时命令卡出现“取消”按钮
 - [x] 取消选中的未完成建筑后，selection、selection ring、HUD、命令卡都恢复到有效空状态
 - [x] 取消未完成建筑会清理 builder 的 `buildTarget` / move target / build state
+- [x] 第二个 worker 不能抢走 Building 状态的 builder（builder-stealing 防护）
+- [x] 第二个 worker 不能抢走 MovingToBuild 状态的 builder（分配后尚未到达）
+- [x] 原始 builder 已停止/失效时，新 worker 可以接手建造
 
 ### 死亡/清理自动化覆盖
 
@@ -323,5 +326,6 @@
 | 2026-04-11 | GLM-5.1 | Command Regression | command-regression.spec.ts: 7 tests green. Move/stop/hold/attackMove/queue contracts proven. |
 | 2026-04-11 | GLM-5.1 | Runtime Truth 01 | first-five-minutes.spec.ts: AI economy/build/train/attack automated. Player manual loop not yet covered. |
 | 2026-04-12 | GLM-5.1 | Order Model Boundary Regression | `order-model-boundary-regression.spec.ts`: 5 tests green. Proves `g.issueCommand()` dispatcher equivalence for move/stop/attackMove, isBuilding guard, and deterministic field mapping. |
+| 2026-04-12 | GLM-5.1 | M4 Builder-Stealing Fix | `construction-lifecycle-regression.spec.ts`: 9/9 green (3 new). Fixed `assignBuilderToConstruction()` builder-stealing bug: guard now checks both `MovingToBuild` and `Building` states. Added tests for Building-state steal block, MovingToBuild-state steal block, and reassignment allowed when builder stopped. 聚焦 M4 包全部通过；全量 runtime 曾跑到 59 passed 0 failed 但被 `Terminated: 15` 截断，不作为完整通过证据。 |
 | 2026-04-11 | GLM-5.1 | pending | Order System Beta + Gameplay Alpha 完成后待验证 |
 | 2026-04-10 | GLM-5.1 | Partial: AI economy ✅, Player micro ❌ | Runtime Hardening Phase 3: AI gather/build/train verified via Playwright. Player commands structurally verified but not runtime-tested. |

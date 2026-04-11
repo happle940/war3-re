@@ -213,6 +213,15 @@ M3 不应只是美术任务。它应该把规则层和视觉层合起来：
 
 ### P2 M4 Human vs AI Alpha
 
+M4 前置收口：建造/防御/人口可操作性（2026-04-12 状态）：
+
+- 建造生命周期（续建/取消/退款/occupancy 释放）：已完成，9 个 runtime tests green。
+- 建造者代理（builder-stealing 防护）：已修复，`assignBuilderToConstruction()` 现在阻止第二个 worker 抢走 MovingToBuild/Building 状态的 builder。
+- 静态防御（箭塔自动索敌/攻击/不追击）：已完成，7 个 runtime tests green。
+- 单位碰撞/分离（applySeparation）：已完成，4 个 runtime tests green。
+- 人口/资源门控（命令卡禁用+原因显示）：已完成，7 个 runtime tests green。
+- 玩家试玩 5 个问题的根因分析结论：4 个为已有实现，1 个（builder-stealing）为真实 bug 已修复。
+
 M4 才进入完整 10-15 分钟人机对局：
 
 - 胜负条件。

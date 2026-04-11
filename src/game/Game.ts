@@ -1602,6 +1602,16 @@ export class Game {
     if (!building.isBuilding || building.buildProgress >= 1 || building.hp <= 0) return false
     if (worker.team !== building.team) return false
 
+    // Prevent stealing from a valid active builder (MovingToBuild or Building)
+    const existing = building.builder
+    if (existing && existing !== worker
+      && this.units.includes(existing)
+      && existing.hp > 0
+      && existing.buildTarget === building
+      && (existing.state === UnitState.MovingToBuild || existing.state === UnitState.Building)) {
+      return false
+    }
+
     building.builder = worker
     dispatchGameCommand([worker], { type: 'build', target: building })
     this.planPath(worker, building.mesh.position)

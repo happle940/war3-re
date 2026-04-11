@@ -347,4 +347,124 @@ test.describe('Construction Lifecycle Contracts', () => {
     expect(result.builderResourceTarget).toBe(false)
     expect(severeConsoleErrors(page)).toHaveLength(0)
   })
+
+  test('second worker cannot steal builder from an active builder (Building state)', async ({ page }) => {
+    await waitForGame(page)
+
+    const result = await page.evaluate(() => {
+      const g = (window as any).__war3Game
+      if (!g) return { ok: false, reason: 'no game' }
+
+      // Setup: active builder in Building state
+      const activeBuilder = g.spawnUnit('worker', 0, 58, 58)
+      const building = g.spawnBuilding('farm', 0, 60, 58)
+      building.buildProgress = 0.3
+      building.builder = activeBuilder
+      activeBuilder.buildTarget = building
+      activeBuilder.state = 6 // Building
+      activeBuilder.moveTarget = null
+
+      // A second idle worker tries to claim the same building
+      const secondWorker = g.spawnUnit('worker', 0, 59, 58)
+      secondWorker.state = 0 // Idle
+
+      const stole = g.assignBuilderToConstruction(secondWorker, building)
+
+      return {
+        ok: true,
+        stole,
+        builderAfter: building.builder ? g.units.indexOf(building.builder) : -1,
+        activeBuilderIdx: g.units.indexOf(activeBuilder),
+        secondWorkerIdx: g.units.indexOf(secondWorker),
+        secondWorkerState: secondWorker.state,
+        secondWorkerBuildTarget: secondWorker.buildTarget ? g.units.indexOf(secondWorker.buildTarget) : -1,
+      }
+    })
+
+    if (!result.ok) await diagnose(page, 'builder-steal-block')
+    expect(result.ok).toBe(true)
+    expect(result.stole, 'Second worker should NOT steal from active builder in Building state').toBe(false)
+    expect(result.builderAfter, 'Original builder should remain assigned').toBe(result.activeBuilderIdx)
+    expect(result.secondWorkerState, 'Second worker should stay Idle').toBe(S.Idle)
+    expect(result.secondWorkerBuildTarget, 'Second worker should not get buildTarget').toBe(-1)
+    expect(severeConsoleErrors(page)).toHaveLength(0)
+  })
+
+  test('second worker cannot steal builder from a builder in MovingToBuild state', async ({ page }) => {
+    await waitForGame(page)
+
+    const result = await page.evaluate(() => {
+      const g = (window as any).__war3Game
+      if (!g) return { ok: false, reason: 'no game' }
+
+      // Setup: builder walking toward the building (MovingToBuild)
+      const activeBuilder = g.spawnUnit('worker', 0, 56, 56)
+      const building = g.spawnBuilding('farm', 0, 60, 58)
+      building.buildProgress = 0.1
+      building.builder = activeBuilder
+      activeBuilder.buildTarget = building
+      activeBuilder.state = 5 // MovingToBuild
+      activeBuilder.moveTarget = building.mesh.position.clone()
+
+      // A second idle worker tries to steal
+      const secondWorker = g.spawnUnit('worker', 0, 59, 58)
+      secondWorker.state = 0
+
+      const stole = g.assignBuilderToConstruction(secondWorker, building)
+
+      return {
+        ok: true,
+        stole,
+        builderAfter: building.builder ? g.units.indexOf(building.builder) : -1,
+        activeBuilderIdx: g.units.indexOf(activeBuilder),
+        activeBuilderState: activeBuilder.state,
+        activeBuilderBuildTarget: activeBuilder.buildTarget ? g.units.indexOf(activeBuilder.buildTarget) : -1,
+      }
+    })
+
+    if (!result.ok) await diagnose(page, 'builder-steal-movingtobuild')
+    expect(result.ok).toBe(true)
+    expect(result.stole, 'Second worker should NOT steal from builder in MovingToBuild state').toBe(false)
+    expect(result.builderAfter, 'Original MovingToBuild builder should remain assigned').toBe(result.activeBuilderIdx)
+    expect(result.activeBuilderState).toBe(S.MovingToBuild)
+    expect(severeConsoleErrors(page)).toHaveLength(0)
+  })
+
+  test('reassignment IS allowed when original builder is dead or stopped', async ({ page }) => {
+    await waitForGame(page)
+
+    const result = await page.evaluate(() => {
+      const g = (window as any).__war3Game
+      if (!g) return { ok: false, reason: 'no game' }
+
+      // Setup: original builder was building but got stopped
+      const origBuilder = g.spawnUnit('worker', 0, 62, 62)
+      const building = g.spawnBuilding('farm', 0, 64, 62)
+      building.buildProgress = 0.3
+      building.builder = origBuilder
+      origBuilder.buildTarget = null // builder cleared its target (e.g. via stop)
+      origBuilder.state = 0 // Idle — no longer actively building
+
+      // A new worker should be able to take over
+      const newBuilder = g.spawnUnit('worker', 0, 63, 62)
+      newBuilder.state = 0
+
+      const assigned = g.assignBuilderToConstruction(newBuilder, building)
+
+      return {
+        ok: true,
+        assigned,
+        builderAfter: building.builder ? g.units.indexOf(building.builder) : -1,
+        newBuilderIdx: g.units.indexOf(newBuilder),
+        newBuilderState: newBuilder.state,
+        newBuilderBuildTarget: newBuilder.buildTarget ? g.units.indexOf(newBuilder.buildTarget) : -1,
+      }
+    })
+
+    if (!result.ok) await diagnose(page, 'builder-reassign-allowed')
+    expect(result.ok).toBe(true)
+    expect(result.assigned, 'New worker should be able to resume construction').toBe(true)
+    expect(result.builderAfter, 'New builder should be assigned').toBe(result.newBuilderIdx)
+    expect(severeConsoleErrors(page)).toHaveLength(0)
+  })
 })
