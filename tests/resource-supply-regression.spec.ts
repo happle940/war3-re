@@ -10,7 +10,8 @@
  *  2. trainUnit refuses training when supply is capped (no resource deduction)
  *  3. Successful training deducts resources exactly once
  *  4. Worker return-gold/lumber increases team resources, clears carry
- *  5. Stop/cancel/override does not duplicate carried resources
+ *  5a. Stop via real command path does not duplicate carried resources
+ *  5b. Move override via real command path drops carried resources
  *  6. AI does not queue/train beyond available supply
  *  7. AI farm supply applies only after completion
  *  8. Multi-building training cannot overspend resources
@@ -357,9 +358,9 @@ test.describe('Resource/Supply Regression', () => {
   })
 
   // ----------------------------------------------------------
-  // 5. Stop/cancel does not duplicate carried resources
+  // 5a. Stop via real command path does not duplicate carried resources
   // ----------------------------------------------------------
-  test('stop does not duplicate carried resources', async ({ page }) => {
+  test('stop via real command path does not duplicate carried resources', async ({ page }) => {
     await waitForGame(page)
 
     const result = await page.evaluate(() => {
@@ -372,33 +373,29 @@ test.describe('Resource/Supply Regression', () => {
       worker.state = 4 // MovingToReturn
       worker.gatherType = 'gold'
       worker.carryAmount = 10
-      worker.moveTarget = g.units.find(
+      const th = g.units.find(
         (u: any) => u.team === 0 && u.type === 'townhall' && u.hp > 0,
-      ).mesh.position.clone()
+      )
+      worker.moveTarget = th.mesh.position.clone()
+      worker.resourceTarget = { type: 'goldmine', mine: g.units.find((u: any) => u.type === 'goldmine') }
       worker.waypoints = []
 
       const resBefore = g.resources.get(0)
 
-      // Issue stop command (issueCommand 'stop' semantics)
-      worker.state = 0 // Idle
-      worker.moveTarget = null
-      worker.waypoints = []
-      worker.moveQueue = []
-      worker.attackTarget = null
-      worker.attackMoveTarget = null
-      worker.gatherType = null
-      worker.resourceTarget = null
-      worker.buildTarget = null
-      worker.carryAmount = 0 // stop discards carried resources
-      worker.previousState = null
-      worker.previousGatherType = null
-      worker.previousResourceTarget = null
-      worker.previousMoveTarget = null
-      worker.previousWaypoints = []
-      worker.previousMoveQueue = []
-      worker.previousAttackMoveTarget = null
+      // Use the REAL command path: select worker, then dispatch keyboard 's'
+      // This exercises: keydown handler → issueCommand(controllable, {type:'stop'})
+      g.selectionModel.clear()
+      g.selectionModel.add(worker)
+
+      document.dispatchEvent(new KeyboardEvent('keydown', {
+        key: 's',
+        code: 'KeyS',
+        bubbles: true,
+      }))
 
       const resAfterStop = g.resources.get(0)
+      const carryAfterStop = worker.carryAmount
+      const stateAfterStop = worker.state
 
       // Now advance game-time — worker is idle with carryAmount=0
       // Resources should NOT change
@@ -410,17 +407,20 @@ test.describe('Resource/Supply Regression', () => {
         resBeforeGold: resBefore.gold,
         resAfterStopGold: resAfterStop.gold,
         resAfterAdvanceGold: resAfterAdvance.gold,
-        carryAfterStop: worker.carryAmount,
-        stateAfterStop: worker.state,
+        carryAfterStop,
+        stateAfterStop,
+        gatherTypeAfter: worker.gatherType,
+        resourceTargetAfter: !!worker.resourceTarget,
+        previousStateAfter: worker.previousState,
       }
     })
 
     if (!result) {
-      await diagnose(page, 't5-no-game')
+      await diagnose(page, 't5a-no-game')
     }
     expect(result).not.toBeNull()
 
-    // Resources should NOT have changed at stop
+    // Resources should NOT have changed at stop (carry is dropped, not deposited)
     expect(result!.resAfterStopGold).toBe(result!.resBeforeGold)
 
     // Resources should NOT have changed after advancing (carry was dropped, not deposited)
@@ -428,6 +428,130 @@ test.describe('Resource/Supply Regression', () => {
 
     // Carry should be 0
     expect(result!.carryAfterStop).toBe(0)
+
+    // State should be Idle
+    expect(result!.stateAfterStop).toBe(0)
+
+    // All command fields should be cleared by the real issueCommand('stop') path
+    expect(result!.gatherTypeAfter).toBeNull()
+    expect(result!.resourceTargetAfter).toBeFalsy()
+    expect(result!.previousStateAfter).toBeNull()
+  })
+
+  // ----------------------------------------------------------
+  // 5b. Move override via real command path drops carried resources
+  // ----------------------------------------------------------
+  test('move override via real command path drops carried resources', async ({ page }) => {
+    await waitForGame(page)
+
+    const result = await page.evaluate(() => {
+      const g = (window as any).__war3Game
+      if (!g) return null
+
+      const worker = g.spawnUnit('worker', 0, 18, 18)
+
+      // Worker is carrying gold and moving to return
+      worker.state = 4 // MovingToReturn
+      worker.gatherType = 'gold'
+      worker.carryAmount = 10
+      const th = g.units.find(
+        (u: any) => u.team === 0 && u.type === 'townhall' && u.hp > 0,
+      )
+      worker.moveTarget = th.mesh.position.clone()
+      worker.resourceTarget = { type: 'goldmine', mine: g.units.find((u: any) => u.type === 'goldmine') }
+      worker.waypoints = []
+
+      const resBefore = g.resources.get(0)
+
+      // Use the REAL command path: select worker, set mouseNDC to a ground point,
+      // then call handleRightClick() which calls issueCommand(move).
+      // This exercises the full path: handleRightClick → issueCommand(controllable, {type:'move'})
+      g.selectionModel.clear()
+      g.selectionModel.add(worker)
+      g.shiftHeld = false
+
+      // Position mouse NDC over open ground away from units/trees.
+      // We need a point that (a) hits the ground plane and (b) is >2 world units
+      // from any tree so handleRightClick issues 'move' instead of 'gather'.
+      // Strategy: scan several NDC positions until we find tree-free ground.
+      const testNDCs = [
+        [0.0, -0.3], [0.1, -0.2], [-0.1, -0.4], [0.0, 0.0],
+        [0.2, -0.1], [-0.2, -0.3], [0.15, -0.35], [-0.15, -0.15],
+      ]
+      let hitGround = false
+      let groundTarget = null
+      for (const [nx, ny] of testNDCs) {
+        g.mouseNDC.set(nx, ny)
+        g.raycaster.setFromCamera(g.mouseNDC, g.camera)
+        const hits = g.raycaster.intersectObject(g.terrain.groundPlane)
+        if (hits.length === 0) continue
+        const pt = hits[0].point
+        // Check no tree within 2 units (same threshold as handleRightClick)
+        const nearestTree = g.treeManager.findNearest(pt, 2)
+        if (!nearestTree) {
+          hitGround = true
+          groundTarget = pt
+          break
+        }
+      }
+
+      if (hitGround) {
+        g.shiftHeld = false
+        g.handleRightClick()
+      }
+
+      const resAfterMove = g.resources.get(0)
+      const carryAfterMove = worker.carryAmount
+      const stateAfterMove = worker.state
+      const gatherTypeAfter = worker.gatherType
+      const resourceTargetAfter = !!worker.resourceTarget
+
+      // Advance game-time to verify no resource deposit happens
+      for (let i = 0; i < 60; i++) g.update(0.016) // ~1s
+
+      const resAfterAdvance = g.resources.get(0)
+
+      return {
+        hitGround,
+        groundHitPoint: groundTarget ? { x: groundTarget.x.toFixed(1), z: groundTarget.z.toFixed(1) } : null,
+        resBeforeGold: resBefore.gold,
+        resAfterMoveGold: resAfterMove.gold,
+        resAfterAdvanceGold: resAfterAdvance.gold,
+        carryAfterMove,
+        stateAfterMove,
+        gatherTypeAfter,
+        resourceTargetAfter,
+        moveTargetSet: !!worker.moveTarget,
+        moveQueueLen: worker.moveQueue?.length ?? 0,
+      }
+    })
+
+    if (!result) {
+      await diagnose(page, 't5b-no-game')
+    }
+    expect(result).not.toBeNull()
+
+    // Raycaster must hit ground for handleRightClick to work
+    expect(
+      result!.hitGround,
+      `Raycaster did not hit ground at NDC (0.0, -0.3). handleRightClick returned early without issuing move command.`,
+    ).toBe(true)
+
+    // Move command drops carryAmount to 0 (per issueCommand 'move': carryAmount = 0)
+    expect(result!.carryAfterMove).toBe(0)
+
+    // Resources should NOT change — carry was dropped, not deposited
+    expect(result!.resAfterMoveGold).toBe(result!.resBeforeGold)
+    expect(result!.resAfterAdvanceGold).toBe(result!.resBeforeGold)
+
+    // Worker should be in Moving state with a real move target
+    expect(result!.stateAfterMove).toBe(1) // Moving
+    expect(result!.moveTargetSet).toBe(true)
+
+    // Gather fields should be cleared by the real issueCommand('move') path
+    expect(result!.gatherTypeAfter).toBeNull()
+    expect(result!.resourceTargetAfter).toBe(false)
+    expect(result!.moveQueueLen).toBe(0)
   })
 
   // ----------------------------------------------------------
