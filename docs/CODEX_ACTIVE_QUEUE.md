@@ -56,7 +56,7 @@ GLM owns:
 | C01 — Dual queue operating model | done | 2026-04-11 | Fixes the root process bug: Codex had no explicit queue and drifted into GLM-waiting. |
 | C02 — Review GLM Resource/Supply Pack | done | 2026-04-11 | Accepted GLM follow-up commit `a64833d`; locked runtime pack reran 9/9 green. |
 | C03 — Worker Visibility Truth | done | 2026-04-11 | Added visibility regression pack and fixed W3X map-load camera reset that left player workers offscreen. |
-| C04 — Live Build Reality Check Protocol | ready | 2026-04-11 | Define how screenshots/human observations convert into reproducible contracts without overusing browser sessions. |
+| C04 — Live Build Reality Check Protocol | done | 2026-04-11 | Added live-build evidence labels and conversion flow to operating model. |
 | C05 — Human Decision Gates | done | 2026-04-11 | Defines when the user should intervene and what Codex/GLM must finish before each gate. |
 | C06 — PLAN.md stale queue cleanup | done | 2026-04-11 | PLAN now points to live queue/gate docs instead of carrying a stale inline GLM queue. |
 | C07 — CI Node 24 Migration | ready | 2026-04-11 | GitHub Actions warns Node 20 actions will be forced to Node 24; low urgency but objective. |
@@ -158,7 +158,7 @@ Closeout:
 
 ### C04 — Live Build Reality Check Protocol
 
-Status: `ready`.
+Status: `done`.
 
 Goal: avoid confusing runtime proof with human visual approval.
 
@@ -171,6 +171,12 @@ Allowed files:
 
 - `docs/PROJECT_OPERATING_MODEL.md`
 - `PLAN.md`
+
+Closeout:
+
+- Added `docs/PROJECT_OPERATING_MODEL.md` section 7.5.
+- Defined `human-observed`, `runtime-measured`, `implemented`, and `human-approved`.
+- Added the default conversion flow from live-build feedback to tests/tasks/milestone approval.
 
 ### C05 — Human Decision Gates
 

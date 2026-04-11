@@ -265,6 +265,39 @@ Do not leave these running unless the user explicitly asks to keep a local serve
 - Chromium / `chrome-headless-shell`
 - visible Chrome tabs for `localhost` / `127.0.0.1` project ports
 
+### 7.5 Live build reality protocol
+
+Human feedback from the live build is product evidence. It must be converted into engineering work without pretending that screenshots are automated proof.
+
+Every user observation must be tagged as one of these:
+
+- `human-observed`: the user saw or felt a problem on the live build.
+- `runtime-measured`: a local or CI test measures the behavior with assertions.
+- `implemented`: code changed and required command gates passed.
+- `human-approved`: the user explicitly confirmed the live build feels acceptable.
+
+Rules:
+
+- A screenshot can prove that the user saw a problem; it does not prove the fix.
+- A Playwright test can prove geometry, state, visibility thresholds, command paths, and absence of console errors; it cannot approve Warcraft-like feel.
+- A final report must not say “looks good”, “feels right”, or “War3-like” unless the user approved that exact claim.
+- If user feedback contradicts tests, the tests are incomplete. Add or revise a regression contract before arguing with the feedback.
+- If the issue is visual but objectively measurable, create a runtime threshold first: on-screen position, bounding box, opacity, healthbar anchor, footprint, path, or selected object count.
+- If the issue is taste or feel, defer final judgment to the next human decision gate and prepare a compact checklist.
+
+Default conversion flow:
+
+1. User reports or screenshots a live-build issue.
+2. Codex classifies it as control, visibility, scale/layout, economy, AI, asset, or pure taste.
+3. Codex either fixes it directly or creates a scoped GLM task with allowed files and assertions.
+4. The implementation passes build, app typecheck, and relevant runtime tests.
+5. Only at the appropriate milestone does the user perform human approval.
+
+This prevents two recurring failures:
+
+- treating `npm run build` as product validation
+- making the user repeatedly inspect small tactical fixes instead of larger milestones
+
 ## 8. Git Policy
 
 Default branch: `main`.
