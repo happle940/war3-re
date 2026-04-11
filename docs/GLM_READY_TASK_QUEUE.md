@@ -399,7 +399,7 @@ Completed: 2026-04-11.
 
 Final review status: accepted after Codex takeover. GLM's first pass produced weak tests and then conflicted on the same files, so Codex paused GLM, implemented the browser-side hook, tightened the assertions, and ran verification.
 
-Accepted commit: pending.
+Accepted commit: `4ba477f` (`test: add asset pipeline regression pack`).
 
 Codex reran:
 
