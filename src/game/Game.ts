@@ -2086,6 +2086,11 @@ export class Game {
         }
       }
     }
+
+    // 强制刷新 HUD 缓存：框选完成后立即让下一帧更新命令卡和选择信息
+    // 没有这行，Shift+框选后命令卡不会更新（因为 clearSelection 被跳过了）
+    this._lastCmdKey = ''
+    this._lastSelKey = ''
   }
 
   // ==================== 选择管理 ====================
