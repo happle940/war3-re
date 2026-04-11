@@ -15,8 +15,9 @@ Read these in order before starting any significant work:
 5. `/Users/zhaocong/Documents/war3-re/docs/GLM_READY_TASK_QUEUE.md`
 6. `/Users/zhaocong/Documents/war3-re/docs/HUMAN_DECISION_GATES.md`
 7. `/Users/zhaocong/Documents/war3-re/docs/PROJECT_MILESTONES.zh-CN.md`
-8. `/Users/zhaocong/Documents/war3-re/docs/WAR3_BENCHMARK_RESEARCH_01.md`
-9. `/Users/zhaocong/Documents/war3-re/docs/CODEX_HANDOFF_2026_04_11.md`
+8. `/Users/zhaocong/Documents/war3-re/docs/WAR3_SYSTEM_ALIGNMENT_01.md`
+9. `/Users/zhaocong/Documents/war3-re/docs/WAR3_BENCHMARK_RESEARCH_01.md`
+10. `/Users/zhaocong/Documents/war3-re/docs/CODEX_HANDOFF_2026_04_11.md`
 
 Execution docs under `docs/OVERNIGHT_*.md` are historical task records or scoped work packets. They do not override this plan or the experience contract.
 
@@ -35,7 +36,7 @@ The target is not a literal asset clone. The target is a legally safe, Warcraft 
 
 Current stage:
 
-**Agency Prototype / Visual Readability Implemented But Human-Unapproved / First-Five-Minutes Truth In Progress**
+**M1 Passed With Visual Debt / War3 Core Systems Alignment Starting**
 
 What this means:
 
@@ -43,7 +44,7 @@ What this means:
 - Core RTS systems exist: selection, commands, resources, build, train, combat, AI, map loading, GitHub Pages.
 - Several earlier fake-green validations have been replaced with real runtime assertions.
 - Worker and key-building readability have stronger proxy implementations, but still require human approval on the live build.
-- The project is still not a convincing Warcraft III-like slice until the first five minutes are runtime-proven and then human-playtested.
+- The project passed the first user playability gate, but it is still not a convincing Warcraft III-like slice because the reusable RTS systems are incomplete.
 
 ## 3. Solved vs Not Solved
 
@@ -64,15 +65,18 @@ What this means:
 
 ### 3.2 Not solved, even if some code exists
 
-- Worker readability is not human-approved on the live build.
-- Goldmine, tower, and barracks readability are not human-approved on the live build.
+- Visual identity is not final; M1 passed with visual debt, not visual approval.
+- Construction lifecycle is incomplete: interrupted buildings cannot be resumed naturally.
+- Construction cancel/refund is missing.
+- Arrow tower is not a real combat participant yet.
+- Units do not have sufficient physical collision/presence.
+- Command-card disabled reasons are weak, especially around supply block and prerequisites.
 - Terrain/base grammar is still weak compared with Warcraft III.
-- AI first-five-minutes truth is not yet strong enough to call the game playable.
-- Human visual feel is not validated by automated tests.
+- Human visual feel remains a later gate after core systems align better with Warcraft-like rules.
 
 ## 4. Top-Level Cause Of Recent Problems
 
-The project started as a working RTS prototype, but the target has shifted to a Warcraft III-like experience. Those require different management.
+The project started as a working RTS prototype, but the target has shifted to a Warcraft III-like experience. Those require different management and a stronger rules layer.
 
 The repeated failure pattern has been:
 
@@ -81,7 +85,7 @@ The repeated failure pattern has been:
 3. A report says the phase is complete.
 4. Human playtest reveals the experience is still wrong.
 
-The root cause is not one bug. The root cause is missing product contracts.
+The root cause is not one bug. The root cause is missing product contracts and missing reusable RTS system contracts.
 
 From now on, every meaningful task must be evaluated through three separate layers:
 
@@ -90,6 +94,18 @@ From now on, every meaningful task must be evaluated through three separate laye
 3. **Human experience**: the player can see it, trust it, and use it naturally.
 
 Do not collapse these layers.
+
+The latest M1 feedback raises a second root cause:
+
+> The game has commands, but it does not yet have enough Warcraft-like systems.
+
+Examples:
+
+- build exists, but construction lifecycle is incomplete
+- tower exists, but static defense combat is missing
+- supply exists, but disabled command feedback is weak
+- movement exists, but unit collision/presence is weak
+- placement exists, but cancel/refund rules are missing
 
 ## 5. Non-Negotiable Experience Contracts
 
@@ -130,43 +146,53 @@ Codex and GLM should complete the objective task bundle before each milestone, t
 
 ## 7. Current Priority Stack
 
-### P0 - Worker Readability Truth
-
-Status: implemented, awaiting human approval on live build.
-
-Previous live issue: the HUD can say workers are selected, but the worker bodies are still too hard to locate on the battlefield.
-
-This blocks almost every RTS feeling layer. If the player cannot see workers, selection, building, harvesting, and base reading all feel unreliable.
-
-Allowed outcome:
-
-- Keep `worker.glb` only if it becomes readable.
-- Otherwise use a stronger readable worker proxy.
-- Readability wins over asset purity.
-
-### P1 - Building Readability Proxy Pass
-
-Status: implemented, awaiting human approval on live build.
-
-Goldmine, tower, and barracks now have stronger proxy silhouettes, but visual approval still belongs to the user.
-
-### P2 - First Five Minutes Playable Truth
+### P0 - War3 Core Systems Alignment
 
 Status: active.
 
-AI and player loops must produce a real opening:
+The next goal is not another broad visual pass. The next goal is to make the existing verbs obey Warcraft-like RTS rules.
 
-- gather gold/lumber
-- build farm/barracks
-- train units
-- first attack pressure
-- basic player response
+Reference:
 
-This must be runtime-proven, not inferred.
+- `/Users/zhaocong/Documents/war3-re/docs/WAR3_SYSTEM_ALIGNMENT_01.md`
+
+Priority sub-systems:
+
+1. Construction lifecycle: resume, interrupt, cancel, refund, cleanup.
+2. Static defense combat: arrow tower weapon stats and target acquisition.
+3. Command-card disabled reasons: supply/resource/prerequisite feedback.
+4. Unit collision and local avoidance baseline.
+
+### P1 - Visual Debt
+
+Status: accepted debt from M1.
+
+M1 passed with visual debt. Do not ignore it, but do not let it displace missing system rules.
+
+Visual debt includes:
+
+- final worker/building readability
+- terrain/base grammar
+- Warcraft-like scale and camera feel
+- legal asset/style direction
+
+### P2 - First Five Minutes Playable Truth
+
+Status: passed at M1.
+
+The user confirmed:
+
+- units/buildings can be seen enough to play
+- controls are broadly obedient
+- gather/build/train/combat is possible
+- AI applies pressure
+- base layout is basically playable
 
 ### P3 - Terrain / Base Grammar
 
-The battlefield must stop reading like a flat board with objects. It needs spatial grammar:
+Status: planned after M2 core systems alignment.
+
+The battlefield still needs spatial grammar:
 
 - base area
 - mine area
@@ -242,16 +268,16 @@ Do not ask the user for another broad playtest yet.
 
 Current next user milestone:
 
-- `M1 — First Playable RTS Slice` in `/Users/zhaocong/Documents/war3-re/docs/HUMAN_DECISION_GATES.md`
+- `M2 — War3 Core Systems Alignment` in `/Users/zhaocong/Documents/war3-re/docs/HUMAN_DECISION_GATES.md`
 
-Before that milestone, Codex and GLM should complete the objective pre-milestone bundle:
+Before that milestone, Codex and GLM should complete the objective M2 bundle:
 
-1. Finish Codex review of GLM Resource/Supply Regression Pack follow-up.
-2. Prove readability baseline: worker, footman, Town Hall, goldmine, barracks, tower.
-3. Prove command ownership baseline: select, move, stop, build, attackMove, shift queue.
-4. Prove economy/production baseline: gather, return, build, train, supply, no overspend.
-5. Prove first pressure baseline: AI gathers/builds/trains/attacks and player can respond.
-6. Present the user a 5-10 minute M1 playtest packet instead of small tactical checks.
+1. Construction lifecycle contract pack.
+2. Tower/static defense combat contract pack.
+3. Command-card disabled reason contract pack.
+4. Construction cancel/refund contract pack if not included in lifecycle.
+5. Unit collision/local avoidance contract pack.
+6. Present the user an M2 playtest packet instead of small tactical checks.
 
 ## 11. Continuous Work Queues
 

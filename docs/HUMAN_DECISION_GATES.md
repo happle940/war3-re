@@ -24,12 +24,13 @@ Before every user milestone, Codex must prepare:
 | Milestone | Status | User needed? | Entry criteria | User decision |
 |---|---|---:|---|---|
 | M0 — Project Operating Foundation | done | no | repo, deploy, CI runtime gate, Codex queue, GLM queue | none |
-| M1 — First Playable RTS Slice | next | yes | readable base, command ownership, gather/build/train/combat, first AI pressure all runtime-proven | Is this playable enough to continue expanding instead of repairing basics? |
-| M2 — Warcraft-Like Feel Vertical Slice | planned | yes | M1 passed; scale, camera, terrain grammar, visual direction prepared | Does it feel close enough to the intended Warcraft-like direction? |
-| M3 — Human vs AI Alpha Match | planned | yes | one complete 10-15 minute match loop with win/loss and AI recovery | Is the core game loop worth balancing/content expansion? |
-| M4 — Content And Identity Direction | planned | yes | technical gameplay alpha stable; legal art/style options prepared | Which content/art direction should become the product identity? |
-| M5 — Public Demo Candidate | planned | yes | stable live build, release checklist green, known issues documented | Is this ready to share for external feedback? |
-| M6 — Architecture Hardening Release | planned | no by default | major behavior contracts covered; refactor plan ready | proceed unless scope/product direction changes |
+| M1 — First Playable RTS Slice | done | yes | readable base, command ownership, gather/build/train/combat, first AI pressure all runtime-proven | Passed with visual debt. |
+| M2 — War3 Core Systems Alignment | next | yes | construction lifecycle, tower combat, command disabled reasons, cancellation, collision baseline runtime-proven | Does the game now obey Warcraft-like RTS rules instead of isolated commands? |
+| M3 — Warcraft-Like Feel Vertical Slice | planned | yes | M2 passed; scale, camera, terrain grammar, visual direction prepared | Does it feel close enough to the intended Warcraft-like direction? |
+| M4 — Human vs AI Alpha Match | planned | yes | one complete 10-15 minute match loop with win/loss and AI recovery | Is the core game loop worth balancing/content expansion? |
+| M5 — Content And Identity Direction | planned | yes | technical gameplay alpha stable; legal art/style options prepared | Which content/art direction should become the product identity? |
+| M6 — Public Demo Candidate | planned | yes | stable live build, release checklist green, known issues documented | Is this ready to share for external feedback? |
+| M7 — Architecture Hardening Release | planned | no by default | major behavior contracts covered; refactor plan ready | proceed unless scope/product direction changes |
 
 ## M0 — Project Operating Foundation
 
@@ -52,7 +53,7 @@ User intervention: none.
 
 ## M1 — First Playable RTS Slice
 
-Status: `next`.
+Status: `done`.
 
 Why this milestone exists:
 
@@ -138,6 +139,13 @@ Allowed M1 outcomes:
 - `pass with visual debt`: move to M2 and track debt.
 - `fail`: convert failure into Codex/GLM tasks and repeat only the failed slice, not the whole milestone.
 
+M1 final result:
+
+- User verdict: `pass with visual debt`.
+- Confirmed by user: workers/buildings are visible enough, controls are obedient, gather/build/train/combat is possible, AI applies pressure, and base layout is basically playable.
+- New debt raised by user: construction cannot resume, tower has no attack, units lack collision presence, supply-blocked command state is unclear, construction cancel is missing, and broader Warcraft-like system alignment is still absent.
+- Resulting direction: M2 is not a pure visual pass. M2 becomes `War3 Core Systems Alignment`.
+
 ### M1 decision packet draft
 
 This packet is what Codex should present when M1 entry criteria are green. Do not ask the user to run it until current GLM work is accepted, CI is green for the target commit, and local runtime leftovers are cleaned.
@@ -218,48 +226,87 @@ Failure routing:
 - `fail AI`: GLM can own AI opening/wave repair if the expected behavior is specific.
 - `fail scale/layout`: Codex owns benchmark and acceptance criteria; GLM can implement bounded footprint/layout changes.
 
-## M2 — Warcraft-Like Feel Vertical Slice
+## M2 — War3 Core Systems Alignment
+
+Status: `next`.
+
+Why this milestone exists:
+
+M1 proved the game can be played for 5-10 minutes. The user's follow-up feedback shows the next gap is not art first; it is that several Warcraft-like rules do not exist yet.
+
+M2 turns isolated verbs into RTS systems:
+
+- construction lifecycle
+- static defense combat
+- command-card prerequisite and disabled reasons
+- construction cancellation and refund
+- unit collision and local avoidance baseline
+- explicit Warcraft-like rule contracts
+
+M2 user question:
+
+> Does the live build now obey the kind of RTS rules a Warcraft III player expects, even if the art is still proxy?
+
+Before asking the user, Codex and GLM must complete:
+
+### M2.1 Construction lifecycle
+
+- Under-construction buildings can be resumed by a valid worker.
+- Builder interruption does not make construction unrecoverable.
+- Construction cancel exists, releases footprint, releases builder state, and applies a deterministic refund.
+- Completion transitions the building to normal usable state.
+
+### M2.2 Static defense combat
+
+- Arrow tower has weapon stats.
+- Tower auto-acquires enemies in range.
+- Tower damages targets and reacquires or idles after target death.
+
+### M2.3 Command-card prerequisite clarity
+
+- Supply-blocked train/build commands communicate why they cannot execute.
+- Insufficient resources communicate why a command cannot execute.
+- Command buttons have explicit enabled/disabled state.
+
+### M2.4 Unit collision baseline
+
+- Units have meaningful collision radius.
+- Groups do not stack permanently on the same point.
+- Building blockers remain hard blockers.
+- Existing pathing tests remain green.
+
+M2 user decision packet:
+
+1. Can interrupted construction be resumed naturally?
+2. Can construction be canceled without weird resource/unit state?
+3. Do towers behave like defensive buildings instead of decorations?
+4. Do blocked commands explain themselves?
+5. Do units have enough physical presence to stop obvious stacking?
+6. Choose one: `pass`, `pass with visual debt`, `fail construction`, `fail combat`, `fail command UI`, `fail collision`.
+
+## M3 — Warcraft-Like Feel Vertical Slice
 
 Status: `planned`.
 
 Why this milestone exists:
 
-After the game is basically playable, the next question is whether it is moving toward the intended Warcraft-like experience. This is not about one model or one tree. It is the combined feeling of camera, scale, terrain grammar, silhouettes, HUD, and feedback.
+After the game is basically playable and its core rules align better with Warcraft-like expectations, the next question is whether it is moving toward the intended Warcraft-like visual and spatial experience. This is not about one model or one tree. It is the combined feeling of camera, scale, terrain grammar, silhouettes, HUD, and feedback.
 
-M2 user question:
+M3 user question:
 
 > Does the live build now read as an intentional Warcraft-like RTS battlefield rather than a web prototype with objects on a plane?
 
 Before asking the user, Codex and GLM must complete:
 
-### M2.1 Scale benchmark
-
 - Unit/building size table.
 - Camera distance/FOV/AoA table.
 - Town Hall to mine spacing.
 - Building footprint hierarchy.
-- Comparison notes against Warcraft III references.
-
-### M2.2 Terrain/base grammar
-
 - Base zone, mine zone, tree line, exit path, and combat approach are visually distinct.
-- Pathing tests prove the layout is usable.
-- Terrain does not read as a random flat board.
-
-### M2.3 Visual direction pass
-
 - Proxy silhouettes or legal assets are consistent enough for a vertical slice.
 - Selection, health bars, damage feedback, and command indicators are readable.
-- HUD does not hide the playfield.
 
-Likely tasks:
-
-- Codex scale/benchmark pass.
-- GLM Task 05 — Pathing/Footprint Contract Pack.
-- GLM Task 07 — Asset Pipeline Contract Pack.
-- New GLM task if needed: Scale Measurement Pack.
-
-M2 user decision packet:
+M3 user decision packet:
 
 1. Does the battlefield immediately read as an RTS space?
 2. Does base/mine/tree/path layout feel intentional?
@@ -267,7 +314,7 @@ M2 user decision packet:
 4. Does the camera framing feel RTS-like enough to continue?
 5. Choose one: `pass`, `pass but art debt`, `fail scale`, `fail terrain`, `fail camera`, `fail visual identity`.
 
-## M3 — Human vs AI Alpha Match
+## M4 — Human vs AI Alpha Match
 
 Status: `planned`.
 
@@ -275,7 +322,7 @@ Why this milestone exists:
 
 A real RTS prototype needs a complete match loop, not just opening mechanics. M3 is the first “can I play a match?” milestone.
 
-M3 user question:
+M4 user question:
 
 > Can I play one complete human-vs-AI match and understand why I won, lost, or stalled?
 
@@ -288,7 +335,7 @@ Before asking the user, Codex and GLM must complete:
 - Basic balance is rough but not absurd.
 - Runtime tests cover the main state transitions.
 
-M3 user decision packet:
+M4 user decision packet:
 
 1. Play one 10-15 minute match.
 2. Did the match have a beginning, pressure phase, and resolution?
@@ -296,7 +343,7 @@ M3 user decision packet:
 4. Did AI behavior fail in a way that breaks the match?
 5. Choose one: `alpha pass`, `fail control`, `fail AI`, `fail pacing`, `fail win/loss clarity`.
 
-## M4 — Content And Identity Direction
+## M5 — Content And Identity Direction
 
 Status: `planned`.
 
@@ -304,7 +351,7 @@ Why this milestone exists:
 
 Only after the game loop is worth playing should the project commit to broader content and visual identity. This avoids wasting effort on assets before the game contracts are stable.
 
-M4 user question:
+M5 user question:
 
 > What should this become visually and content-wise?
 
@@ -316,17 +363,17 @@ Before asking the user, Codex and GLM must complete:
 - Map/content expansion options documented.
 - Cost and risk for each direction stated.
 
-M4 default recommendation unless overridden:
+M5 default recommendation unless overridden:
 
 - Hybrid: readable proxy gameplay silhouettes now, legal asset pipeline preserved for later replacement.
 
-M4 user decision packet:
+M5 user decision packet:
 
 1. Choose visual direction: `proxy-first`, `asset-pack-first`, or `hybrid`.
 2. Choose content scope: `one polished Human slice`, `Human vs Orc`, or `systems-first sandbox`.
 3. Choose next product target: `better game feel`, `more content`, or `public demo`.
 
-## M5 — Public Demo Candidate
+## M6 — Public Demo Candidate
 
 Status: `planned`.
 
@@ -334,7 +381,7 @@ Why this milestone exists:
 
 This is the first “show other people” checkpoint. It is larger than passing tests; it requires a stable, explainable experience.
 
-M5 user question:
+M6 user question:
 
 > Is this ready to send to other people for feedback?
 
@@ -347,13 +394,13 @@ Before asking the user, Codex and GLM must complete:
 - No local-only dependency or hidden setup is required.
 - Smoke checklist is current.
 
-M5 user decision packet:
+M6 user decision packet:
 
 1. Share publicly now?
 2. Share privately to a few testers?
 3. Hold until one more milestone?
 
-## M6 — Architecture Hardening Release
+## M7 — Architecture Hardening Release
 
 Status: `planned`.
 
@@ -361,11 +408,11 @@ Why this milestone exists:
 
 After product direction is validated, reduce long-term engineering risk. This should not block early product discovery unless `Game.ts` complexity starts preventing progress.
 
-M6 user intervention:
+M7 user intervention:
 
 Not required by default. Codex decides and reports unless refactor changes scope or visible behavior.
 
-Before M6:
+Before M7:
 
 - Command, selection, resources, pathing, AI, asset refresh, and first-match contracts have tests.
 - `docs/GAME_TS_RISK_MAP.md` exists.
@@ -373,18 +420,16 @@ Before M6:
 
 ## Current Next User Intervention
 
-Current next user milestone: `M1 — First Playable RTS Slice`.
+Current next user milestone: `M2 — War3 Core Systems Alignment`.
 
-Status: `ready for user gate`.
+Status: `objective work in progress`.
 
-Target code commit: `14bd7ba` (`refactor: extract placement controller slice`).
+Last completed user gate: `M1 — First Playable RTS Slice`.
 
-Objective gate status:
+M1 result:
 
-- Local build passed.
-- Local app typecheck passed.
-- Local affected runtime packs passed: 17/17.
-- GitHub Actions for target code commit passed.
-- Local Vite, Playwright, Chromium, and `chrome-headless-shell` processes were cleaned.
+- User selected `pass with visual debt`.
+- Objective gate was green before user playtest.
+- Follow-up issues are now tracked under M2 system alignment.
 
-Do not ask the user to validate tactical items like “worker visibility” alone unless it blocks M1 and cannot be decided by measurement. Codex and GLM should now use the M1 decision packet above when asking for user playtest judgment.
+Do not ask the user for another broad playtest until the M2 objective packs are complete.

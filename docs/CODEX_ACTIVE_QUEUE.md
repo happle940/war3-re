@@ -65,6 +65,9 @@ GLM owns:
 | C10 — M1 Gate Packet Prep | done | 2026-04-11 | Prepared concrete M1 playtest packet, controls, objective entry criteria, automated proof list, and failure routing. |
 | C11 — Review GLM Placement Controller Slice | done | 2026-04-11 | Accepted GLM commit `14bd7ba`; Codex reran build, app typecheck, and 17 affected runtime tests locally. |
 | C12 — M1 Candidate Audit | done | 2026-04-11 | Latest code commit `14bd7ba` is locally verified and GitHub Actions green; M1 is ready for user gate. |
+| C13 — M1 Result And M2 System Replan | done | 2026-04-11 | User selected `pass with visual debt`; next phase reframed from visual pass to War3 core systems alignment. |
+| C14 — Review GLM Construction Lifecycle Pack | watch | 2026-04-11 | Starts after GLM Task 11 completes. Codex must verify resume/cancel/refund/builder cleanup behavior before acceptance. |
+| C15 — M2 Systems Architecture Slice | ready | 2026-04-11 | Define how order lifecycle, abilities, construction, combat, collision, and command-card rules should converge without turning Game.ts into more glue. |
 
 ## Task Cards
 
@@ -425,6 +428,117 @@ Closeout:
 - GitHub Actions for `14bd7ba`: success.
 - Local browser/runtime leftovers: none after cleanup.
 - Current next step is the documented M1 user gate, not another tactical bug review.
+
+### C13 — M1 Result And M2 System Replan
+
+Status: `done`.
+
+Goal: record the user's M1 verdict and convert the follow-up issues into system-level direction.
+
+User M1 verdict:
+
+- `pass with visual debt`.
+
+User-confirmed positives:
+
+- Workers and buildings are visible enough for the current slice.
+- Controls are broadly obedient.
+- Gather, build, train, and fight are possible.
+- AI applies pressure.
+- Base layout is basically playable.
+
+User-raised issues:
+
+- Barracks construction can stop halfway and cannot resume.
+- Arrow tower has no attack power.
+- Units lack collision volume.
+- Supply cap blocks play but population-building command feedback is weak.
+- Construction cancel is missing.
+- The higher-level direction is still incomplete: align with Warcraft III systems, not just fix isolated bugs.
+
+System diagnosis:
+
+- This is not a pure visual problem.
+- The missing layer is War3-like RTS systems: construction lifecycle, ability/prerequisite UI, static defense combat, cancellation/refund rules, and unit physical presence.
+
+Allowed files:
+
+- `PLAN.md`
+- `docs/HUMAN_DECISION_GATES.md`
+- `docs/WAR3_SYSTEM_ALIGNMENT_01.md`
+- `docs/CODEX_ACTIVE_QUEUE.md`
+- `docs/GLM_READY_TASK_QUEUE.md`
+
+Verification:
+
+```bash
+git diff --check
+```
+
+Closeout:
+
+- Added `docs/WAR3_SYSTEM_ALIGNMENT_01.md`.
+- Updated `PLAN.md`, `docs/HUMAN_DECISION_GATES.md`, and `docs/PROJECT_MILESTONES.zh-CN.md`.
+- Added GLM Tasks 11-14 for construction lifecycle, tower combat, command disabled reasons, and unit collision.
+- M2 is now `War3 Core Systems Alignment`; M3 is the visual/War3-feel pass.
+
+### C14 — Review GLM Construction Lifecycle Pack
+
+Status: `watch`.
+
+Trigger: GLM Task 11 completes.
+
+Goal: accept or reject construction lifecycle implementation based on runtime proof.
+
+Review checklist:
+
+- Under-construction building can be resumed by a valid worker.
+- Retasking or stopping the builder does not make construction unrecoverable.
+- Cancel construction releases footprint.
+- Cancel construction releases builder state.
+- Cancel construction refunds according to the documented rule.
+- Canceling a selected under-construction building leaves selection/HUD in a valid state.
+- No resource duplication.
+- No unrelated command, AI, visual, or pathing behavior changed.
+- Local runtime leftovers are cleaned.
+
+Required verification:
+
+```bash
+npm run build
+npx tsc --noEmit -p tsconfig.app.json
+./scripts/run-runtime-tests.sh tests/construction-lifecycle-regression.spec.ts tests/building-agency-regression.spec.ts tests/resource-supply-regression.spec.ts tests/death-cleanup-regression.spec.ts --reporter=list
+```
+
+### C15 — M2 Systems Architecture Slice
+
+Status: `ready`.
+
+Goal: define the medium-term architecture direction for War3-like systems before too many one-off fixes accumulate.
+
+Deliverable:
+
+- A concise system architecture note describing how these should converge:
+  - order lifecycle
+  - ability command cards
+  - construction lifecycle
+  - combat weapons
+  - unit collision/local avoidance
+  - command-card disabled reasons
+- Extraction order that does not block M2 implementation.
+- Boundaries for what GLM can implement directly vs what Codex must own.
+
+Allowed files:
+
+- `docs/WAR3_SYSTEM_ALIGNMENT_01.md`
+- `docs/GAME_TS_RISK_MAP.md`
+- `docs/CODEX_ACTIVE_QUEUE.md`
+
+Verification:
+
+```bash
+git diff --check
+```
 
 ## Default Next Action Logic
 

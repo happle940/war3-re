@@ -36,6 +36,10 @@ Current queue state:
 | Task 03 — Building Placement Agency Pack | completed | Codex takeover | 2026-04-11 | GLM stalled in exploration; Codex completed at commit `6290f90`. Runtime pack 57/57 passed locally. |
 | Task 09 — Death/Cleanup Contract Pack | completed | Codex takeover | 2026-04-11 | GLM stalled in broad exploration; Codex completed core pack directly. `death-cleanup-regression.spec.ts` 5/5 green. |
 | Task 10 — Placement Controller Development Slice | completed | GLM + Codex review | 2026-04-11 | Accepted at commit `14bd7ba`; Codex reran build, app typecheck, and 17 affected runtime tests locally. GitHub Actions for this commit was still in progress at acceptance update time. |
+| Task 11 — Construction Lifecycle Contract Pack | in_progress | GLM | 2026-04-11 | First M2 system-alignment task. Covers resume, cancel, refund, builder cleanup, and unrecoverable-construction bug. |
+| Task 12 — Static Defense Combat Contract Pack | ready | GLM | 2026-04-11 | Give arrow towers real weapon behavior after construction lifecycle is stable. |
+| Task 13 — Command Disabled Reasons Pack | ready | GLM | 2026-04-11 | Supply/resource blocked commands must explain failure instead of silently doing nothing. |
+| Task 14 — Unit Collision Presence Pack | ready | GLM | 2026-04-11 | Add small-unit physical presence and anti-stacking after order/construction semantics stabilize. |
 | Task 08 — Game.ts Module Extraction Slice | ready | Codex dispatch | 2026-04-11 | Defer until death/cleanup and HUD cache gaps are covered. |
 
 ## Dispatch Rules
@@ -112,6 +116,203 @@ Bad development examples:
 - changing scale/camera/visual taste as a side effect of logic work
 
 ## Queue
+
+### Task 11 — Construction Lifecycle Contract Pack
+
+Status: `in_progress`.
+
+Owner: GLM.
+
+Started: 2026-04-11.
+
+Priority: highest M2 task.
+
+Why now:
+
+User reported that a barracks can stop halfway and cannot be resumed, and that construction cancel is missing. This is one higher-level system gap: construction lifecycle.
+
+Goal:
+
+Implement a Warcraft-like construction lifecycle baseline:
+
+- under-construction buildings can be resumed by a valid worker
+- builder interruption does not make construction unrecoverable
+- construction can be canceled
+- cancel releases footprint and builder state
+- cancel applies a deterministic refund
+- selection/HUD stays valid after cancel
+
+Product contract:
+
+Construction is no longer a one-shot command. It is an order lifecycle with active builder, interrupted state, resumable state, cancellation, cleanup, and resource consequences.
+
+Default rule:
+
+- Cancel refund: 75% of the building's total cost while under construction.
+- If this conflicts with existing code shape, keep the rule simple and document it in the test.
+
+Allowed files:
+
+- `tests/construction-lifecycle-regression.spec.ts`
+- `src/game/Game.ts`
+- `src/game/GameCommand.ts`
+- `docs/GAMEPLAY_REGRESSION_CHECKLIST.md`
+- `docs/GLM_READY_TASK_QUEUE.md` only for closeout status
+
+Forbidden files:
+
+- `src/game/SimpleAI.ts`
+- `src/game/TeamResources.ts` unless a proven resource API gap blocks refund
+- `src/game/Asset*`
+- `src/game/*VisualFactory.ts`
+- `src/map/*`
+- `scripts/*`
+- `.github/*`
+- screenshots or image files
+- camera, terrain, or visual tuning
+
+Required tests:
+
+- A worker starts constructing a building, is stopped or retasked, and construction remains resumable.
+- A valid worker can resume an interrupted under-construction building.
+- Canceling under-construction building removes the building and releases occupancy.
+- Canceling under-construction building refunds the documented amount and does not duplicate resources.
+- Canceling selected under-construction building leaves selection and HUD in a valid state.
+- Builder state/buildTarget is cleared on cancel.
+
+Required verification:
+
+```bash
+npm run build
+npx tsc --noEmit -p tsconfig.app.json
+./scripts/run-runtime-tests.sh tests/construction-lifecycle-regression.spec.ts tests/building-agency-regression.spec.ts tests/resource-supply-regression.spec.ts tests/death-cleanup-regression.spec.ts --reporter=list
+./scripts/cleanup-local-runtime.sh
+```
+
+Commit message:
+
+```text
+systems: add construction lifecycle baseline
+```
+
+Do not claim:
+
+- full Warcraft III construction parity
+- multi-builder speed scaling
+- repair system completeness
+- final command-card UX
+
+Dispatch prompt summary:
+
+```text
+Implement Task 11 Construction Lifecycle Contract Pack. Add runtime tests first. Fix only the construction lifecycle gaps: resume interrupted construction, cancel under-construction building, refund, footprint release, builder cleanup, selection/HUD validity. Keep scope inside allowed files. Verify with build, app typecheck, locked runtime tests, cleanup, then commit/push.
+```
+
+### Task 12 — Static Defense Combat Contract Pack
+
+Status: `ready`.
+
+Owner: GLM.
+
+Priority: after Task 11.
+
+Goal:
+
+Make arrow towers actual combat buildings.
+
+Must prove:
+
+- tower has range/damage/cooldown weapon behavior
+- tower auto-acquires enemy units in range
+- tower damages targets over time
+- tower stops or reacquires after target death
+- no severe console errors
+
+Allowed files:
+
+- `tests/static-defense-regression.spec.ts`
+- `src/game/Game.ts`
+- `src/game/GameData.ts`
+- `docs/GAMEPLAY_REGRESSION_CHECKLIST.md`
+
+Required verification:
+
+```bash
+npm run build
+npx tsc --noEmit -p tsconfig.app.json
+./scripts/run-runtime-tests.sh tests/static-defense-regression.spec.ts tests/death-cleanup-regression.spec.ts --reporter=list
+./scripts/cleanup-local-runtime.sh
+```
+
+### Task 13 — Command Disabled Reasons Pack
+
+Status: `ready`.
+
+Owner: GLM.
+
+Priority: after Task 11 or Task 12.
+
+Goal:
+
+Make command buttons communicate blocked states, especially supply block and insufficient resources.
+
+Must prove:
+
+- supply-blocked train command is disabled or returns visible reason
+- insufficient-resource build/train command is disabled or returns visible reason
+- successful commands still work
+- command card state updates after resources/supply changes
+
+Allowed files:
+
+- `tests/command-card-state-regression.spec.ts`
+- `src/game/Game.ts`
+- `src/styles.css`
+- `docs/GAMEPLAY_REGRESSION_CHECKLIST.md`
+
+Required verification:
+
+```bash
+npm run build
+npx tsc --noEmit -p tsconfig.app.json
+./scripts/run-runtime-tests.sh tests/command-card-state-regression.spec.ts tests/resource-supply-regression.spec.ts --reporter=list
+./scripts/cleanup-local-runtime.sh
+```
+
+### Task 14 — Unit Collision Presence Pack
+
+Status: `ready`.
+
+Owner: GLM.
+
+Priority: after construction and command state.
+
+Goal:
+
+Add a minimal unit physical-presence baseline without building a full physics engine.
+
+Must prove:
+
+- moving units do not permanently stack at one exact position
+- worker/footman have deterministic collision radius or separation rule
+- building blockers remain respected
+- existing pathing tests remain green
+
+Allowed files:
+
+- `tests/unit-collision-regression.spec.ts`
+- `src/game/Game.ts`
+- `src/game/GameData.ts`
+- `docs/GAMEPLAY_REGRESSION_CHECKLIST.md`
+
+Required verification:
+
+```bash
+npm run build
+npx tsc --noEmit -p tsconfig.app.json
+./scripts/run-runtime-tests.sh tests/unit-collision-regression.spec.ts tests/pathing-footprint-regression.spec.ts tests/command-regression.spec.ts --reporter=list
+./scripts/cleanup-local-runtime.sh
+```
 
 ### Task 01 — Resource/Supply Regression Pack
 
@@ -701,14 +902,10 @@ Do one mechanical extraction from Game.ts with no behavior change. Choose only t
 
 Use this order unless current failures suggest otherwise:
 
-1. Task 01 Resource/Supply Regression Pack
-2. Task 02 Unit Visibility Contract Pack
-3. Task 05 Pathing/Footprint Contract Pack
-4. Task 06 AI First Five Minutes Deepening
-6. Task 07 Asset Pipeline Contract Pack
-7. Task 03 Building Placement Agency Pack
-8. Task 09 Death/Cleanup Contract Pack
-9. Task 10 Placement Controller Development Slice
-10. Task 08 Game.ts Module Extraction Slice
+1. Task 11 Construction Lifecycle Contract Pack
+2. Task 12 Static Defense Combat Contract Pack
+3. Task 13 Command Disabled Reasons Pack
+4. Task 14 Unit Collision Presence Pack
+5. Task 08 Game.ts Module Extraction Slice only after M2 contracts are safer
 
-Reasoning: first protect economy/command/pathing contracts, then visual asset reliability, then refactor.
+Reasoning: M1 passed with visual debt. User feedback now points to missing Warcraft-like systems, so M2 must harden construction, combat, command UI, and physical presence before another broad visual gate.
