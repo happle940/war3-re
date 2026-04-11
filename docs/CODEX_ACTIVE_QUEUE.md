@@ -60,7 +60,7 @@ GLM owns:
 | C05 — Human Decision Gates | done | 2026-04-11 | Defines when the user should intervene and what Codex/GLM must finish before each gate. |
 | C06 — PLAN.md stale queue cleanup | done | 2026-04-11 | PLAN now points to live queue/gate docs instead of carrying a stale inline GLM queue. |
 | C07 — CI Node 24 Migration | ready | 2026-04-11 | GitHub Actions warns Node 20 actions will be forced to Node 24; low urgency but objective. |
-| C08 — Game.ts Risk Map | ready | 2026-04-11 | Before refactor, identify high-change zones and safe extraction seams. |
+| C08 — Game.ts Risk Map | done | 2026-04-11 | Added responsibility zones, coverage gaps, no-go zones, and safe extraction order. |
 
 ## Task Cards
 
@@ -239,7 +239,7 @@ GitHub Actions must pass after push.
 
 ### C08 — Game.ts Risk Map
 
-Status: `ready`.
+Status: `done`.
 
 Goal: prepare future refactor by mapping `Game.ts` responsibilities before moving code.
 
@@ -254,6 +254,12 @@ Must include:
 - Test coverage protecting each zone.
 - Safe extraction candidates.
 - No-go zones until more tests exist.
+
+Closeout:
+
+- Added `docs/GAME_TS_RISK_MAP.md`.
+- Marked pathing/footprint, asset replacement/disposal, building agency edge cases, AI recovery, death cleanup, and HUD cache transitions as coverage gaps.
+- Defined safe extraction phases and M1 no-go zones.
 
 ## Default Next Action Logic
 
