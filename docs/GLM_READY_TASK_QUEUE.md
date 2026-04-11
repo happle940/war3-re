@@ -36,7 +36,7 @@ Current queue state:
 | Task 03 — Building Placement Agency Pack | completed | Codex takeover | 2026-04-11 | GLM stalled in exploration; Codex completed at commit `6290f90`. Runtime pack 57/57 passed locally. |
 | Task 09 — Death/Cleanup Contract Pack | completed | Codex takeover | 2026-04-11 | GLM stalled in broad exploration; Codex completed core pack directly. `death-cleanup-regression.spec.ts` 5/5 green. |
 | Task 10 — Placement Controller Development Slice | completed | GLM + Codex review | 2026-04-11 | Accepted at commit `14bd7ba`; Codex reran build, app typecheck, and 17 affected runtime tests locally. GitHub Actions for this commit was still in progress at acceptance update time. |
-| Task 11 — Construction Lifecycle Contract Pack | in_progress | GLM | 2026-04-11 | First M2 system-alignment task. Covers resume, cancel, refund, builder cleanup, and unrecoverable-construction bug. |
+| Task 11 — Construction Lifecycle Contract Pack | completed | Codex takeover | 2026-04-11 | GLM stalled in broad exploration; Codex implemented resumable construction, cancel, refund, footprint release, HUD cleanup, builder cleanup, and runtime proof. |
 | Task 12 — Static Defense Combat Contract Pack | ready | GLM | 2026-04-11 | Give arrow towers real weapon behavior after construction lifecycle is stable. |
 | Task 13 — Command Disabled Reasons Pack | ready | GLM | 2026-04-11 | Supply/resource blocked commands must explain failure instead of silently doing nothing. |
 | Task 14 — Unit Collision Presence Pack | ready | GLM | 2026-04-11 | Add small-unit physical presence and anti-stacking after order/construction semantics stabilize. |
@@ -119,11 +119,36 @@ Bad development examples:
 
 ### Task 11 — Construction Lifecycle Contract Pack
 
-Status: `in_progress`.
+Status: `completed`.
 
-Owner: GLM.
+Owner: Codex takeover.
 
 Started: 2026-04-11.
+
+Completed: 2026-04-11.
+
+Final review status: accepted locally. GLM stalled in exploration without creating files, so Codex interrupted and completed the pack directly.
+
+Implemented:
+
+- `assignBuilderToConstruction()` as the minimal construction-resume path.
+- Right-clicking a friendly under-construction building assigns selected workers to resume construction.
+- `cancelConstruction()` for under-construction buildings.
+- Deterministic cancel refund: `floor(75% of total building cost)`.
+- Cancel cleanup through the existing death cleanup path, plus forced HUD/command-card cache invalidation.
+- Command-card “取消” button when a player under-construction building is selected.
+- Added `tests/construction-lifecycle-regression.spec.ts` and integrated it into `npm run test:runtime`.
+
+Codex verified:
+
+```bash
+npm run build
+npx tsc --noEmit -p tsconfig.app.json
+./scripts/run-runtime-tests.sh tests/construction-lifecycle-regression.spec.ts --reporter=list
+./scripts/run-runtime-tests.sh tests/construction-lifecycle-regression.spec.ts tests/building-agency-regression.spec.ts tests/resource-supply-regression.spec.ts tests/death-cleanup-regression.spec.ts --reporter=list
+```
+
+Result: build passed; app typecheck passed; construction lifecycle pack passed 6/6; affected construction/building/resource/death pack passed 25/25.
 
 Priority: highest M2 task.
 

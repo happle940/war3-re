@@ -66,7 +66,7 @@ GLM owns:
 | C11 — Review GLM Placement Controller Slice | done | 2026-04-11 | Accepted GLM commit `14bd7ba`; Codex reran build, app typecheck, and 17 affected runtime tests locally. |
 | C12 — M1 Candidate Audit | done | 2026-04-11 | Latest code commit `14bd7ba` is locally verified and GitHub Actions green; M1 is ready for user gate. |
 | C13 — M1 Result And M2 System Replan | done | 2026-04-11 | User selected `pass with visual debt`; next phase reframed from visual pass to War3 core systems alignment. |
-| C14 — Review GLM Construction Lifecycle Pack | watch | 2026-04-11 | Starts after GLM Task 11 completes. Codex must verify resume/cancel/refund/builder cleanup behavior before acceptance. |
+| C14 — Construction Lifecycle Pack Takeover | done | 2026-04-11 | GLM stalled without file changes; Codex implemented and verified resume/cancel/refund/builder cleanup directly. |
 | C15 — M2 Systems Architecture Slice | ready | 2026-04-11 | Define how order lifecycle, abilities, construction, combat, collision, and command-card rules should converge without turning Game.ts into more glue. |
 
 ## Task Cards
@@ -482,13 +482,13 @@ Closeout:
 - Added GLM Tasks 11-14 for construction lifecycle, tower combat, command disabled reasons, and unit collision.
 - M2 is now `War3 Core Systems Alignment`; M3 is the visual/War3-feel pass.
 
-### C14 — Review GLM Construction Lifecycle Pack
+### C14 — Construction Lifecycle Pack Takeover
 
-Status: `watch`.
+Status: `done`.
 
-Trigger: GLM Task 11 completes.
+Trigger: GLM Task 11 stalled without creating files.
 
-Goal: accept or reject construction lifecycle implementation based on runtime proof.
+Goal: implement and verify the construction lifecycle pack directly instead of waiting on a stalled external agent.
 
 Review checklist:
 
@@ -509,6 +509,15 @@ npm run build
 npx tsc --noEmit -p tsconfig.app.json
 ./scripts/run-runtime-tests.sh tests/construction-lifecycle-regression.spec.ts tests/building-agency-regression.spec.ts tests/resource-supply-regression.spec.ts tests/death-cleanup-regression.spec.ts --reporter=list
 ```
+
+Closeout:
+
+- Added `tests/construction-lifecycle-regression.spec.ts`.
+- Added minimal construction resume path and right-click resume for friendly under-construction buildings.
+- Added under-construction cancel with deterministic `floor(75%)` refund.
+- Added selected-building cancel button and HUD cache invalidation.
+- Added construction pack to `npm run test:runtime`.
+- Verification passed: build, app typecheck, construction pack 6/6, affected construction/building/resource/death pack 25/25.
 
 ### C15 — M2 Systems Architecture Slice
 

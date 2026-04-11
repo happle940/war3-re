@@ -127,6 +127,7 @@ export interface Unit {
 }
 
 const TEAM_COLORS = [0x4488ff, 0xff4444]
+const CONSTRUCTION_CANCEL_REFUND_RATE = 0.75
 
 /**
  * 游戏主类
@@ -1425,11 +1426,7 @@ export class Game {
       peasant = this.findNearestIdlePeasant(pos)
     }
 
-    if (peasant) {
-      building.builder = peasant
-      issueCommand([peasant], { type: 'build', target: building })
-      this.planPath(peasant, building.mesh.position)
-    }
+    if (peasant) this.assignBuilderToConstruction(peasant, building)
 
     // 清理
     this.exitPlacementMode()
@@ -1438,6 +1435,50 @@ export class Game {
   exitPlacementMode() {
     this.placement.exit(this.scene)
     this.updateModeHint('')
+  }
+
+  /**
+   * Assign a worker to active construction.
+   *
+   * This is intentionally small: it is not a full repair system or
+   * multi-builder model. It only makes interrupted construction resumable.
+   */
+  private assignBuilderToConstruction(worker: Unit, building: Unit): boolean {
+    if (!this.units.includes(worker) || !this.units.includes(building)) return false
+    if (worker.isBuilding || !UNITS[worker.type]?.canGather) return false
+    if (!building.isBuilding || building.buildProgress >= 1 || building.hp <= 0) return false
+    if (worker.team !== building.team) return false
+
+    building.builder = worker
+    issueCommand([worker], { type: 'build', target: building })
+    this.planPath(worker, building.mesh.position)
+    return true
+  }
+
+  /**
+   * Cancel an under-construction building.
+   *
+   * Current deterministic baseline: refund floor(75% of total building cost).
+   * This is a product contract, not a claim of full Warcraft III parity.
+   */
+  private cancelConstruction(building: Unit): boolean {
+    if (!this.units.includes(building)) return false
+    if (!building.isBuilding || building.buildProgress >= 1 || building.hp <= 0) return false
+    const def = BUILDINGS[building.type]
+    if (!def || building.team < 0) return false
+
+    const refundGold = Math.floor(def.cost.gold * CONSTRUCTION_CANCEL_REFUND_RATE)
+    const refundLumber = Math.floor(def.cost.lumber * CONSTRUCTION_CANCEL_REFUND_RATE)
+    if (refundGold > 0 || refundLumber > 0) {
+      this.resources.earn(building.team, refundGold, refundLumber)
+    }
+
+    building.hp = 0
+    this.handleDeadUnits()
+    // Force the next HUD tick to rebuild empty selection/command-card state.
+    this._lastCmdKey = '__construction_cancel__'
+    this._lastSelKey = '__construction_cancel__'
+    return true
   }
 
   /** 进入攻击移动目标选择模式 */
@@ -1947,6 +1988,19 @@ export class Game {
           issueCommand(controllable, { type: 'attack', target })
           this.planPathForUnits(controllable, target.mesh.position)
           return
+        }
+
+        // 右键己方未完成建筑 → 农民续建
+        if (target.team === 0 && target.isBuilding && target.buildProgress < 1) {
+          const workers = controllable.filter((u) => UNITS[u.type]?.canGather)
+          let assigned = 0
+          for (const worker of workers) {
+            if (this.assignBuilderToConstruction(worker, target)) assigned++
+          }
+          if (assigned > 0) {
+            this.showMoveIndicator(target.mesh.position.x, target.mesh.position.z)
+            return
+          }
         }
 
         // 右键己方建筑 → 移动到建筑旁
@@ -3942,6 +3996,19 @@ export class Game {
           },
         })
       }
+    }
+
+    // 未完成建筑：显示取消建造
+    if (primary.isBuilding && primary.buildProgress < 1) {
+      const def = BUILDINGS[primary.type]
+      const refundGold = Math.floor((def?.cost.gold ?? 0) * CONSTRUCTION_CANCEL_REFUND_RATE)
+      const refundLumber = Math.floor((def?.cost.lumber ?? 0) * CONSTRUCTION_CANCEL_REFUND_RATE)
+      buttons.push({
+        label: '取消',
+        cost: `返还 ${refundGold}g ${refundLumber}w`,
+        onClick: () => { this.cancelConstruction(primary) },
+        hotkey: 'C',
+      })
     }
 
     // 可移动军事单位：显示 停止 / 驻守 / 攻击移动

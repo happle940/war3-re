@@ -42,6 +42,8 @@
 ## 建造/训练/人口
 
 - [ ] 农民放置建筑 → 扣资源 → 半透明 → 农民走去建造 → 进度增长 → 完成
+- [ ] 建造被中断后，农民右键未完成建筑 → 继续建造
+- [ ] 选中未完成建筑 → 点击取消 → 建筑消失、返还资源、释放占地
 - [ ] TH 训练农民 → 扣资源 → 出兵
 - [ ] 兵营训练步兵 → 扣资源 → 出兵
 - [ ] 人口上限（10 无农场）→ 训练被拒绝（HUD 不变化）
@@ -193,6 +195,19 @@
 - [x] Shift-style 追加选择进入放置模式时保留 selection order，不污染 remembered worker list
 - [x] 建造代理测试过程中无严重 console error
 
+### 建造生命周期自动化覆盖
+
+以下项目由 `tests/construction-lifecycle-regression.spec.ts` 自动验证（Playwright）：
+
+- [x] 建造者被 stop 中断后，未完成建筑仍保留并可继续建造
+- [x] 有效农民可以接手并恢复未完成建筑建造
+- [x] 取消未完成建筑会移除实体并释放 footprint occupancy
+- [x] 取消退款规则确定：返还建筑总成本的 `floor(75%)`
+- [x] 取消同一未完成建筑不能重复返还资源
+- [x] 选中未完成建筑时命令卡出现“取消”按钮
+- [x] 取消选中的未完成建筑后，selection、selection ring、HUD、命令卡都恢复到有效空状态
+- [x] 取消未完成建筑会清理 builder 的 `buildTarget` / move target / build state
+
 ### 死亡/清理自动化覆盖
 
 以下项目由 `tests/death-cleanup-regression.spec.ts` 自动验证（Playwright）：
@@ -217,6 +232,7 @@
 
 | 日期 | 验证人 | 结果 | 备注 |
 |------|--------|------|------|
+| 2026-04-11 | Codex | Construction Lifecycle Regression | `construction-lifecycle-regression.spec.ts`: 6 tests green. Added resumable construction, under-construction cancel, deterministic 75% refund, footprint release, selected-building HUD cleanup, and builder cleanup. Added the spec to `npm run test:runtime`. |
 | 2026-04-11 | Codex | Death/Cleanup Regression | `death-cleanup-regression.spec.ts`: 5 tests green. Selection/ring/healthbar/outline cleanup, attack target cleanup, building footprint release, builder cleanup, and invalid resource target recovery are now runtime-proven. Added the spec to `npm run test:runtime`. |
 | 2026-04-11 | Codex | Building Agency Regression | `building-agency-regression.spec.ts`: 5 tests green. Fixed `building.builder` never being set and `findNearestIdlePeasant()` considering dead workers during fallback. Added the spec to `npm run test:runtime`. |
 | 2026-04-11 | Codex | Asset Pipeline Regression | `asset-pipeline-regression.spec.ts`: 4 tests green. Fixed `Material[]` clone isolation, browser-side fake asset refresh proof, and `dealDamage()` scale reset that would break glTF asset scale. Added the spec to `npm run test:runtime`. |
