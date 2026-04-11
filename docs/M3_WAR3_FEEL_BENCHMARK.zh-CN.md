@@ -454,6 +454,41 @@ Immediate M3 implication:
 3. Keep footprint/pathing sizes stable until visual scale and `GameData.size` are separated.
 4. Only after runtime ratios are sane should camera and terrain be tuned.
 
+### 6.4 运行时比例归一化后快照
+
+来源：`npm run test:m3-scale`，M3 scale normalization patch。该补丁只调整视觉代理/资产 scale/selection ring，不调整碰撞、寻路、人口或 AI 语义。
+
+```
+Worker:    1.240w × 1.865h × 0.963d
+Footman:   1.365w × 2.040h × 0.960d
+Town Hall: 3.508w × 2.232h × 3.229d
+Gold Mine: 2.840w × 3.160h × 2.840d
+Barracks:  2.546w × 2.550h × 2.546d
+Farm:      1.500w × 1.000h × 2.200d
+Tower:     1.320w × 3.500h × 1.320d
+
+Measured ratios:
+  Farm / TH area       = 0.291
+  Barracks / TH area   = 0.572
+  GoldMine / TH area   = 0.712
+  Tower / TH area      = 0.154
+  Tower height / TH    = 1.568
+  Footman silhouette / Worker silhouette = 1.204
+```
+
+Changes from previous runtime snapshot:
+
+- Footman silhouette changed from `0.506× Worker` to `1.204× Worker`. The previous hierarchy was inverted; this now satisfies the measurable military-readability contract.
+- Barracks footprint changed from `3.925× Town Hall` to `0.572× Town Hall`. Town Hall is now the measurable base visual anchor.
+- Gold Mine remains a strong landmark but no longer visually dominates Town Hall by footprint.
+- Tower keeps a vertical defense profile while no longer dwarfing Town Hall beyond the current M3 guardrail.
+
+Remaining visual debt:
+
+1. This is still a numeric scale correction, not human visual approval.
+2. Worker visibility on the live page still requires human review because the proxy can be occluded by dark terrain, tree shadows, and HUD opacity.
+3. Final M3 approval still depends on browser playtest: default view, base readability, drag-select, worker construction, and first combat.
+
 ---
 
 ## 7. 参考文档

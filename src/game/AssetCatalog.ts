@@ -27,7 +27,7 @@ const CATALOG: AssetEntry[] = [
   // worker: 使用 RTS 增强版 proxy（glTF 是高面数角色模型，RTS 镜头下不可读）
   { key: 'footman',  kind: 'unit',     path: 'assets/models/units/footman.glb',    scale: 1.0, offsetY: 0 },
   // ===== 建筑 =====
-  { key: 'townhall', kind: 'building', path: 'assets/models/buildings/townhall.glb', scale: 1.4, offsetY: 0 },
+  { key: 'townhall', kind: 'building', path: 'assets/models/buildings/townhall.glb', scale: 1.65, offsetY: 0 },
   { key: 'barracks', kind: 'building', path: 'assets/models/buildings/barracks.glb', scale: 1.0, offsetY: 0 },
   { key: 'farm',     kind: 'building', path: 'assets/models/buildings/farm.glb',     scale: 1.0, offsetY: 0 },
   { key: 'tower',    kind: 'building', path: 'assets/models/buildings/tower.glb',    scale: 1.0, offsetY: 0 },

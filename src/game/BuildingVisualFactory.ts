@@ -165,16 +165,18 @@ function createProxyTownhall(group: THREE.Group, color: number) {
 }
 
 function createProxyBarracks(group: THREE.Group, color: number) {
-  // size=3: mid-size production building — wide body, big open gate, military motifs
+  // size=3: mid-size production building.
+  // Keep its visual bbox below Town Hall; production identity comes from gate/crest,
+  // not from being wider than the base anchor.
   const stonework = new THREE.Mesh(
-    new THREE.BoxGeometry(2.8, 0.35, 2.6),
+    new THREE.BoxGeometry(2.4, 0.35, 2.1),
     new THREE.MeshLambertMaterial({ color: 0x707060 }),
   )
   stonework.position.y = 0.175
   group.add(stonework)
 
   const base = new THREE.Mesh(
-    new THREE.BoxGeometry(2.6, 1.1, 2.4),
+    new THREE.BoxGeometry(2.2, 1.1, 1.9),
     new THREE.MeshLambertMaterial({ color: 0x604020 }),
   )
   base.position.y = 0.9
@@ -182,18 +184,18 @@ function createProxyBarracks(group: THREE.Group, color: number) {
 
   // Wide military gate — primary production cue
   const gateFrame = new THREE.Mesh(
-    new THREE.BoxGeometry(1.2, 1.1, 0.08),
+    new THREE.BoxGeometry(1.0, 1.05, 0.08),
     new THREE.MeshLambertMaterial({ color: 0x2a1a0a }),
   )
-  gateFrame.position.set(0, 0.7, 1.22)
+  gateFrame.position.set(0, 0.7, 0.98)
   group.add(gateFrame)
 
   // Gate arch (semicircle above gate)
   const gateArch = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.6, 0.6, 0.08, 12, 1, false, 0, Math.PI),
+    new THREE.CylinderGeometry(0.5, 0.5, 0.08, 12, 1, false, 0, Math.PI),
     new THREE.MeshLambertMaterial({ color: 0x5c3a1e }),
   )
-  gateArch.position.set(0, 1.25, 1.22)
+  gateArch.position.set(0, 1.22, 0.98)
   gateArch.rotation.z = Math.PI / 2
   gateArch.rotation.y = Math.PI / 2
   group.add(gateArch)
@@ -203,62 +205,62 @@ function createProxyBarracks(group: THREE.Group, color: number) {
     new THREE.BoxGeometry(0.5, 0.12, 0.06),
     new THREE.MeshLambertMaterial({ color }),
   )
-  shieldH.position.set(0, 1.45, 1.24)
+  shieldH.position.set(0, 1.42, 1.0)
   group.add(shieldH)
   const shieldV = new THREE.Mesh(
     new THREE.BoxGeometry(0.12, 0.5, 0.06),
     new THREE.MeshLambertMaterial({ color }),
   )
-  shieldV.position.set(0, 1.45, 1.24)
+  shieldV.position.set(0, 1.42, 1.0)
   group.add(shieldV)
 
   // Roof
   const roof = new THREE.Mesh(
-    new THREE.ConeGeometry(2.0, 1.3, 4),
+    new THREE.ConeGeometry(0.9, 1.1, 4),
     new THREE.MeshLambertMaterial({ color: 0x5c3a1e }),
   )
-  roof.position.y = 2.1
+  roof.position.y = 2.0
   roof.rotation.y = Math.PI / 4
   group.add(roof)
 
   // Crossed swords above gate — production identity
   const swordMat = new THREE.MeshLambertMaterial({ color: 0xcccccc })
   const swordL = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.6, 0.04), swordMat)
-  swordL.position.set(-0.15, 1.0, 1.26)
+  swordL.position.set(-0.15, 1.0, 1.04)
   swordL.rotation.z = 0.3
   group.add(swordL)
   const swordR = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.6, 0.04), swordMat)
-  swordR.position.set(0.15, 1.0, 1.26)
+  swordR.position.set(0.15, 1.0, 1.04)
   swordR.rotation.z = -0.3
   group.add(swordR)
 
   // Anvil outside gate — crafting/production cue
   const anvilBase = new THREE.Mesh(
-    new THREE.BoxGeometry(0.4, 0.25, 0.35),
+    new THREE.BoxGeometry(0.32, 0.22, 0.28),
     new THREE.MeshLambertMaterial({ color: 0x555555 }),
   )
-  anvilBase.position.set(1.0, 0.125, 1.4)
+  anvilBase.position.set(0.82, 0.11, 1.08)
   group.add(anvilBase)
   const anvilTop = new THREE.Mesh(
-    new THREE.BoxGeometry(0.5, 0.1, 0.4),
+    new THREE.BoxGeometry(0.42, 0.1, 0.34),
     new THREE.MeshLambertMaterial({ color: 0x666666 }),
   )
-  anvilTop.position.set(1.0, 0.3, 1.4)
+  anvilTop.position.set(0.82, 0.26, 1.08)
   group.add(anvilTop)
 
-  // Team color banner — bigger, on side
+  // Team color banner: kept inside bbox so it does not distort scale metrics.
   const pole = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.04, 0.04, 1.5, 4),
+    new THREE.CylinderGeometry(0.035, 0.035, 1.25, 4),
     new THREE.MeshLambertMaterial({ color: 0x888888 }),
   )
-  pole.position.set(-1.2, 1.7, 0.8)
+  pole.position.set(-0.92, 1.55, 0.62)
   group.add(pole)
 
   const flag = new THREE.Mesh(
-    new THREE.PlaneGeometry(0.6, 0.4),
+    new THREE.PlaneGeometry(0.46, 0.32),
     new THREE.MeshLambertMaterial({ color, side: THREE.DoubleSide }),
   )
-  flag.position.set(-1.2, 2.3, 0.8)
+  flag.position.set(-0.92, 2.08, 0.62)
   group.add(flag)
 }
 

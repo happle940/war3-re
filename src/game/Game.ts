@@ -2083,7 +2083,13 @@ export class Game {
 
   /** 为单位创建选中圈（war3 风格：团队色圆环 + 微弱脉冲） */
   private createSelectionRing(unit: Unit) {
-    const radius = unit.isBuilding ? (BUILDINGS[unit.type]?.size ?? 1) * 0.55 : 0.5
+    const radius = unit.isBuilding
+      ? (BUILDINGS[unit.type]?.size ?? 1) * 0.55
+      : unit.type === 'footman'
+        ? 0.68
+        : unit.type === 'worker'
+          ? 0.62
+          : 0.5
     const thickness = unit.isBuilding ? 0.15 : 0.1
     const ringGeo = new THREE.RingGeometry(radius - thickness, radius, 32)
     ringGeo.rotateX(-Math.PI / 2)

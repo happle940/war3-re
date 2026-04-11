@@ -238,6 +238,10 @@ function createProxyUnit(type: string, team: number): THREE.Group {
 }
 
 function createProxyFootman(group: THREE.Group, color: number) {
+  // M3 scale contract: military units must read heavier than workers at RTS zoom.
+  // Collision/pathing remains unchanged; this is only the visual adapter.
+  group.userData.healthBarY = 2.35
+
   const body = new THREE.Mesh(
     new THREE.CylinderGeometry(0.28, 0.32, 0.9, 8),
     new THREE.MeshLambertMaterial({ color: 0x787878 }),
@@ -301,17 +305,19 @@ function createProxyFootman(group: THREE.Group, color: number) {
   hilt.position.set(0.4, 0.28, 0)
   group.add(hilt)
 
-  const shield = new THREE.Mesh(
-    new THREE.BoxGeometry(0.08, 0.5, 0.4),
-    new THREE.MeshLambertMaterial({ color }),
-  )
-  shield.position.set(-0.38, 0.55, 0)
-  group.add(shield)
-
   const shieldRim = new THREE.Mesh(
-    new THREE.BoxGeometry(0.09, 0.52, 0.42),
+    new THREE.BoxGeometry(0.09, 0.58, 0.48),
     new THREE.MeshLambertMaterial({ color: 0x666666 }),
   )
   shieldRim.position.set(-0.38, 0.55, 0)
   group.add(shieldRim)
+
+  const shield = new THREE.Mesh(
+    new THREE.BoxGeometry(0.1, 0.42, 0.32),
+    new THREE.MeshLambertMaterial({ color }),
+  )
+  shield.position.set(-0.43, 0.55, 0)
+  group.add(shield)
+
+  group.scale.setScalar(1.5)
 }

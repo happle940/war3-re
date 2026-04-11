@@ -232,8 +232,8 @@ test.describe('M3 Scale Measurement Baseline', () => {
       for (const [key, size] of Object.entries(buildingSizes)) {
         expectedRingRadii[key] = size * 0.55
       }
-      expectedRingRadii.worker = 0.5
-      expectedRingRadii.footman = 0.5
+      expectedRingRadii.worker = 0.62
+      expectedRingRadii.footman = 0.68
 
       // Verify selection ring radius is sane relative to footprint
       // For buildings: ring should be > 0 and < 2x the data size
@@ -386,6 +386,15 @@ test.describe('M3 Scale Measurement Baseline', () => {
     const towerH = s.tower?.bboxHeight ?? 0
     const towerW = s.tower?.bboxWidth ?? 0
     expect(towerH, `tower height (${towerH}) must exceed tower width (${towerW}) for vertical profile`).toBeGreaterThan(towerW)
+
+    // M3 visual-scale contract: the runtime bbox must preserve base hierarchy.
+    // These thresholds are intentionally broad; they prevent inverted silhouettes
+    // while leaving room for later asset swaps and hand-tuned visual polish.
+    expect(s.ratios.footmanOverWorker, 'footman silhouette must read heavier than worker').toBeGreaterThan(1.1)
+    expect(s.ratios.barracksOverTH, 'barracks must remain visually smaller than Town Hall anchor').toBeLessThan(0.95)
+    expect(s.ratios.farmOverTH, 'farm must remain a compact wall/supply piece').toBeLessThan(0.45)
+    expect(s.ratios.goldmineOverTH, 'goldmine should not visually dominate Town Hall').toBeLessThan(1.1)
+    expect(s.ratios.towerHeightOverTH, 'tower skyline should not dwarf Town Hall').toBeLessThan(1.8)
 
     // ---- GROUP 3: Spawned workers outside blockers ----
     for (const w of s.workerBlockerStatus) {
