@@ -256,7 +256,7 @@ Allowed scope:
 ### Next glm tasks, in order
 
 1. `CI Runtime Gate 01`: make GitHub Actions run build, app tsc, closeout tests, and first-five-minutes tests.
-2. `Command Regression Pack 01`: add runtime assertions for move override, stop/hold, attackMove, and shift queue semantics.
+2. `Command Regression Pack 01`: add runtime assertions for move override, stop/hold, attackMove, and shift queue semantics. Task packet: `/Users/zhaocong/Documents/war3-re/docs/GLM_TASK_COMMAND_REGRESSION_PACK_01.md`.
 3. `AI Opening Fix 01`: if first-five-minutes tests expose objective AI blockers, fix only the smallest SimpleAI/Game slice required.
 4. `Resource/Supply Regression Pack 01`: assert supply, multi-building training, resources, and build-progress edge cases.
 5. `Runtime Diagnostics Overlay 01`: add a dev-only state snapshot helper for tests and debugging, not a user-facing HUD feature.

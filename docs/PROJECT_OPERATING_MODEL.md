@@ -135,7 +135,52 @@ For tests, include:
 
 - “tests must assert behavior, not only log”
 
-## 5. Review Rules
+## 5. glm Repair Authority
+
+`glm` should not be limited to reporting failures. It has repair authority when the failure is inside the task's declared scope.
+
+### 5.1 Default repair rights
+
+`glm` may directly fix:
+
+- test infrastructure failures
+- flaky waits, ports, host binding, and cleanup scripts
+- assertion diagnostics
+- docs/checklist mismatches caused by the current task
+- small implementation bugs inside explicitly allowed files
+
+### 5.2 Conditional repair rights
+
+`glm` may fix gameplay implementation only when all of these are true:
+
+- the failing behavior is runtime-proven by the task's test
+- the affected files are in the prompt's allowed file list
+- the fix is narrow and does not change product semantics
+- the final report states the failing assertion before and after the fix
+
+If these conditions are not true, `glm` must stop and report the exact failing assertion and suspected code area.
+
+### 5.3 No silent weakening
+
+`glm` must not turn a real gameplay failure into a passing test by lowering the product bar.
+
+Allowed:
+
+- making a wall-clock wait depend on observed `gameTime`
+- fixing `localhost` versus `127.0.0.1`
+- improving failure diagnostics
+
+Not allowed:
+
+- replacing behavior assertions with smoke checks
+- deleting a failing user-contract scenario
+- claiming visual or feel approval without user confirmation
+
+### 5.4 Codex responsibility
+
+Codex should give `glm` enough repair room to stay productive, then review whether the repair preserved the contract.
+
+## 6. Review Rules
 
 Codex reviews glm output using this order:
 
@@ -148,16 +193,16 @@ Codex reviews glm output using this order:
 
 Reports from glm are useful, but not authoritative.
 
-## 6. Verification Policy
+## 7. Verification Policy
 
-### 6.1 Always required after code changes
+### 7.1 Always required after code changes
 
 ```bash
 npm run build
 npx tsc --noEmit -p tsconfig.app.json
 ```
 
-### 6.2 Required for interaction logic
+### 7.2 Required for interaction logic
 
 ```bash
 npx playwright test tests/closeout.spec.ts --reporter=list
@@ -165,7 +210,7 @@ npx playwright test tests/closeout.spec.ts --reporter=list
 
 or a task-specific Playwright suite with real assertions.
 
-### 6.3 Required for visual feel
+### 7.3 Required for visual feel
 
 Human confirmation.
 
@@ -177,7 +222,7 @@ Automated tests cannot approve:
 - HUD atmosphere
 - Warcraft III likeness
 
-### 6.4 Mandatory runtime cleanup
+### 7.4 Mandatory runtime cleanup
 
 After any local browser, Vite, preview, or Playwright validation, Codex must clean up before leaving the turn or moving to another task.
 
@@ -198,24 +243,26 @@ Do not leave these running unless the user explicitly asks to keep a local serve
 - Chromium / `chrome-headless-shell`
 - visible Chrome tabs for `localhost` / `127.0.0.1` project ports
 
-## 7. Git Policy
+## 8. Git Policy
 
 Default branch: `main`.
 
 For glm tasks:
 
 ```bash
-git add -A
+git add <only-files-allowed-by-this-task>
 git commit -m "<scoped message>"
 git push origin main
 ```
 
 Only after required verification passes.
 
+Do not stage generated Playwright artifacts, local runtime logs, screenshots, or unrelated dirty files unless the task explicitly asks for them.
+
 No force push.
 No history rewriting unless the user explicitly requests it.
 
-## 8. Current Recommended Parallelization
+## 9. Current Recommended Parallelization
 
 ### Track A - Codex owned
 
@@ -252,7 +299,7 @@ Goal:
 - improve goldmine, tower, barracks proxy readability
 - no gameplay changes
 
-## 9. Stop Conditions
+## 10. Stop Conditions
 
 Stop and ask or escalate when:
 
@@ -262,7 +309,7 @@ Stop and ask or escalate when:
 - a “simple” fix requires changing product semantics
 - glm reports completion but evidence is only structural
 
-## 10. Operating Principle
+## 11. Operating Principle
 
 Codex defines contracts and validates truth.
 glm implements scoped modules quickly.
