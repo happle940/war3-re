@@ -246,6 +246,18 @@
 - [x] 资源变化后，不重新选择单位也会刷新命令卡状态
 - [x] 命令卡状态测试过程无严重 console error
 
+### 单位存在感/防堆叠自动化覆盖
+
+以下项目由 `tests/unit-presence-regression.spec.ts` 自动验证（Playwright）：
+
+- [x] 开局农民不在建筑/金矿 blocker footprint 内
+- [x] 开局农民之间不是精确重叠
+- [x] 多个完全同坐标单位会被确定性推开，且不会瞬移
+- [x] 多单位移动到同一目标后保持最小间距
+- [x] 多个采金农民靠近同一金矿时不会坍缩成同一点
+- [x] 分离后单位不会被推入建筑/树木 blocker tile
+- [x] 单位存在感测试过程无严重 console error
+
 ## 仍未被自动化覆盖（需人工验证）
 
 - [ ] 玩家手动操作的采集/建造/训练完整流程
@@ -258,6 +270,7 @@
 
 | 日期 | 验证人 | 结果 | 备注 |
 |------|--------|------|------|
+| 2026-04-11 | GLM-5.1 + Codex takeover | Unit Presence Regression | `unit-presence-regression.spec.ts`: 4 tests green. Added lightweight unit separation, formation offsets for group movement, exact-overlap deterministic push, blocker guard, and runtime proof. Added the spec to `npm run test:runtime`. |
 | 2026-04-11 | Codex | Command Card State Regression | `command-card-state-regression.spec.ts`: 7 tests green. Added explicit disabled reasons for supply/resource blocked commands and made command-card cache include resources, supply, and queued supply. Added the spec to `npm run test:runtime`. |
 | 2026-04-11 | GLM-5.1 + Codex | Static Defense Regression | `static-defense-regression.spec.ts`: 7 tests green from GLM. Codex review integrated the spec into `npm run test:runtime` and added `npm run test:static-defense`. |
 | 2026-04-11 | Codex | Construction Lifecycle Regression | `construction-lifecycle-regression.spec.ts`: 6 tests green. Added resumable construction, under-construction cancel, deterministic 75% refund, footprint release, selected-building HUD cleanup, and builder cleanup. Added the spec to `npm run test:runtime`. |

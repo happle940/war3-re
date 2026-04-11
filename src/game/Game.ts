@@ -129,6 +129,11 @@ export interface Unit {
 const TEAM_COLORS = [0x4488ff, 0xff4444]
 const CONSTRUCTION_CANCEL_REFUND_RATE = 0.75
 
+// Unit presence / separation constants
+const UNIT_SEPARATION_RADIUS = 0.6   // minimum distance between units (world units)
+const UNIT_SEPARATION_PUSH = 0.08    // max push per frame
+const FORMATION_SPACING = 0.7        // formation offset spacing
+
 /**
  * 游戏主类
  *
@@ -399,6 +404,86 @@ export class Game {
       this.updateTrainingQueue(unit, dt)
       this.updateCarryIndicator(unit)
     }
+    // Post-move separation: push apart units that are too close
+    this.applySeparation()
+  }
+
+  /**
+   * Lightweight post-move separation pass.
+   *
+   * For each non-building unit that is too close to another non-building unit,
+   * push them apart by a small amount per frame. This prevents permanent stacking
+   * without requiring a full physics engine.
+   *
+   * Respects blockers: never pushes a unit into a blocked tile.
+   * Deterministic: exact-overlap pairs get a deterministic direction from pair indexes.
+   */
+  private applySeparation() {
+    const mobileUnits: Unit[] = []
+    for (const u of this.units) {
+      if (!u.isBuilding && u.hp > 0) mobileUnits.push(u)
+    }
+
+    for (let i = 0; i < mobileUnits.length; i++) {
+      const a = mobileUnits[i]
+
+      for (let j = i + 1; j < mobileUnits.length; j++) {
+        const b = mobileUnits[j]
+        // Read A's current position each iteration (may have been pushed by earlier pairs)
+        const ax = a.mesh.position.x
+        const az = a.mesh.position.z
+        const bx = b.mesh.position.x
+        const bz = b.mesh.position.z
+
+        let dx = ax - bx
+        let dz = az - bz
+        let dist = Math.sqrt(dx * dx + dz * dz)
+
+        if (dist >= UNIT_SEPARATION_RADIUS) continue
+
+        // Handle exact overlap: use deterministic direction from pair indexes.
+        const exactOverlap = dist <= 0.001
+        if (exactOverlap) {
+          const angle = ((i * 92821 + j * 68917) % 360) * Math.PI / 180
+          dx = Math.cos(angle)
+          dz = Math.sin(angle)
+        }
+
+        // Push each unit away by half the overlap, capped at max push per frame
+        const effectiveDist = exactOverlap ? 0 : dist
+        const overlap = (UNIT_SEPARATION_RADIUS - effectiveDist) * 0.5
+        const pushAmount = Math.min(overlap, UNIT_SEPARATION_PUSH)
+        // Normalize: exact-overlap dx/dz are already unit length.
+        const normDist = exactOverlap ? 1 : dist
+        const pushX = (dx / normDist) * pushAmount
+        const pushZ = (dz / normDist) * pushAmount
+
+        // Apply to A if not blocked
+        const newAx = ax + pushX
+        const newAz = az + pushZ
+        if (!this.isPositionBlocked(newAx, newAz)) {
+          a.mesh.position.x = newAx
+          a.mesh.position.z = newAz
+          a.mesh.position.y = this.getWorldHeight(newAx - 0.5, newAz - 0.5)
+        }
+
+        // Apply to B (opposite direction)
+        const newBx = bx - pushX
+        const newBz = bz - pushZ
+        if (!this.isPositionBlocked(newBx, newBz)) {
+          b.mesh.position.x = newBx
+          b.mesh.position.z = newBz
+          b.mesh.position.y = this.getWorldHeight(newBx - 0.5, newBz - 0.5)
+        }
+      }
+    }
+  }
+
+  /** Check if a world position falls on a blocked tile */
+  private isPositionBlocked(wx: number, wz: number): boolean {
+    const tx = Math.floor(wx)
+    const tz = Math.floor(wz)
+    return this.pathingGrid.isBlocked(tx, tz)
   }
 
   /** 通用移动逻辑（支持 A* waypoints） */
@@ -1858,10 +1943,38 @@ export class Game {
     }
   }
 
-  /** 为一组单位批量计算路径 */
+  /** 为一组单位批量计算路径（含编队偏移） */
   private planPathForUnits(units: Unit[], target: THREE.Vector3) {
-    for (const u of units) {
-      if (!u.isBuilding) this.planPath(u, target)
+    if (units.length <= 1) {
+      for (const u of units) {
+        if (!u.isBuilding) this.planPath(u, target)
+      }
+      return
+    }
+
+    // Formation offsets: arrange units in a grid around the target
+    const cols = Math.ceil(Math.sqrt(units.length))
+    for (let i = 0; i < units.length; i++) {
+      const u = units[i]
+      if (u.isBuilding) continue
+
+      const row = Math.floor(i / cols)
+      const col = i % cols
+      const offsetX = (col - (cols - 1) / 2) * FORMATION_SPACING
+      const offsetZ = (row - (Math.ceil(units.length / cols) - 1) / 2) * FORMATION_SPACING
+
+      const offsetTarget = new THREE.Vector3(
+        target.x + offsetX,
+        target.y,
+        target.z + offsetZ,
+      )
+
+      // Validate offset target is not blocked; if it is, fall back to base target
+      if (this.isPositionBlocked(offsetTarget.x, offsetTarget.z)) {
+        this.planPath(u, target)
+      } else {
+        this.planPath(u, offsetTarget)
+      }
     }
   }
 
