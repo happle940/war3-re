@@ -9,10 +9,11 @@ If a new Codex account/session takes over, it should be able to recover project 
 
 Read these files in this order:
 
-1. `/Users/zhaocong/Documents/war3-re/docs/CODEX_HANDOFF_2026_04_11.md`
-2. `/Users/zhaocong/Documents/war3-re/PLAN.md`
-3. `/Users/zhaocong/Documents/war3-re/docs/WAR3_BENCHMARK_RESEARCH_01.md`
-4. `/Users/zhaocong/Documents/war3-re/docs/OVERNIGHT_AGENCY_AND_SCALE_CLOSEOUT_01.md`
+1. `/Users/zhaocong/Documents/war3-re/PLAN.md`
+2. `/Users/zhaocong/Documents/war3-re/docs/WAR3_EXPERIENCE_CONTRACT.md`
+3. `/Users/zhaocong/Documents/war3-re/docs/PROJECT_OPERATING_MODEL.md`
+4. `/Users/zhaocong/Documents/war3-re/docs/WAR3_BENCHMARK_RESEARCH_01.md`
+5. `/Users/zhaocong/Documents/war3-re/docs/CODEX_HANDOFF_2026_04_11.md`
 
 ## Repo / Live
 
@@ -22,11 +23,19 @@ Read these files in this order:
 
 ## Current Head
 
+This file is a recovery guide, not a live commit tracker. Always check current state with:
+
+```bash
+cd /Users/zhaocong/Documents/war3-re
+git status --short
+git log --oneline -5
+```
+
+Known important commits around this handoff:
+
 - `874a232` `assets: closeout — worker readability tuning`
 - `aa8c461` `fix: load test map via BASE_URL on Pages`
 - `e680c19` `truth: runtime-proof tests — all 9 pass`
-
-At the time of writing this handoff, `git status --short` is clean.
 
 ## What This Project Is
 
@@ -36,7 +45,10 @@ At the time of writing this handoff, `git status --short` is clean.
 
 ## Top-Level Project Truths
 
-These are the most important conclusions from the project so far.
+These are the most important conclusions from the project so far. The current authoritative versions live in:
+
+- `/Users/zhaocong/Documents/war3-re/docs/WAR3_EXPERIENCE_CONTRACT.md`
+- `/Users/zhaocong/Documents/war3-re/docs/PROJECT_OPERATING_MODEL.md`
 
 1. Night work for `glm` should favor logic, runtime hardening, and objective validation.
 2. Visual polish based only on parameter guessing is low leverage.

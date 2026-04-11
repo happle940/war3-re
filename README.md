@@ -42,6 +42,15 @@ npm run build
 - 当前项目是纯前端静态站点，适合 GitHub Pages
 - 线上版本适合做试玩、归档和 milestone 回看
 
+## 项目治理文档
+
+开始重要工作前先读：
+
+- `PLAN.md`：当前总控判断和优先级
+- `docs/DOCS_INDEX.md`：文档索引和优先级
+- `docs/WAR3_EXPERIENCE_CONTRACT.md`：War3-like 体验契约
+- `docs/PROJECT_OPERATING_MODEL.md`：用户 / Codex / glm 分工模型
+
 ## 观看 glm 会话
 
 如果你想在终端里实时旁观 `Claude Code / glm` 的执行过程，而不是只看最终汇报，可以用：
