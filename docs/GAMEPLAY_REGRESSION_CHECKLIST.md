@@ -95,12 +95,35 @@
 - [x] AI 资源被消费（90s 内 gold/lumber 低于初始值）
 - [x] AI 积累 footmen 达到攻击阈值或攻击波已发出（150s）
 
+### 命令系统自动化覆盖
+
+以下项目由 `tests/command-regression.spec.ts` 自动验证（Playwright）：
+
+- [x] 移动命令覆盖 Attacking 状态 + 抑制 auto-aggro（1.5s）
+- [x] stop 清空所有命令状态（moveTarget, moveQueue, attackTarget, attackMoveTarget, gatherType, resourceTarget, buildTarget, carryAmount, previous* 链）
+- [x] holdPosition 不追击范围外敌人
+- [x] attackMove 自动接敌（aggroSuppressUntil=0）
+- [x] Shift+move 空闲单位立即启动，保留剩余队列
+- [x] Shift+attackMove 空闲单位立即启动，保留剩余队列
+- [x] 普通 move 清空已有命令队列
+
+### 资源/人口自动化覆盖
+
+以下项目由 `tests/resource-supply-regression.spec.ts` 自动验证（Playwright）：
+
+- [x] computeSupply 仅计算已完成建筑（buildProgress >= 1）
+- [x] 人口上限拒绝训练，不扣资源
+- [x] 成功训练精确扣一次资源（worker 75g, footman 135g）
+- [x] 农民返还资源路径：carryAmount → resources.earn → carryAmount=0
+- [x] stop 丢弃携带资源（不重复存入）
+- [x] AI 有效人口（used + queued）不超过 total
+- [x] AI 农场供应仅在完成后生效
+- [x] 多建筑训练不可超支（200g + 2 barracks → 最多 1 footman）
+
 ## 仍未被自动化覆盖（需人工验证）
 
 - [ ] 玩家手动操作的采集/建造/训练完整流程
-- [ ] 命令覆盖 / 中断行为
 - [ ] auto-aggro 命令恢复
-- [ ] 队列系统完整行为
 - [ ] 战斗循环（伤害数字、护甲减伤）
 - [ ] 视觉可读性（worker、建筑辨识度）
 - [ ] 布局语法（基地空间关系、路径可通性）
@@ -109,6 +132,8 @@
 
 | 日期 | 验证人 | 结果 | 备注 |
 |------|--------|------|------|
+| 2026-04-11 | GLM-5.1 | Resource/Supply Regression | resource-supply-regression.spec.ts: 8 tests green. Supply, training, resource flow, AI spending contracts proven. |
+| 2026-04-11 | GLM-5.1 | Command Regression | command-regression.spec.ts: 7 tests green. Move/stop/hold/attackMove/queue contracts proven. |
 | 2026-04-11 | GLM-5.1 | Runtime Truth 01 | first-five-minutes.spec.ts: AI economy/build/train/attack automated. Player manual loop not yet covered. |
 | 2026-04-11 | GLM-5.1 | pending | Order System Beta + Gameplay Alpha 完成后待验证 |
 | 2026-04-10 | GLM-5.1 | Partial: AI economy ✅, Player micro ❌ | Runtime Hardening Phase 3: AI gather/build/train verified via Playwright. Player commands structurally verified but not runtime-tested. |
