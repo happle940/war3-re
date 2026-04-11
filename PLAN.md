@@ -31,14 +31,15 @@ The target is not a literal asset clone. The target is a legally safe, Warcraft 
 
 Current stage:
 
-**Agency Prototype / Gameplay Truth Partially Proven / Visual Readability Not Closed**
+**Agency Prototype / Visual Readability Implemented But Human-Unapproved / First-Five-Minutes Truth In Progress**
 
 What this means:
 
 - The project is no longer an empty prototype.
 - Core RTS systems exist: selection, commands, resources, build, train, combat, AI, map loading, GitHub Pages.
 - Several earlier fake-green validations have been replaced with real runtime assertions.
-- The project is still not a convincing Warcraft III-like slice because visual readability and product grammar are not yet stable.
+- Worker and key-building readability have stronger proxy implementations, but still require human approval on the live build.
+- The project is still not a convincing Warcraft III-like slice until the first five minutes are runtime-proven and then human-playtested.
 
 ## 3. Solved vs Not Solved
 
@@ -51,11 +52,16 @@ What this means:
 - Legal asset loading architecture exists: catalog, loader, fallback, async replacement, material isolation.
 - `worker.glb` and `townhall.glb` exist and can be loaded.
 - `tests/closeout.spec.ts` now contains meaningful runtime assertions.
+- `tests/closeout.spec.ts` no longer depends on flaky canvas visibility checks.
+- Local browser/test cleanup is mandatory via `./scripts/cleanup-local-runtime.sh`.
+- `glm` can be watched safely with `./scripts/glm-watch.sh readonly`.
+- Worker readability has an enlarged RTS proxy implementation.
+- Goldmine, barracks, and tower have stronger procedural readability proxies.
 
 ### 3.2 Not solved, even if some code exists
 
-- Worker readability is still not acceptable in live play.
-- Buildings such as goldmine, tower, barracks still read like proxies or placeholders.
+- Worker readability is not human-approved on the live build.
+- Goldmine, tower, and barracks readability are not human-approved on the live build.
 - Terrain/base grammar is still weak compared with Warcraft III.
 - AI first-five-minutes truth is not yet strong enough to call the game playable.
 - Human visual feel is not validated by automated tests.
@@ -116,7 +122,9 @@ Short version:
 
 ### P0 - Worker Readability Truth
 
-Current live issue: the HUD can say workers are selected, but the worker bodies are still too hard to locate on the battlefield.
+Status: implemented, awaiting human approval on live build.
+
+Previous live issue: the HUD can say workers are selected, but the worker bodies are still too hard to locate on the battlefield.
 
 This blocks almost every RTS feeling layer. If the player cannot see workers, selection, building, harvesting, and base reading all feel unreliable.
 
@@ -128,11 +136,13 @@ Allowed outcome:
 
 ### P1 - Building Readability Proxy Pass
 
-Goldmine, tower, and barracks still need clearer proxy silhouettes.
+Status: implemented, awaiting human approval on live build.
 
-This should be implemented as a separate module task, preferably parallel to worker work, with strict file boundaries.
+Goldmine, tower, and barracks now have stronger proxy silhouettes, but visual approval still belongs to the user.
 
 ### P2 - First Five Minutes Playable Truth
+
+Status: active.
 
 AI and player loops must produce a real opening:
 
@@ -222,7 +232,48 @@ Do not start with a new broad roadmap.
 
 Start with this sequence:
 
-1. Codex handles or directly supervises `Worker Readability Truth`.
-2. glm can independently handle `Building Readability Proxy Pass` with strict file boundaries.
-3. User playtests the live result.
-4. Only after human confirmation, move to first-five-minutes gameplay truth.
+1. `glm`: build `First Five Minutes Runtime Truth 01` as objective Playwright coverage.
+2. Codex: supervise test quality, keep cleanup discipline, and prepare the next implementation task from test failures.
+3. User: playtest the live visual readability when convenient.
+4. After P2 runtime truth exposes the actual blockers, fix the first-five-minutes loop in scoped implementation slices.
+
+## 11. Continuous Work Queue
+
+This queue exists so `glm` is never idle because of unclear planning. Keep at least one scoped, objective task ready.
+
+### Active glm task
+
+`First Five Minutes Runtime Truth 01`
+
+Allowed scope:
+
+- create runtime tests for first-five-minutes gameplay truth
+- prefer tests/docs first
+- do not modify visual files
+- do not claim human approval
+- clean up local browser/runtime processes after verification
+
+### Next glm tasks, in order
+
+1. `CI Runtime Gate 01`: make GitHub Actions run build, app tsc, closeout tests, and first-five-minutes tests.
+2. `Command Regression Pack 01`: add runtime assertions for move override, stop/hold, attackMove, and shift queue semantics.
+3. `AI Opening Fix 01`: if first-five-minutes tests expose objective AI blockers, fix only the smallest SimpleAI/Game slice required.
+4. `Resource/Supply Regression Pack 01`: assert supply, multi-building training, resources, and build-progress edge cases.
+5. `Runtime Diagnostics Overlay 01`: add a dev-only state snapshot helper for tests and debugging, not a user-facing HUD feature.
+
+### Codex continuous responsibilities
+
+- keep `glm` on a non-conflicting scoped task
+- review every `glm` diff before treating it as accepted
+- immediately clean local browser/test runtime after verification
+- update this plan when a priority moves from active to done/human-gated
+
+### When Codex may pause
+
+Only pause for:
+
+- human visual approval
+- product taste decisions
+- credentials or account actions
+- destructive git operations
+- broad semantic changes that would alter the game contract
