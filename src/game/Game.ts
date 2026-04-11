@@ -2696,41 +2696,41 @@ export class Game {
 
   private spawnStartingUnits() {
     // ===== 玩家基地区（地图左下象限）=====
-    // war3 风格布局：TH 居中，金矿紧贴 NE，兵营 SW，农民在 TH 和金矿之间
-    // 紧凑但可读，一眼就能看出 war3 起始基地的空间关系
+    // WC3 研究参考布局：
+    //   TH (4x4) 居中锚定，金矿 (3x3) 紧贴 NE，worker 往返路径短
+    //   Barracks (3x3) 在 SW 出口方向，Farm (2x2) 用于填充墙
+    //   开放方向 S-SE 用于出兵/集结/扩张
     //
-    // 空间语法：
-    //   N: 密集树林（边界/资源）
-    //   NW-W: 密集树林（边界）
-    //   NE: 金矿（紧贴 TH，worker 路径短）
-    //   C: Town Hall（基地核心）
-    //   SW: 兵营（出口/军事区）
+    // 空间语法（从 TH 中心看）：
+    //   NE: Gold Mine（3-4 tile edge-to-edge）
+    //   C: Town Hall（4x4，基地核心，最大建筑）
+    //   SW: Barracks（3x3，出口/军事区）
     //   S-SE: 开阔空地（出兵/集结/扩张方向）
 
-    // Town Hall：tile (10,12) → world (11.5, 13.5) — 基地核心偏中
+    // Town Hall：tile (10,12) size=4 → occupies (10-13, 12-15), world center (12.5, 14.5)
     this.spawnBuilding('townhall', 0, 10, 12)
 
-    // 金矿：紧贴 TH 右上方（NE），tile (14,9) → world (15.5, 10.5)
-    // 距离 TH 约 4 格 — 和 war3 类似的紧凑矿区
-    this.spawnBuilding('goldmine', -1, 14, 9)
+    // Gold Mine：TH 右上方 (NE)，tile (15,8) size=3 → occupies (15-17, 8-10)
+    // TH edge (x=13) to GM edge (x=15) = 2 tile gap，接近 WC3 典型的 3-4 tile
+    this.spawnBuilding('goldmine', -1, 15, 8)
 
-    // 兵营：TH 左下方（SW 出口方向），tile (6,16) → world (7.5, 17.5)
-    this.spawnBuilding('barracks', 0, 6, 16)
+    // Barracks：TH 左下方 (SW)，tile (5,17) size=3 → occupies (5-7, 17-19)
+    this.spawnBuilding('barracks', 0, 5, 17)
 
-    // 5个农民：TH 南面、TH 与金矿之间
-    // TH blocker: (10-12, 12-14)，所以农民 z < 12 在 TH 南面
+    // 5 个农民：TH 南面空地，在 TH (z=12) 和树林之间
+    // worker 排成一排，紧贴 TH 南面，第一趟采金路径自然
     for (let i = 0; i < 5; i++) this.spawnUnit('worker', 0, 10 + i, 11)
 
     // ===== AI 基地区（地图右上角，镜像布局）=====
     const far = 50
     this.spawnBuilding('townhall', 1, far, far)
-    this.spawnBuilding('goldmine', -1, far - 5, far + 1)
-    this.spawnBuilding('barracks', 1, far + 3, far - 6)
-    for (let i = 0; i < 5; i++) this.spawnUnit('worker', 1, far - 2 + i, far + 3)
+    this.spawnBuilding('goldmine', -1, far + 5, far - 4)
+    this.spawnBuilding('barracks', 1, far - 5, far + 5)
+    for (let i = 0; i < 5; i++) this.spawnUnit('worker', 1, far + i, far - 2)
 
     // 初始镜头：聚焦玩家基地中心，让 TH + 金矿 + 农民一屏尽收
-    this.cameraCtrl.setTarget(12, 14)
-    this.cameraCtrl.distance = 22
+    this.cameraCtrl.setTarget(13, 14)
+    this.cameraCtrl.distance = 24
   }
 
   private spawnUnit(type: string, team: number, x: number, z: number): Unit {
@@ -3013,23 +3013,23 @@ export class Game {
     const rng = this.seededRandom(42)
 
     // ===== 玩家基地树环 =====
-    // TH 中心 ≈ (11.5, 13.5), 金矿中心 ≈ (15.5, 10.5)
-    // 树林在金矿北侧（z<8）和基地西侧（x<7），形成自然的基地边界
+    // TH occupies (10-13, 12-15), goldmine occupies (15-17, 8-10)
+    // 树林在金矿北侧（z<8）和基地西侧（x<5），形成自然的基地边界
     const baseTreePositions: [number, number][] = []
-    // 金矿北侧：x=12-22, z=0-7（密集，形成北边界）
-    for (let tx = 12; tx <= 22; tx++) {
+    // 金矿北侧/东侧：x=13-24, z=0-7（密集，形成北边界和伐木资源）
+    for (let tx = 13; tx <= 24; tx++) {
       for (let tz = 0; tz <= 7; tz++) {
         if (rng() < 0.70) baseTreePositions.push([tx, tz])
       }
     }
-    // 基地西侧：x=0-4, z=5-25（加密，覆盖兵营西侧）
+    // 基地西侧：x=0-4, z=5-20（加密，覆盖兵营西侧）
     for (let tx = 0; tx <= 4; tx++) {
-      for (let tz = 5; tz <= 25; tz++) {
+      for (let tz = 5; tz <= 20; tz++) {
         if (rng() < 0.58) baseTreePositions.push([tx, tz])
       }
     }
-    // 基地北侧上方：x=5-11, z=0-7（更密，形成清晰的北/西北边界）
-    for (let tx = 5; tx <= 11; tx++) {
+    // 基地北侧上方：x=5-12, z=0-7（更密，形成清晰的北/西北边界）
+    for (let tx = 5; tx <= 12; tx++) {
       for (let tz = 0; tz <= 7; tz++) {
         if (rng() < 0.65) baseTreePositions.push([tx, tz])
       }
@@ -3085,9 +3085,9 @@ export class Game {
       const tile = this.terrain.getTile(x, z)
       if (tile === TileType.Water || tile === TileType.Dirt || tile === TileType.LightDirt
         || tile === TileType.Stone || tile === TileType.DarkStone) continue
-      const d1 = Math.sqrt((x - 11) ** 2 + (z - 13) ** 2)
+      const d1 = Math.sqrt((x - 12) ** 2 + (z - 13) ** 2)
       const d2 = Math.sqrt((x - 50) ** 2 + (z - 50) ** 2)
-      if (d1 < 14 || d2 < 14) continue
+      if (d1 < 16 || d2 < 16) continue
 
       const h = this.getWorldHeight(x, z)
       const scale = 0.8 + rng() * 0.8

@@ -288,6 +288,59 @@ No history rewriting.
 ### 7. Next Theme
 - only one next-step recommendation
 
+---
+
+## Research Findings (Phase 3)
+
+### WC3 Pathing Footprint Reference
+
+| Building | WC3 Pathing Footprint | Pathing Buffer | Our Current `size` | Proposed `size` |
+|---|---|---|---|---|
+| Town Hall | 4x4 small cells | 1 cell | 3 | **4** |
+| Barracks | 3x3 small cells | 1 cell | 2 | **3** |
+| Farm | 2x2 small cells | none (tight) | 2 | 2 |
+| Tower | ~2x2 small cells | none | 1 | **2** |
+| Gold Mine | ~3-4x4 small cells | none | 3 | 3 |
+
+Key spatial hierarchy: Farm (2) < Barracks (3) < Town Hall (4) ≈ Gold Mine (3-4).
+
+### Human Starting Base Grammar
+
+```
+        N: Dense treeline (boundary / lumber resource)
+        NE: Gold Mine (adjacent, ~3-4 tile edge-to-edge from TH)
+        C: Town Hall (base anchor, largest building)
+        SW: Barracks (production exit / military zone)
+        S-SE: Open ground (rally / spawn / expansion direction)
+        Perimeter: Farms forming partial walls between buildings
+```
+
+Worker travel path (gold): TH ↔ Gold Mine should be 3-4 tiles edge-to-edge.
+
+### Unit Collision / Readability
+
+| Unit | WC3 Collision | Footprint | Visual height vs TH width |
+|---|---|---|---|
+| Worker (Peasant) | 16 (small) | 2x2 cells | ~1/4 to 1/5 |
+| Footman | 16 (small) | 2x2 cells | slightly taller/heavier silhouette |
+
+Both occupy the same collision class but differ in visual silhouette (armor, sword, shield).
+
+### Layout Corrections Applied
+
+1. `townhall.size`: 3 → 4 (matches WC3 4x4 pathing footprint)
+2. `barracks.size`: 2 → 3 (matches WC3 3x3 pathing footprint)
+3. `tower.size`: 1 → 2 (matches WC3 ~2x2)
+4. Starting base layout tightened: TH-goldmine distance, worker spawn line, barracks placement
+5. AI base layout mirrored to match player base grammar
+
+### Sources
+
+- classic.battle.net/war3/human/unitstats.shtml
+- classic.battle.net/war3/basics/buildings.shtml
+- warcraft-gym.com/human-base-building-guide/
+- Hive Workshop pathing blocker threads
+
 ## One-line Principle
 
 This round is not about adding content.
