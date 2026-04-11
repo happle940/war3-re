@@ -131,6 +131,17 @@
 - [x] 血条锚点在真实视觉包围盒上方且距离不过大
 - [x] 显式 asset refresh 后农民可见性和 scale 不坍塌
 
+### 选择/输入自动化覆盖
+
+以下项目由 `tests/selection-input-regression.spec.ts` 自动验证（Playwright）：
+
+- [x] 左键拖框在 mouseup 当帧完成选择，不需要再点一下
+- [x] 右键拖动/右键点击不启动 box selection
+- [x] 右键拖动释放后不留下 ghost selection state
+- [x] Shift+框选追加选择，HUD cache 重置（code-path reviewed）
+- [x] Tab subgroup 切换后 selection ring 仍贴在正确对象上
+- [x] Control group restore 后 selection ring/object mapping 正确
+
 ## 仍未被自动化覆盖（需人工验证）
 
 - [ ] 玩家手动操作的采集/建造/训练完整流程
@@ -143,6 +154,7 @@
 
 | 日期 | 验证人 | 结果 | 备注 |
 |------|--------|------|------|
+| 2026-04-11 | GLM-5.1 | Selection/Input Regression | selection-input-regression.spec.ts: 6 tests green. Box select, right-drag guard, Shift+append, Tab subgroup rings, control group rings. Fixed finishBoxSelect to use e.shiftKey for robust Shift+box. |
 | 2026-04-11 | Codex | Runtime Full Pack | `npm run test:runtime`: 33 tests green. Includes closeout, command, first-five, resource/supply, unit visibility. |
 | 2026-04-11 | Codex | Unit Visibility Regression | `unit-visibility-regression.spec.ts`: 2 tests green. Fixed W3X map-load camera reset that left player workers offscreen. |
 | 2026-04-11 | GLM-5.1 | Resource/Supply Regression | resource-supply-regression.spec.ts: 9 tests green. Supply, training, resource flow, AI spending contracts proven. |

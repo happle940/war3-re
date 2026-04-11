@@ -1515,7 +1515,7 @@ export class Game {
       if (this.rallyMode) return
 
       if (this.isDragging) {
-        this.finishBoxSelect(e.clientX, e.clientY)
+        this.finishBoxSelect(e.clientX, e.clientY, this.shiftHeld || e.shiftKey)
       } else {
         this.mouseNDC.x = (e.clientX / window.innerWidth) * 2 - 1
         this.mouseNDC.y = -(e.clientY / window.innerHeight) * 2 + 1
@@ -2102,7 +2102,7 @@ export class Game {
     this.selBoxEl.style.height = `${h}px`
   }
 
-  private finishBoxSelect(ex: number, ey: number) {
+  private finishBoxSelect(ex: number, ey: number, appendSelection: boolean = false) {
     const x1 = Math.min(this.dragStart.x, ex)
     const y1 = Math.min(this.dragStart.y, ey)
     const x2 = Math.max(this.dragStart.x, ex)
@@ -2116,7 +2116,7 @@ export class Game {
     }
 
     // 如果没有 Shift，先清除现有选择
-    if (!this.shiftHeld) {
+    if (!appendSelection) {
       this.clearSelection()
       this.clearSelectionRings()
     }
@@ -2129,7 +2129,7 @@ export class Game {
       const sy = (-screenPos.y + 1) / 2 * window.innerHeight
       if (sx >= x1 && sx <= x2 && sy >= y1 && sy <= y2) {
         // Shift+框选时避免重复添加
-        if (!this.shiftHeld || !this.selectionModel.contains(unit)) {
+        if (!appendSelection || !this.selectionModel.contains(unit)) {
           this.selectUnit(unit)
         }
       }
