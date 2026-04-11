@@ -11,8 +11,11 @@ Read these in order before starting any significant work:
 1. `/Users/zhaocong/Documents/war3-re/PLAN.md`
 2. `/Users/zhaocong/Documents/war3-re/docs/WAR3_EXPERIENCE_CONTRACT.md`
 3. `/Users/zhaocong/Documents/war3-re/docs/PROJECT_OPERATING_MODEL.md`
-4. `/Users/zhaocong/Documents/war3-re/docs/WAR3_BENCHMARK_RESEARCH_01.md`
-5. `/Users/zhaocong/Documents/war3-re/docs/CODEX_HANDOFF_2026_04_11.md`
+4. `/Users/zhaocong/Documents/war3-re/docs/CODEX_ACTIVE_QUEUE.md`
+5. `/Users/zhaocong/Documents/war3-re/docs/GLM_READY_TASK_QUEUE.md`
+6. `/Users/zhaocong/Documents/war3-re/docs/HUMAN_DECISION_GATES.md`
+7. `/Users/zhaocong/Documents/war3-re/docs/WAR3_BENCHMARK_RESEARCH_01.md`
+8. `/Users/zhaocong/Documents/war3-re/docs/CODEX_HANDOFF_2026_04_11.md`
 
 Execution docs under `docs/OVERNIGHT_*.md` are historical task records or scoped work packets. They do not override this plan or the experience contract.
 
@@ -117,6 +120,12 @@ Short version:
 - glm / Claude Code: high-speed implementation lieutenant for scoped, objectively verifiable tasks.
 
 `glm` is strong. Use it for execution, not final product judgment.
+
+Human intervention is organized through planned gates, not ad hoc interruptions:
+
+- `/Users/zhaocong/Documents/war3-re/docs/HUMAN_DECISION_GATES.md`
+
+Codex and GLM should complete the objective task bundle before each gate, then ask the user for a small product decision packet.
 
 ## 7. Current Priority Stack
 
@@ -228,45 +237,40 @@ A report may say “implemented” or “runtime-proven”. It must not say “v
 
 ## 10. Immediate Next Move
 
-Do not start with a new broad roadmap.
+Do not ask the user for another broad playtest yet.
 
-Start with this sequence:
+Current next human gate:
 
-1. `glm`: build `First Five Minutes Runtime Truth 01` as objective Playwright coverage.
-2. Codex: supervise test quality, keep cleanup discipline, and prepare the next implementation task from test failures.
-3. User: playtest the live visual readability when convenient.
-4. After P2 runtime truth exposes the actual blockers, fix the first-five-minutes loop in scoped implementation slices.
+- `G1 — Worker/Base Readability` in `/Users/zhaocong/Documents/war3-re/docs/HUMAN_DECISION_GATES.md`
 
-## 11. Continuous Work Queue
+Before that gate, Codex and GLM should complete the objective pre-gate bundle:
 
-This queue exists so `glm` is never idle because of unclear planning. Keep at least one scoped, objective task ready.
+1. Finish Codex review of GLM Resource/Supply Regression Pack follow-up.
+2. Add/prove Unit Visibility Contract Pack for the worker body disappearing / unreadable-worker class.
+3. Add/prove Asset Pipeline Contract Pack if async refresh remains suspicious.
+4. Add/prove Pathing/Footprint Contract Pack if workers/buildings overlap blockers or spawn in bad positions.
+5. Present the user a short G1 checklist instead of an open-ended request.
 
-### Active glm task
+## 11. Continuous Work Queues
 
-`First Five Minutes Runtime Truth 01`
+Do not maintain long inline queues in `PLAN.md`; they become stale. The live queues are:
 
-Allowed scope:
+- Codex queue: `/Users/zhaocong/Documents/war3-re/docs/CODEX_ACTIVE_QUEUE.md`
+- GLM queue: `/Users/zhaocong/Documents/war3-re/docs/GLM_READY_TASK_QUEUE.md`
+- Human gates: `/Users/zhaocong/Documents/war3-re/docs/HUMAN_DECISION_GATES.md`
 
-- create runtime tests for first-five-minutes gameplay truth
-- prefer tests/docs first
-- do not modify visual files
-- do not claim human approval
-- clean up local browser/runtime processes after verification
+Operating rule:
 
-### Next glm tasks, in order
+- GLM should always have a scoped objective task when it is idle.
+- Codex should always have a non-conflicting project-brain or implementation task when GLM is running.
+- User should be asked to intervene only at planned gates, after the objective pre-gate task bundle is done.
+- If either queue changes state, update the relevant queue document before dispatching more work.
+- If user feedback contradicts tests, add or re-rank a queue item immediately.
 
-1. `CI Runtime Gate 01`: make GitHub Actions run build, app tsc, closeout tests, and first-five-minutes tests.
-2. `Command Regression Pack 01`: add runtime assertions for move override, stop/hold, attackMove, and shift queue semantics. Task packet: `/Users/zhaocong/Documents/war3-re/docs/GLM_TASK_COMMAND_REGRESSION_PACK_01.md`.
-3. `AI Opening Fix 01`: if first-five-minutes tests expose objective AI blockers, fix only the smallest SimpleAI/Game slice required.
-4. `Resource/Supply Regression Pack 01`: assert supply, multi-building training, resources, and build-progress edge cases.
-5. `Runtime Diagnostics Overlay 01`: add a dev-only state snapshot helper for tests and debugging, not a user-facing HUD feature.
+Current default split:
 
-### Codex continuous responsibilities
-
-- keep `glm` on a non-conflicting scoped task
-- review every `glm` diff before treating it as accepted
-- immediately clean local browser/test runtime after verification
-- update this plan when a priority moves from active to done/human-gated
+- GLM: deterministic resource/supply/command/pathing/AI regression packs.
+- Codex: queue maintenance, GLM review, worker visibility truth, architecture, CI gates, and human-feedback translation.
 
 ### When Codex may pause
 

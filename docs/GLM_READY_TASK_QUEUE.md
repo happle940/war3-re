@@ -27,7 +27,7 @@ Current queue state:
 
 | Task | Status | Owner | Last update | Notes |
 |---|---|---|---|---|
-| Task 01 — Resource/Supply Regression Pack | in_progress | GLM | 2026-04-11 | GLM has created `tests/resource-supply-regression.spec.ts`; awaiting verification/closeout. |
+| Task 01 — Resource/Supply Regression Pack | in_progress | GLM | 2026-04-11 | Commit `fb5caa2` passed 8/8, but Codex review found stop/override proof used manual field mutation; GLM follow-up dispatched. |
 | Task 02 — Unit Visibility Contract Pack | ready | Codex dispatch | 2026-04-11 | Highest next priority because user still reports invisible workers. |
 | Task 05 — Pathing/Footprint Contract Pack | ready | Codex dispatch | 2026-04-11 | Protects scale/layout/path blockers after visibility is stable. |
 | Task 04 — Selection/Input Contract Pack | ready | Codex dispatch | 2026-04-11 | Covers right-drag, mouseup commit, Tab ring mapping. |
@@ -92,6 +92,8 @@ Owner: GLM.
 Started: 2026-04-11.
 
 Current artifact observed: `tests/resource-supply-regression.spec.ts`.
+
+Current review status: commit `fb5caa2` is not fully accepted yet. Codex review found the stop/override carried-resource test manually mutates worker fields rather than using the real command path. GLM has been asked for a follow-up commit that proves stop and normal move/override through the actual command path.
 
 Do not dispatch again unless the current attempt is marked `failed`, `abandoned`, or `superseded`.
 
