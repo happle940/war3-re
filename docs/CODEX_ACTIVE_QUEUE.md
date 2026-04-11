@@ -67,7 +67,8 @@ GLM owns:
 | C12 — M1 Candidate Audit | done | 2026-04-11 | Latest code commit `14bd7ba` is locally verified and GitHub Actions green; M1 is ready for user gate. |
 | C13 — M1 Result And M2 System Replan | done | 2026-04-11 | User selected `pass with visual debt`; next phase reframed from visual pass to War3 core systems alignment. |
 | C14 — Construction Lifecycle Pack Takeover | done | 2026-04-11 | GLM stalled without file changes; Codex implemented and verified resume/cancel/refund/builder cleanup directly. |
-| C15 — M2 Systems Architecture Slice | ready | 2026-04-11 | Define how order lifecycle, abilities, construction, combat, collision, and command-card rules should converge without turning Game.ts into more glue. |
+| C15 — M2 Systems Architecture Slice | active | 2026-04-11 | Keep M2 source-of-truth docs synced with completed packs and add combat-control as the final objective contract before the M2 user gate. |
+| C16 — Review GLM Combat Control Contract | watch | 2026-04-11 | GLM is implementing Task 15. Codex must review tests, rerun affected packs, clean runtime processes, and accept/reject before M2 gate. |
 
 ## Task Cards
 

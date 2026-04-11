@@ -36,7 +36,7 @@ The target is not a literal asset clone. The target is a legally safe, Warcraft 
 
 Current stage:
 
-**M1 Passed With Visual Debt / War3 Core Systems Alignment Starting**
+**M2 War3 Core Systems Alignment In Progress**
 
 What this means:
 
@@ -44,7 +44,9 @@ What this means:
 - Core RTS systems exist: selection, commands, resources, build, train, combat, AI, map loading, GitHub Pages.
 - Several earlier fake-green validations have been replaced with real runtime assertions.
 - Worker and key-building readability have stronger proxy implementations, but still require human approval on the live build.
-- The project passed the first user playability gate, but it is still not a convincing Warcraft III-like slice because the reusable RTS systems are incomplete.
+- The project passed the first user playability gate, but it is still not a convincing Warcraft III-like slice because several reusable RTS systems are still being hardened.
+- M2 objective packs completed so far: construction lifecycle, static defense combat, command-card disabled reasons, and unit presence baseline.
+- M2 objective pack currently in progress: combat-control contract, especially manual move/stop/hold/attack-move behavior during auto-aggro.
 
 ## 3. Solved vs Not Solved
 
@@ -54,6 +56,10 @@ What this means:
 - Test map loading uses the Vite base path and should work on GitHub Pages.
 - Box-select has real runtime proof rather than smoke-only validation.
 - Selected-worker builder agency has real runtime proof.
+- Construction lifecycle has runtime proof: interrupted construction can resume, construction can cancel, footprint/builder cleanup occurs, and refund is deterministic.
+- Arrow tower static defense combat has runtime proof.
+- Command-card disabled reasons exist for resource/supply blocked commands.
+- Unit presence baseline exists: exact stacking is separated, group movement uses formation offsets, and blockers remain hard blockers.
 - Legal asset loading architecture exists: catalog, loader, fallback, async replacement, material isolation.
 - `worker.glb` and `townhall.glb` exist and can be loaded.
 - `tests/closeout.spec.ts` now contains meaningful runtime assertions.
@@ -66,11 +72,9 @@ What this means:
 ### 3.2 Not solved, even if some code exists
 
 - Visual identity is not final; M1 passed with visual debt, not visual approval.
-- Construction lifecycle is incomplete: interrupted buildings cannot be resumed naturally.
-- Construction cancel/refund is missing.
-- Arrow tower is not a real combat participant yet.
-- Units do not have sufficient physical collision/presence.
-- Command-card disabled reasons are weak, especially around supply block and prerequisites.
+- Combat-control semantics still need a dedicated contract: fighting units must obey player move/stop/hold commands and cannot be immediately stolen back by auto-aggro.
+- Unit collision/presence is only a baseline. It is not yet full Warcraft-like collision, body blocking, or pathfinder-integrated local avoidance.
+- Command-card disabled reasons cover resource/supply blocks, but prerequisites and richer ability-state modeling are not final.
 - Terrain/base grammar is still weak compared with Warcraft III.
 - Human visual feel remains a later gate after core systems align better with Warcraft-like rules.
 
@@ -158,10 +162,11 @@ Reference:
 
 Priority sub-systems:
 
-1. Construction lifecycle: resume, interrupt, cancel, refund, cleanup.
-2. Static defense combat: arrow tower weapon stats and target acquisition.
-3. Command-card disabled reasons: supply/resource/prerequisite feedback.
-4. Unit collision and local avoidance baseline.
+1. Construction lifecycle: resume, interrupt, cancel, refund, cleanup. `completed`
+2. Static defense combat: arrow tower weapon stats and target acquisition. `completed`
+3. Command-card disabled reasons: supply/resource feedback. `completed`
+4. Unit collision and local avoidance baseline. `completed as baseline`
+5. Combat-control contract: manual move/stop/hold/attack-move during auto-aggro. `in progress`
 
 ### P1 - Visual Debt
 

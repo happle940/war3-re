@@ -25,7 +25,7 @@ Before every user milestone, Codex must prepare:
 |---|---|---:|---|---|
 | M0 — Project Operating Foundation | done | no | repo, deploy, CI runtime gate, Codex queue, GLM queue | none |
 | M1 — First Playable RTS Slice | done | yes | readable base, command ownership, gather/build/train/combat, first AI pressure all runtime-proven | Passed with visual debt. |
-| M2 — War3 Core Systems Alignment | next | yes | construction lifecycle, tower combat, command disabled reasons, cancellation, collision baseline runtime-proven | Does the game now obey Warcraft-like RTS rules instead of isolated commands? |
+| M2 — War3 Core Systems Alignment | in progress | yes | construction lifecycle, tower combat, command disabled reasons, cancellation, collision baseline, and combat-control semantics runtime-proven | Does the game now obey Warcraft-like RTS rules instead of isolated commands? |
 | M3 — Warcraft-Like Feel Vertical Slice | planned | yes | M2 passed; scale, camera, terrain grammar, visual direction prepared | Does it feel close enough to the intended Warcraft-like direction? |
 | M4 — Human vs AI Alpha Match | planned | yes | one complete 10-15 minute match loop with win/loss and AI recovery | Is the core game loop worth balancing/content expansion? |
 | M5 — Content And Identity Direction | planned | yes | technical gameplay alpha stable; legal art/style options prepared | Which content/art direction should become the product identity? |
@@ -241,6 +241,7 @@ M2 turns isolated verbs into RTS systems:
 - command-card prerequisite and disabled reasons
 - construction cancellation and refund
 - unit collision and local avoidance baseline
+- manual combat-control semantics during auto-aggro
 - explicit Warcraft-like rule contracts
 
 M2 user question:
@@ -275,6 +276,13 @@ Before asking the user, Codex and GLM must complete:
 - Building blockers remain hard blockers.
 - Existing pathing tests remain green.
 
+### M2.5 Combat-control baseline
+
+- A fighting unit obeys normal right-click ground move.
+- Manual move/stop cannot be stolen back by auto-aggro immediately.
+- Attack-move still auto-engages along the path.
+- Hold position uses local acquisition and does not chase outside hold range.
+
 M2 user decision packet:
 
 1. Can interrupted construction be resumed naturally?
@@ -282,7 +290,8 @@ M2 user decision packet:
 3. Do towers behave like defensive buildings instead of decorations?
 4. Do blocked commands explain themselves?
 5. Do units have enough physical presence to stop obvious stacking?
-6. Choose one: `pass`, `pass with visual debt`, `fail construction`, `fail combat`, `fail command UI`, `fail collision`.
+6. Can you pull a fighting unit away and trust stop/hold/attack-move behavior?
+7. Choose one: `pass`, `pass with visual debt`, `fail construction`, `fail combat`, `fail command UI`, `fail collision`, `fail combat control`.
 
 ## M3 — Warcraft-Like Feel Vertical Slice
 

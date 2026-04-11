@@ -112,13 +112,25 @@ Required contracts:
 - Cancel clears selection if the canceled building was selected.
 - Cancel cannot duplicate resources.
 
+### M2.6 Combat-Control Contract
+
+Required contracts:
+
+- A unit currently attacking must obey a normal right-click ground move.
+- A manual move must clear or ignore the current attack target and suppress immediate auto-aggro briefly.
+- Attack-move must not use the same suppression rule; it should still engage enemies along the path.
+- Stop must be visibly honored and must clear queued movement and stale previous-order state.
+- Hold position must use local acquisition and must not chase outside hold range.
+- Explicit player commands must break stale `previousState` restoration chains.
+
 ## Recommended Execution Order
 
 1. Construction Lifecycle Contract Pack.
 2. Static Defense Combat Pack.
 3. Command Card Disabled Reasons Pack.
 4. Unit Collision / Local Avoidance Pack.
-5. M2 user gate after objective tests are green.
+5. Combat Control Contract Pack.
+6. M2 user gate after objective tests are green.
 
 Reasoning:
 
@@ -126,6 +138,7 @@ Reasoning:
 - Tower combat turns existing buildings into real gameplay objects.
 - Disabled reasons remove silent failure, especially around supply.
 - Collision is important but riskier and should happen after command/construction semantics are stable.
+- Combat-control gets an explicit final pack because Warcraft-like control requires the player to pull a fighting unit away without auto-aggro immediately stealing the order back.
 
 ## Division Of Labor
 
@@ -161,5 +174,5 @@ M2 can pass only when the prototype stops feeling like isolated commands and sta
 - combat buildings actually participate in combat
 - command-card failures explain themselves
 - units have physical presence
+- fighting units still obey manual player commands
 - all accepted behavior has runtime proof
-
