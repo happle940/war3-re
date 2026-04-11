@@ -59,7 +59,7 @@ GLM owns:
 | C04 — Live Build Reality Check Protocol | done | 2026-04-11 | Added live-build evidence labels and conversion flow to operating model. |
 | C05 — Human Decision Gates | done | 2026-04-11 | Defines when the user should intervene and what Codex/GLM must finish before each gate. |
 | C06 — PLAN.md stale queue cleanup | done | 2026-04-11 | PLAN now points to live queue/gate docs instead of carrying a stale inline GLM queue. |
-| C07 — CI Node 24 Migration | ready | 2026-04-11 | GitHub Actions warns Node 20 actions will be forced to Node 24; low urgency but objective. |
+| C07 — CI Node 24 Migration | done | 2026-04-11 | Workflow now opts JavaScript actions and app verification into Node 24. |
 | C08 — Game.ts Risk Map | done | 2026-04-11 | Added responsibility zones, coverage gaps, no-go zones, and safe extraction order. |
 
 ## Task Cards
@@ -214,7 +214,7 @@ Done when:
 
 ### C07 — CI Node 24 Migration
 
-Status: `ready`.
+Status: `done`.
 
 Goal: remove GitHub Actions deprecation warnings before they become failures.
 
@@ -236,6 +236,12 @@ npm run test:runtime
 ```
 
 GitHub Actions must pass after push.
+
+Closeout:
+
+- Added workflow-level `FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true`.
+- Changed both `actions/setup-node@v4` uses from Node 20 to Node 24.
+- CI is now the verification source for Node 24 compatibility because it runs install, build, app typecheck, runtime tests, Pages build, and deploy on GitHub-hosted runners.
 
 ### C08 — Game.ts Risk Map
 
