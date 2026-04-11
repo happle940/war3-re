@@ -33,7 +33,7 @@ Current queue state:
 | Task 05 — Pathing/Footprint Contract Pack | completed | GLM + Codex review | 2026-04-11 | Accepted at commit `edd0bde`; Codex tightened blocked-start proof and integrated spec into `test:runtime`. |
 | Task 06 — AI First Five Minutes Deepening | completed | GLM + Codex review | 2026-04-11 | Added AI economy regression pack; Codex tightened weak assertions, fixed flashHit crash, and integrated into `test:runtime`. |
 | Task 07 — Asset Pipeline Contract Pack | completed | GLM + Codex takeover | 2026-04-11 | Accepted after Codex takeover. Asset pipeline runtime spec green; fixed `Material[]` clone and attack animation scale reset. |
-| Task 03 — Building Placement Agency Pack | ready | Codex dispatch | 2026-04-11 | Lower priority because initial selected-worker fix already exists. |
+| Task 03 — Building Placement Agency Pack | in_progress | GLM | 2026-04-11 | Dispatched after Task07 acceptance; hardens selected-worker build agency before more gameplay work. |
 | Task 08 — Game.ts Module Extraction Slice | ready | Codex dispatch | 2026-04-11 | Only after gameplay contracts are better covered. |
 
 ## Dispatch Rules
@@ -187,7 +187,11 @@ Implement Unit Visibility Contract Pack. Focus on the reported bug: workers are 
 
 ### Task 03 — Building Placement Agency Pack
 
-Status: `ready`.
+Status: `in_progress`.
+
+Owner: GLM.
+
+Started: 2026-04-11.
 
 Goal: harden the contract that the selected worker performs the build order and no unrelated idle worker steals the command.
 
