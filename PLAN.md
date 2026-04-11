@@ -121,11 +121,11 @@ Short version:
 
 `glm` is strong. Use it for execution, not final product judgment.
 
-Human intervention is organized through planned gates, not ad hoc interruptions:
+Human intervention is organized through project-level milestones, not ad hoc interruptions:
 
 - `/Users/zhaocong/Documents/war3-re/docs/HUMAN_DECISION_GATES.md`
 
-Codex and GLM should complete the objective task bundle before each gate, then ask the user for a small product decision packet.
+Codex and GLM should complete the objective task bundle before each milestone, then ask the user for a compact product decision packet.
 
 ## 7. Current Priority Stack
 
@@ -239,17 +239,18 @@ A report may say “implemented” or “runtime-proven”. It must not say “v
 
 Do not ask the user for another broad playtest yet.
 
-Current next human gate:
+Current next user milestone:
 
-- `G1 — Worker/Base Readability` in `/Users/zhaocong/Documents/war3-re/docs/HUMAN_DECISION_GATES.md`
+- `M1 — First Playable RTS Slice` in `/Users/zhaocong/Documents/war3-re/docs/HUMAN_DECISION_GATES.md`
 
-Before that gate, Codex and GLM should complete the objective pre-gate bundle:
+Before that milestone, Codex and GLM should complete the objective pre-milestone bundle:
 
 1. Finish Codex review of GLM Resource/Supply Regression Pack follow-up.
-2. Add/prove Unit Visibility Contract Pack for the worker body disappearing / unreadable-worker class.
-3. Add/prove Asset Pipeline Contract Pack if async refresh remains suspicious.
-4. Add/prove Pathing/Footprint Contract Pack if workers/buildings overlap blockers or spawn in bad positions.
-5. Present the user a short G1 checklist instead of an open-ended request.
+2. Prove readability baseline: worker, footman, Town Hall, goldmine, barracks, tower.
+3. Prove command ownership baseline: select, move, stop, build, attackMove, shift queue.
+4. Prove economy/production baseline: gather, return, build, train, supply, no overspend.
+5. Prove first pressure baseline: AI gathers/builds/trains/attacks and player can respond.
+6. Present the user a 5-10 minute M1 playtest packet instead of small tactical checks.
 
 ## 11. Continuous Work Queues
 
@@ -263,7 +264,7 @@ Operating rule:
 
 - GLM should always have a scoped objective task when it is idle.
 - Codex should always have a non-conflicting project-brain or implementation task when GLM is running.
-- User should be asked to intervene only at planned gates, after the objective pre-gate task bundle is done.
+- User should be asked to intervene only at planned project milestones, after the objective pre-milestone task bundle is done.
 - If either queue changes state, update the relevant queue document before dispatching more work.
 - If user feedback contradicts tests, add or re-rank a queue item immediately.
 

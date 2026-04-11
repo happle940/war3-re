@@ -1,221 +1,298 @@
 # Human Decision Gates
 
-Purpose: the user should intervene at planned product gates, not during every implementation detail. Codex and GLM must do most objective work before each gate, then present a small decision packet for human judgment.
+Purpose: the user should intervene at project-level milestones, not during every implementation detail or tactical test gate. Codex and GLM must complete most objective work before each milestone, then present a compact decision packet for human judgment.
 
 ## Core Rule
 
 Do not ask the user to confirm things that tools can prove.
 
-Ask the user only when the decision requires human perception, product taste, legal/account action, or semantic tradeoff.
+Ask the user only when the decision requires human perception, product taste, scope tradeoff, legal/account action, or release judgment.
 
-Before every human gate, Codex must prepare:
+Tactical checks such as worker visibility, pathing assertions, resource correctness, CI status, or command semantics are not user milestones by themselves. They are entry criteria inside larger milestones.
+
+Before every user milestone, Codex must prepare:
 
 - Live URL or exact local run instruction.
-- What changed since last gate.
-- What the user must judge in 5-10 minutes.
-- Known automated verification results.
-- A small checklist, not an open-ended request.
-- Clear choices if a decision is needed.
+- What changed since the last milestone.
+- Automated verification summary.
+- Known remaining risks.
+- A 10-20 minute test script or decision checklist.
+- Clear choices if a product decision is needed.
 
-## Gate Status Summary
+## Project Milestone Summary
 
-| Gate | Status | User needed? | Entry criteria | User decision |
+| Milestone | Status | User needed? | Entry criteria | User decision |
 |---|---|---:|---|---|
-| G0 — Process/CI/Queues | done | no | CI runtime gate green; Codex and GLM queues exist | none |
-| G1 — Worker/Base Readability | next | yes | worker visibility contract, asset refresh contract, pathing blockers stable | Are workers/buildings readable enough at default RTS camera? |
-| G2 — First Five Minutes Playability | planned | yes | command/resource/supply/AI/pathing regressions green | Does a 5-minute human play session feel controllable? |
-| G3 — Scale/Map Grammar | planned | yes | footprint/pathing tests stable; benchmark measurements documented | Does base/map proportion feel Warcraft-like enough to continue? |
-| G4 — Visual Identity Direction | planned | yes | legal asset/proxy options prepared and technically validated | Use proxy-first, asset-pack-first, or hybrid visual direction? |
-| G5 — Refactor/Architecture Hardening | planned | no by default | gameplay contracts are covered by tests | proceed unless product scope changes |
+| M0 — Project Operating Foundation | done | no | repo, deploy, CI runtime gate, Codex queue, GLM queue | none |
+| M1 — First Playable RTS Slice | next | yes | readable base, command ownership, gather/build/train/combat, first AI pressure all runtime-proven | Is this playable enough to continue expanding instead of repairing basics? |
+| M2 — Warcraft-Like Feel Vertical Slice | planned | yes | M1 passed; scale, camera, terrain grammar, visual direction prepared | Does it feel close enough to the intended Warcraft-like direction? |
+| M3 — Human vs AI Alpha Match | planned | yes | one complete 10-15 minute match loop with win/loss and AI recovery | Is the core game loop worth balancing/content expansion? |
+| M4 — Content And Identity Direction | planned | yes | technical gameplay alpha stable; legal art/style options prepared | Which content/art direction should become the product identity? |
+| M5 — Public Demo Candidate | planned | yes | stable live build, release checklist green, known issues documented | Is this ready to share for external feedback? |
+| M6 — Architecture Hardening Release | planned | no by default | major behavior contracts covered; refactor plan ready | proceed unless scope/product direction changes |
 
-## Gate G0 — Process/CI/Queues
+## M0 — Project Operating Foundation
 
 Status: `done`.
 
+What it means:
+
+The project has a working engineering operating system. This is not a gameplay milestone.
+
 Completed evidence:
 
-- GitHub Actions runs build, app typecheck, runtime tests, build, deploy.
+- GitHub repository and Pages deployment exist.
+- GitHub Actions runs build, app typecheck, runtime tests, build, and deploy.
 - `docs/CODEX_ACTIVE_QUEUE.md` exists.
 - `docs/GLM_READY_TASK_QUEUE.md` exists.
 - Runtime test lock exists via `scripts/run-runtime-tests.sh`.
+- Local cleanup discipline exists via `scripts/cleanup-local-runtime.sh`.
 
-No user intervention required.
+User intervention: none.
 
-## Gate G1 — Worker/Base Readability
+## M1 — First Playable RTS Slice
 
 Status: `next`.
 
-Why this gate exists:
+Why this milestone exists:
 
-If the player cannot immediately see workers and key buildings, all later gameplay work feels broken even when logic is correct.
+The project should first become a small RTS that can be played without feeling broken. This is larger than “can I see the worker” or “does one command test pass”. It is the first moment where the user should sit down and play the live build as a game.
 
-Before asking user, Codex/GLM must complete:
+M1 user question:
 
-Codex tasks:
+> Can I play the first 5-10 minutes without fighting the controls, losing units visually, or seeing obviously broken economy/combat behavior?
 
-- C03 Worker Visibility Truth from `docs/CODEX_ACTIVE_QUEUE.md`.
-- Review any GLM visibility or asset-pipeline tests before acceptance.
-- Ensure local/browser cleanup after validation.
-- Prepare a short live-build checklist.
+Before asking the user, Codex and GLM must complete these objective bundles:
 
-GLM candidate tasks:
+### M1.1 Readability baseline
 
-- Task 02 — Unit Visibility Contract Pack.
-- Task 07 — Asset Pipeline Contract Pack if async refresh remains suspicious.
-- Task 05 — Pathing/Footprint Contract Pack if workers/buildings overlap blockers.
+- Worker body remains visible after initial load and asset refresh.
+- Worker vs footman can be distinguished at default camera distance by silhouette/size/color.
+- Town Hall, goldmine, barracks, and tower are identifiable as gameplay objects.
+- Health bars/select rings align with actual bodies.
+
+Likely tasks:
+
+- Codex C03 — Worker Visibility Truth.
+- GLM Task 02 — Unit Visibility Contract Pack.
+- GLM Task 07 — Asset Pipeline Contract Pack if refresh remains suspicious.
+
+### M1.2 Command ownership baseline
+
+- Box select commits on mouseup.
+- Right click / move / stop / attackMove do not get stolen by automation.
+- Selected worker owns build command.
+- Shift queue semantics are not obviously broken.
+
+Likely tasks:
+
+- Existing command regression pack.
+- GLM Task 04 — Selection/Input Contract Pack.
+- Codex review of test quality.
+
+### M1.3 Economy and production baseline
+
+- Workers gather and return resources.
+- Build/train costs are paid once.
+- Supply cap blocks correctly.
+- Multi-building training cannot overspend.
+- AI does not break supply/resource rules.
+
+Likely tasks:
+
+- GLM Task 01 — Resource/Supply Regression Pack and follow-up.
+- Codex C02 — Review GLM Resource/Supply Pack.
+
+### M1.4 First pressure baseline
+
+- AI gathers, builds, trains, and sends first attack pressure.
+- Player can respond with selection, movement, production, and combat.
+- No obvious blocker prevents a 5-10 minute session.
+
+Likely tasks:
+
+- GLM Task 06 — AI First Five Minutes Deepening.
+- Pathing/footprint regression if units/buildings overlap blockers.
 
 Automated entry criteria:
 
 - `npm run build` passes.
 - `npx tsc --noEmit -p tsconfig.app.json` passes.
 - `npm run test:runtime` passes.
-- Unit visibility regression passes if added.
-- Asset refresh regression passes if added.
+- Resource/supply regression accepted by Codex.
+- Command regression accepted by Codex.
+- Unit visibility contract accepted by Codex.
 - No local runtime/browser leftovers.
 
-User decision packet should ask only:
+M1 user decision packet:
 
-1. Can you see each worker body at default zoom without hunting for health bars?
-2. Can you distinguish worker vs footman quickly?
-3. Can you identify Town Hall, goldmine, barracks, and tower within 2 seconds?
-4. Does the base look readable enough to test gameplay, even if not beautiful?
-5. If no, choose the failure: too small, too dark, wrong silhouette, hidden by camera/tree/HUD, or scale mismatch.
+1. Play the live build for 5-10 minutes.
+2. Can you see and command workers without hunting for health bars?
+3. Can you gather, build, train, and fight without obvious command betrayal?
+4. Does the AI create enough pressure to make the loop testable?
+5. Choose one: `pass`, `pass with visual debt`, `fail controls`, `fail visibility`, `fail economy`, `fail AI`, `fail scale/layout`.
 
-Allowed outcomes:
+Allowed M1 outcomes:
 
-- Pass: move to G2.
-- Conditional pass: continue to G2 but add specific visual debt.
-- Fail: Codex owns another readability implementation pass before gameplay expansion.
+- `pass`: move to M2.
+- `pass with visual debt`: move to M2 and track debt.
+- `fail`: convert failure into Codex/GLM tasks and repeat only the failed slice, not the whole milestone.
 
-## Gate G2 — First Five Minutes Playability
-
-Status: `planned`.
-
-Why this gate exists:
-
-A Warcraft-like RTS prototype must let the player perform the opening loop without fighting the UI or automation.
-
-Before asking user, Codex/GLM must complete:
-
-Codex tasks:
-
-- Review GLM Resource/Supply Pack.
-- Review command and selection regressions for real assertions.
-- Prepare a 5-minute playtest script.
-- Triage any obvious runtime bugs before asking the user to test.
-
-GLM candidate tasks:
-
-- Task 01 — Resource/Supply Regression Pack.
-- Task 04 — Selection/Input Contract Pack.
-- Task 05 — Pathing/Footprint Contract Pack.
-- Task 06 — AI First Five Minutes Deepening.
-
-Automated entry criteria:
-
-- `npm run test:runtime` passes.
-- Resource/supply regression passes.
-- Command regression passes.
-- Selection/input regression passes if added.
-- AI first-five deepening passes if added.
-
-User decision packet should ask only:
-
-1. Can you box-select and command units without extra clicks or weird state?
-2. Can you select a worker, place a building, and trust that worker to build it?
-3. Can you pull a fighting unit away with move/stop?
-4. Does resource gathering/build/train produce a coherent opening?
-5. Does AI create pressure without obvious stupidity in the first 5 minutes?
-
-Allowed outcomes:
-
-- Pass: move to G3.
-- Fail with objective bug: convert to runtime regression task.
-- Fail with feel/taste issue: Codex owns a focused control-feel pass.
-
-## Gate G3 — Scale/Map Grammar
+## M2 — Warcraft-Like Feel Vertical Slice
 
 Status: `planned`.
 
-Why this gate exists:
+Why this milestone exists:
 
-The current biggest gap from Warcraft III is not only models; it is proportion, readable space, and terrain grammar.
+After the game is basically playable, the next question is whether it is moving toward the intended Warcraft-like experience. This is not about one model or one tree. It is the combined feeling of camera, scale, terrain grammar, silhouettes, HUD, and feedback.
 
-Before asking user, Codex/GLM must complete:
+M2 user question:
 
-Codex tasks:
+> Does the live build now read as an intentional Warcraft-like RTS battlefield rather than a web prototype with objects on a plane?
 
-- Produce a scale benchmark table: unit height, building footprint, mine distance, default camera framing.
-- Decide which ratios are product contracts and which are visual tuning.
-- Prepare before/after screenshots only if they do not require long browser sessions.
+Before asking the user, Codex and GLM must complete:
 
-GLM candidate tasks:
+### M2.1 Scale benchmark
 
-- Task 05 — Pathing/Footprint Contract Pack.
-- New task if needed: Scale Measurement Pack.
-- New task if needed: Terrain Grammar Runtime Metrics.
+- Unit/building size table.
+- Camera distance/FOV/AoA table.
+- Town Hall to mine spacing.
+- Building footprint hierarchy.
+- Comparison notes against Warcraft III references.
 
-User decision packet should ask only:
+### M2.2 Terrain/base grammar
 
-1. Does the base cluster feel too spread out, too cramped, or acceptable?
-2. Does mine-to-townhall spacing feel like an RTS economy relationship?
-3. Are units/buildings proportioned enough to read hierarchy?
-4. Does the terrain read as base, tree line, path, and combat space?
+- Base zone, mine zone, tree line, exit path, and combat approach are visually distinct.
+- Pathing tests prove the layout is usable.
+- Terrain does not read as a random flat board.
 
-Allowed outcomes:
+### M2.3 Visual direction pass
 
-- Pass: move to G4.
-- Fail: one targeted scale/layout pass, then repeat G3.
+- Proxy silhouettes or legal assets are consistent enough for a vertical slice.
+- Selection, health bars, damage feedback, and command indicators are readable.
+- HUD does not hide the playfield.
 
-## Gate G4 — Visual Identity Direction
+Likely tasks:
 
-Status: `planned`.
+- Codex scale/benchmark pass.
+- GLM Task 05 — Pathing/Footprint Contract Pack.
+- GLM Task 07 — Asset Pipeline Contract Pack.
+- New GLM task if needed: Scale Measurement Pack.
 
-Why this gate exists:
+M2 user decision packet:
 
-Legal asset sourcing and proxy art direction affect long-term identity. Automated tests can verify loading, not taste.
+1. Does the battlefield immediately read as an RTS space?
+2. Does base/mine/tree/path layout feel intentional?
+3. Are unit/building proportions acceptable for the intended direction?
+4. Does the camera framing feel RTS-like enough to continue?
+5. Choose one: `pass`, `pass but art debt`, `fail scale`, `fail terrain`, `fail camera`, `fail visual identity`.
 
-Before asking user, Codex/GLM must complete:
-
-Codex tasks:
-
-- Present 2-3 legal visual directions.
-- Verify asset license safety before recommending.
-- State cost: readability, implementation time, file size, consistency.
-
-GLM candidate tasks:
-
-- Task 07 — Asset Pipeline Contract Pack.
-- Asset catalog consistency checks.
-- Disposal/material isolation tests.
-
-User decision packet should ask only:
-
-1. Proxy-first stylized readable RTS?
-2. Legal asset-pack-first, accepting style mismatch initially?
-3. Hybrid: proxy gameplay silhouettes now, legal assets later after scale contracts stabilize?
-
-Default recommendation unless user overrides:
-
-- Hybrid: proxy silhouettes for readability now, asset pipeline kept ready for legal models later.
-
-## Gate G5 — Refactor/Architecture Hardening
+## M3 — Human vs AI Alpha Match
 
 Status: `planned`.
 
-Why this gate exists:
+Why this milestone exists:
 
-`Game.ts` is large and risky, but refactoring before contracts are covered can destroy behavior.
+A real RTS prototype needs a complete match loop, not just opening mechanics. M3 is the first “can I play a match?” milestone.
 
-Before this gate:
+M3 user question:
 
-- Command, selection, resource/supply, pathing, first-five, and asset refresh contracts should be covered.
-- `docs/GAME_TS_RISK_MAP.md` should identify safe extraction seams.
+> Can I play one complete human-vs-AI match and understand why I won, lost, or stalled?
 
-User intervention is not required unless refactor changes product scope or slows feature progress.
+Before asking the user, Codex and GLM must complete:
 
-## Current Next Gate
+- Win/loss condition.
+- AI can recover from partial worker/unit loss.
+- AI attack waves do not permanently stall.
+- Player can defend, rebuild, and counterattack.
+- Basic balance is rough but not absurd.
+- Runtime tests cover the main state transitions.
 
-Current next human gate: `G1 — Worker/Base Readability`.
+M3 user decision packet:
 
-Do not ask the user for another broad playtest before G1 entry criteria are met. First, Codex and GLM should finish objective visibility/resource/pathing work, then present a short G1 checklist.
+1. Play one 10-15 minute match.
+2. Did the match have a beginning, pressure phase, and resolution?
+3. Did any control issue make the match feel unfair?
+4. Did AI behavior fail in a way that breaks the match?
+5. Choose one: `alpha pass`, `fail control`, `fail AI`, `fail pacing`, `fail win/loss clarity`.
+
+## M4 — Content And Identity Direction
+
+Status: `planned`.
+
+Why this milestone exists:
+
+Only after the game loop is worth playing should the project commit to broader content and visual identity. This avoids wasting effort on assets before the game contracts are stable.
+
+M4 user question:
+
+> What should this become visually and content-wise?
+
+Before asking the user, Codex and GLM must complete:
+
+- Legal asset options documented.
+- Proxy-first vs asset-pack-first vs hybrid tradeoff documented.
+- One-race vs multi-race scope options documented.
+- Map/content expansion options documented.
+- Cost and risk for each direction stated.
+
+M4 default recommendation unless overridden:
+
+- Hybrid: readable proxy gameplay silhouettes now, legal asset pipeline preserved for later replacement.
+
+M4 user decision packet:
+
+1. Choose visual direction: `proxy-first`, `asset-pack-first`, or `hybrid`.
+2. Choose content scope: `one polished Human slice`, `Human vs Orc`, or `systems-first sandbox`.
+3. Choose next product target: `better game feel`, `more content`, or `public demo`.
+
+## M5 — Public Demo Candidate
+
+Status: `planned`.
+
+Why this milestone exists:
+
+This is the first “show other people” checkpoint. It is larger than passing tests; it requires a stable, explainable experience.
+
+M5 user question:
+
+> Is this ready to send to other people for feedback?
+
+Before asking the user, Codex and GLM must complete:
+
+- Live GitHub Pages build is stable.
+- CI is green.
+- README explains controls and current scope.
+- Known issues are documented.
+- No local-only dependency or hidden setup is required.
+- Smoke checklist is current.
+
+M5 user decision packet:
+
+1. Share publicly now?
+2. Share privately to a few testers?
+3. Hold until one more milestone?
+
+## M6 — Architecture Hardening Release
+
+Status: `planned`.
+
+Why this milestone exists:
+
+After product direction is validated, reduce long-term engineering risk. This should not block early product discovery unless `Game.ts` complexity starts preventing progress.
+
+M6 user intervention:
+
+Not required by default. Codex decides and reports unless refactor changes scope or visible behavior.
+
+Before M6:
+
+- Command, selection, resources, pathing, AI, asset refresh, and first-match contracts have tests.
+- `docs/GAME_TS_RISK_MAP.md` exists.
+- Refactor is split into reversible slices.
+
+## Current Next User Intervention
+
+Current next user milestone: `M1 — First Playable RTS Slice`.
+
+Do not ask the user to validate tactical items like “worker visibility” alone unless it blocks M1 and cannot be decided by measurement. Codex and GLM should finish the M1 objective bundles first, then present the M1 playtest packet.

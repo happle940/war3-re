@@ -99,13 +99,13 @@ The project uses two live queues:
 
 - `docs/CODEX_ACTIVE_QUEUE.md`: Codex-owned strategy, integration, review, and high-risk implementation work.
 - `docs/GLM_READY_TASK_QUEUE.md`: GLM-owned scoped execution tasks.
-- `docs/HUMAN_DECISION_GATES.md`: planned user intervention points and pre-gate work bundles.
+- `docs/HUMAN_DECISION_GATES.md`: project-level user intervention milestones and pre-milestone work bundles.
 
 Codex must not become passive while GLM is working. If GLM is running for more than 5 minutes, Codex should work the next non-conflicting Codex queue item, update project contracts, check CI/deploy health, or prepare the next GLM task.
 
 Waiting is allowed only when continuing would create file conflicts, require human product judgment, or risk accepting an unreviewed GLM change.
 
-User intervention should happen at gates, not during routine implementation. Codex and GLM must complete the objective pre-gate task bundle first, then ask the user to judge only the human-perception or product-choice questions.
+User intervention should happen at project milestones, not during routine implementation or tactical test gates. Codex and GLM must complete the objective pre-milestone task bundle first, then ask the user to judge only the human-perception, product-choice, or release-readiness questions.
 
 Good split:
 
