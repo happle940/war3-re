@@ -31,7 +31,7 @@ Current queue state:
 | Task 02 — Unit Visibility Contract Pack | completed | Codex | 2026-04-11 | Added visibility runtime pack and fixed W3X camera reset; `npm run test:runtime` passed 33/33. |
 | Task 04 — Selection/Input Contract Pack | completed | GLM + Codex review | 2026-04-11 | Accepted at commit `96d9d4a`; Codex integrated it into `test:runtime`. |
 | Task 05 — Pathing/Footprint Contract Pack | completed | GLM + Codex review | 2026-04-11 | Accepted at commit `edd0bde`; Codex tightened blocked-start proof and integrated spec into `test:runtime`. |
-| Task 06 — AI First Five Minutes Deepening | ready | Codex dispatch | 2026-04-11 | Extends current AI smoke into real economy robustness. |
+| Task 06 — AI First Five Minutes Deepening | in_progress | GLM | 2026-04-11 | Dispatched after Task 05 acceptance; extends AI smoke into real economy robustness. |
 | Task 07 — Asset Pipeline Contract Pack | ready | Codex dispatch | 2026-04-11 | Useful after worker visibility contract proves current failure mode. |
 | Task 03 — Building Placement Agency Pack | ready | Codex dispatch | 2026-04-11 | Lower priority because initial selected-worker fix already exists. |
 | Task 08 — Game.ts Module Extraction Slice | ready | Codex dispatch | 2026-04-11 | Only after gameplay contracts are better covered. |
@@ -329,7 +329,13 @@ Implement Pathing/Footprint Contract Pack. Build runtime tests for spawn blocker
 
 ### Task 06 — AI First Five Minutes Deepening
 
-Status: `ready`.
+Status: `in_progress`.
+
+Owner: GLM.
+
+Started: 2026-04-11.
+
+Priority reason: M1 still needs stronger proof that the AI can sustain the first playable loop, recover from disruption, and launch pressure without economy/pathing stalls.
 
 Goal: move from “AI does something” to “AI can sustain a playable first five minutes”.
 
