@@ -3,22 +3,94 @@
  *
  * These tests prove that the 3 human-verified fixes actually work at runtime.
  * They must fail if the fix regresses — not just log values.
+ *
+ * Wait strategy: do NOT rely on Playwright locator visibility/attachment for canvas.
+ * Instead use page.waitForFunction checking DOM canvas, __war3Game, units, renderer.
+ * Diagnostic snapshot on every failure so CI logs are actionable.
  */
 import { test, expect, type Page } from '@playwright/test'
 import { BUILDINGS } from '../src/game/GameData'
 
 const BASE = 'http://127.0.0.1:4173'
 
-/** Wait for game to initialize and settle */
-async function waitForGame(page: Page) {
-  await page.goto(BASE)
-  const canvas = page.locator('#game-canvas')
-  await canvas.waitFor({ state: 'visible', timeout: 10000 })
-  await page.waitForFunction(() => {
+// ==================== Test helpers ====================
+
+/** Collect a diagnostic snapshot of game state for error messages */
+async function diagnose(page: Page, label: string) {
+  const snap = await page.evaluate(() => {
     const game = (window as any).__war3Game
-    return !!game && Array.isArray(game.units) && game.units.length > 0
-  }, { timeout: 10000 })
-  await page.waitForTimeout(1500)
+    const canvas = document.getElementById('game-canvas')
+    const rect = canvas?.getBoundingClientRect()
+    const mapStatus = document.getElementById('map-status')?.textContent
+    return {
+      hasGame: !!game,
+      unitsLength: game?.units?.length ?? -1,
+      unitTypes: game?.units?.map((u: any) => u.type) ?? [],
+      canvasRect: rect ? { x: rect.x, y: rect.y, w: rect.width, h: rect.height } : null,
+      mapStatus,
+      rendererSize: game?.renderer
+        ? `${game.renderer.domElement.width}x${game.renderer.domElement.height}`
+        : null,
+    }
+  })
+  console.error(`[DIAGNOSE ${label}]`, JSON.stringify(snap, null, 2))
+  return snap
+}
+
+/**
+ * Wait for game to initialize and settle.
+ *
+ * Does NOT use locator.waitFor() for canvas. In this WebGL/HUD page the
+ * accessibility snapshot can show the HUD while canvas locators still time out
+ * intermittently in headless runs. Instead we verify from inside the page:
+ *   1. canvas exists in DOM and has a non-zero client rect
+ *   2. window.__war3Game exists with populated units array
+ *   3. renderer has non-zero dimensions (Three.js initialized)
+ *   4. A short settle for the animation loop to produce one frame
+ */
+async function waitForGame(page: Page) {
+  // Collect console errors during load for diagnostics
+  const consoleErrors: string[] = []
+  page.on('console', (msg) => {
+    if (msg.type() === 'error') consoleErrors.push(msg.text())
+  })
+  ;(page as any).__consoleErrors = consoleErrors
+
+  await page.goto(BASE, { waitUntil: 'domcontentloaded' })
+
+  // Game instance + units + renderer ready
+  try {
+    await page.waitForFunction(() => {
+      const canvas = document.getElementById('game-canvas')
+      if (!canvas) return false
+      const rect = canvas.getBoundingClientRect()
+      if (rect.width === 0 || rect.height === 0) return false
+
+      const game = (window as any).__war3Game
+      if (!game) return false
+      if (!Array.isArray(game.units) || game.units.length === 0) return false
+      if (!game.renderer) return false
+      const c = game.renderer.domElement
+      if (c.width === 0 || c.height === 0) return false
+      return true
+    }, { timeout: 15000 })
+  } catch (e) {
+    const snap = await diagnose(page, 'waitForGame-fail')
+    // Attach useful info to the error
+    const reason = snap.hasGame
+      ? (snap.unitsLength > 0 ? 'renderer-not-ready' : 'no-units')
+      : 'no-game-instance'
+    throw new Error(
+      `waitForGame failed (${reason}). ` +
+      `canvas=${JSON.stringify(snap.canvasRect)} mapStatus="${snap.mapStatus}" ` +
+      `units=${snap.unitsLength} renderer=${snap.rendererSize}. ` +
+      `Console errors: ${consoleErrors.slice(-5).join(' | ')}. ` +
+      `Original: ${(e as Error).message}`,
+    )
+  }
+
+  // One animation frame settle
+  await page.waitForTimeout(1000)
 }
 
 /**
@@ -124,6 +196,9 @@ test.describe('Truth Validation: Box Selection', () => {
       }
     })
 
+    if (!result.ok) {
+      await diagnose(page, 'box-select-no-workers')
+    }
     expect(result.ok).toBe(true)
     expect(result.isDragging).toBe(false) // mouseup must clear isDragging
     expect(result.selectionCount).toBeGreaterThan(0)
@@ -139,7 +214,6 @@ test.describe('Truth Validation: Box Selection', () => {
       if (!g) return
       const worker = g.units.find((u: any) => u.team === 0 && u.type === 'worker' && u.hp > 0)
       if (!worker) return
-      // Use selectionModel directly since selectUnit is private but creates visual artifacts
       g.selectionModel.clear()
       g.selectionModel.add(worker)
       g._lastCmdKey = ''
@@ -152,10 +226,12 @@ test.describe('Truth Validation: Box Selection', () => {
       const g = (window as any).__war3Game
       return g ? g.selectionModel.units.length : 0
     })
+    if (beforeCount === 0) {
+      await diagnose(page, 'clear-selection-no-worker')
+    }
     expect(beforeCount).toBeGreaterThan(0)
 
     // Click on corner (empty ground) via canvas dispatch
-    // Get viewport height inside evaluate
     const viewportHeight = await page.evaluate(() => window.innerHeight)
     await dispatchCanvasMouseEvent(page, 'mousedown', { clientX: 5, clientY: viewportHeight - 5, button: 0 })
     await dispatchCanvasMouseEvent(page, 'mouseup', { clientX: 5, clientY: viewportHeight - 5, button: 0 })
@@ -252,6 +328,9 @@ test.describe('Truth Validation: Builder Agency', () => {
       }
     })
 
+    if (!result.ok) {
+      await diagnose(page, 'builder-agency-fail')
+    }
     expect(result.ok).toBe(true)
     // The selected worker must be in placementWorkers
     expect(result.savedWorkerIndices).toContain(result.workerIndex)
@@ -294,6 +373,8 @@ test.describe('Truth Validation: Builder Agency', () => {
 // TEST 3: Scale / Layout structural validation
 // ============================================================
 test.describe('Truth Validation: Scale and Layout', () => {
+  test.setTimeout(60000)
+
   test('building size hierarchy: Farm < Barracks < Town Hall', async ({ page }) => {
     await waitForGame(page)
 
@@ -310,6 +391,9 @@ test.describe('Truth Validation: Scale and Layout', () => {
         workerCount: g.units.filter((u: any) => u.type === 'worker' && u.team === 0).length,
       }
     })
+    if (!sizes) {
+      await diagnose(page, 'size-hierarchy-no-game')
+    }
     expect(sizes).not.toBeNull()
     expect(sizes!.townhallExists).toBe(true)
     expect(sizes!.barracksExists).toBe(true)
@@ -337,6 +421,9 @@ test.describe('Truth Validation: Scale and Layout', () => {
         gmIsNE: gm.mesh.position.x > th.mesh.position.x && gm.mesh.position.z < th.mesh.position.z,
       }
     })
+    if (!spatial) {
+      await diagnose(page, 'th-gm-distance-no-units')
+    }
     expect(spatial).not.toBeNull()
 
     expect(spatial!.distance).toBeGreaterThanOrEqual(3)
@@ -359,6 +446,9 @@ test.describe('Truth Validation: Scale and Layout', () => {
         isSW: bk.mesh.position.x < th.mesh.position.x && bk.mesh.position.z > th.mesh.position.z,
       }
     })
+    if (!spatial) {
+      await diagnose(page, 'barracks-sw-no-units')
+    }
     expect(spatial).not.toBeNull()
     expect(spatial!.isSW).toBe(true)
   })
@@ -389,6 +479,9 @@ test.describe('Truth Validation: Scale and Layout', () => {
 
       return { allOutside }
     })
+    if (!layout) {
+      await diagnose(page, 'workers-outside-th-no-units')
+    }
     expect(layout).not.toBeNull()
     expect(layout!.allOutside).toBe(true)
   })
@@ -411,6 +504,9 @@ test.describe('Truth Validation: Scale and Layout', () => {
       !e.includes('maps/')
     )
 
+    if (criticalErrors.length > 0) {
+      console.error('[DIAGNOSE console-errors]', criticalErrors.join('\n'))
+    }
     expect(criticalErrors).toHaveLength(0)
   })
 })

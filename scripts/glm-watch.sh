@@ -24,11 +24,12 @@ session_exists() {
 
 print_help() {
   cat <<USAGE
-Usage: scripts/glm-watch.sh <start|attach|tail|status|capture|send|stop>
+Usage: scripts/glm-watch.sh <start|attach|readonly|tail|status|capture|send|stop>
 
 Commands:
   start    Start a new tmux-backed Claude Code session with logging
   attach   Attach to the running tmux session
+  readonly Attach to the running tmux session in read-only mode
   tail     Tail the latest glm log file
   status   Show session info and recent pane output
   capture  Print more pane history to stdout
@@ -89,6 +90,15 @@ attach_session() {
     exit 1
   fi
   exec tmux -S "$SOCKET" attach -t "$SESSION"
+}
+
+readonly_attach_session() {
+  if ! session_exists; then
+    echo "Session '$SESSION' is not running. Start one with: $0 start"
+    exit 1
+  fi
+  # Clear TMUX so this also works from inside another tmux session.
+  exec env TMUX= tmux -S "$SOCKET" attach-session -r -t "$SESSION"
 }
 
 tail_log() {
@@ -162,6 +172,7 @@ cmd="${1:-help}"
 case "$cmd" in
   start) start_session ;;
   attach) attach_session ;;
+  readonly) readonly_attach_session ;;
   tail) tail_log ;;
   status) capture_status ;;
   capture) capture_full ;;

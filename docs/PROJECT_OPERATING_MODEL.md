@@ -177,6 +177,27 @@ Automated tests cannot approve:
 - HUD atmosphere
 - Warcraft III likeness
 
+### 6.4 Mandatory runtime cleanup
+
+After any local browser, Vite, preview, or Playwright validation, Codex must clean up before leaving the turn or moving to another task.
+
+Required command:
+
+```bash
+./scripts/cleanup-local-runtime.sh
+```
+
+This is mandatory because leftover local Chrome tabs, Vite servers, Playwright workers, and Chromium headless processes can make the user's machine noticeably slower.
+
+Do not leave these running unless the user explicitly asks to keep a local server or browser open:
+
+- `npm run dev`
+- `npm run preview`
+- `vite`
+- `playwright`
+- Chromium / `chrome-headless-shell`
+- visible Chrome tabs for `localhost` / `127.0.0.1` project ports
+
 ## 7. Git Policy
 
 Default branch: `main`.
