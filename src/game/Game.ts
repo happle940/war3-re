@@ -185,6 +185,8 @@ export class Game {
   // 建造放置模式
   private placementMode: string | null = null
   private ghostMesh: THREE.Group | null = null
+  // 进入建造模式时被选中的 worker 列表（保证放置时用选中的工人建造）
+  private placementWorkers: Unit[] = []
 
   // 攻击移动目标模式
   private attackMoveMode = false
@@ -1297,6 +1299,11 @@ export class Game {
     // 检查资源
     if (!this.resources.canAfford(0, def.cost)) return
 
+    // 保存当前选中的可控 worker（进入放置模式后选择会被清除）
+    this.placementWorkers = this.selectedUnits.filter(
+      (u) => u.team === 0 && u.type === 'worker' && !u.isBuilding,
+    )
+
     this.placementMode = buildingKey
     this.clearSelection()
 
@@ -1363,8 +1370,23 @@ export class Game {
     const bMat = bMesh?.material as THREE.MeshLambertMaterial | undefined
     if (bMat) { bMat.transparent = true; bMat.opacity = 0.5 }
 
-    // 找最近的空闲农民去建造
-    const peasant = this.findNearestIdlePeasant(pos)
+    // 优先使用进入建造模式时选中的 worker（玩家指定建造者）
+    // 只有在没有选中 worker 时才 fallback 到最近空闲农民
+    let peasant: Unit | null = null
+
+    // 从已保存的选中 worker 中找：优先 primary（第一个），然后其他选中的
+    const savedWorkers = this.placementWorkers.filter(
+      (u) => u.hp > 0 && u.state !== UnitState.Building && this.units.includes(u),
+    )
+    if (savedWorkers.length > 0) {
+      // 如果只有一个选中的 worker → 它就是建造者
+      // 如果多个选中的 → 用 primary（第一个）
+      peasant = savedWorkers[0]
+    } else {
+      // Fallback：没有选中 worker（从命令卡直接点击建造按钮时，选中可能是建筑）
+      peasant = this.findNearestIdlePeasant(pos)
+    }
+
     if (peasant) {
       issueCommand([peasant], { type: 'build', target: building })
       this.planPath(peasant, building.mesh.position)
@@ -1380,6 +1402,7 @@ export class Game {
       this.ghostMesh = null
     }
     this.placementMode = null
+    this.placementWorkers = []
     this.updateModeHint('')
   }
 
