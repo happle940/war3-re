@@ -30,7 +30,7 @@ Current queue state:
 | Task 01 — Resource/Supply Regression Pack | completed | GLM | 2026-04-11 | Accepted at commit `a64833d`; Codex reran locked runtime pack, 9/9 passed. |
 | Task 02 — Unit Visibility Contract Pack | completed | Codex | 2026-04-11 | Added visibility runtime pack and fixed W3X camera reset; `npm run test:runtime` passed 33/33. |
 | Task 04 — Selection/Input Contract Pack | completed | GLM + Codex review | 2026-04-11 | Accepted at commit `96d9d4a`; Codex integrated it into `test:runtime`. |
-| Task 05 — Pathing/Footprint Contract Pack | ready | Codex dispatch | 2026-04-11 | Protects scale/layout/path blockers after visibility is stable. |
+| Task 05 — Pathing/Footprint Contract Pack | in_progress | GLM | 2026-04-11 | Dispatched for M1: protect scale/layout/path blockers after selection and visibility stabilized. |
 | Task 06 — AI First Five Minutes Deepening | ready | Codex dispatch | 2026-04-11 | Extends current AI smoke into real economy robustness. |
 | Task 07 — Asset Pipeline Contract Pack | ready | Codex dispatch | 2026-04-11 | Useful after worker visibility contract proves current failure mode. |
 | Task 03 — Building Placement Agency Pack | ready | Codex dispatch | 2026-04-11 | Lower priority because initial selected-worker fix already exists. |
@@ -187,7 +187,13 @@ Implement Unit Visibility Contract Pack. Focus on the reported bug: workers are 
 
 ### Task 03 — Building Placement Agency Pack
 
-Status: `ready`.
+Status: `in_progress`.
+
+Owner: GLM.
+
+Started: 2026-04-11.
+
+Priority reason: M1 needs RTS-scale/pathing trust before another human playtest. Recent issues included workers spawning inside blockers, map/building scale drift, and fallback movement masking invalid paths.
 
 Goal: harden the contract that the selected worker performs the build order and no unrelated idle worker steals the command.
 
@@ -412,8 +418,7 @@ Use this order unless current failures suggest otherwise:
 1. Task 01 Resource/Supply Regression Pack
 2. Task 02 Unit Visibility Contract Pack
 3. Task 05 Pathing/Footprint Contract Pack
-4. Task 04 Selection/Input Contract Pack
-5. Task 06 AI First Five Minutes Deepening
+4. Task 06 AI First Five Minutes Deepening
 6. Task 07 Asset Pipeline Contract Pack
 7. Task 03 Building Placement Agency Pack
 8. Task 08 Game.ts Module Extraction Slice
