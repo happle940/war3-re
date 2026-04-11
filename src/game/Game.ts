@@ -1423,6 +1423,7 @@ export class Game {
     }
 
     if (peasant) {
+      building.builder = peasant
       issueCommand([peasant], { type: 'build', target: building })
       this.planPath(peasant, building.mesh.position)
     }
@@ -2905,6 +2906,7 @@ export class Game {
     let bestDist = Infinity
     for (const u of this.units) {
       if (u.type !== 'worker' || u.team !== 0) continue
+      if (u.hp <= 0) continue
       if (u.state !== UnitState.Idle) continue
       const d = pos.distanceTo(u.mesh.position)
       if (d < bestDist) { bestDist = d; best = u }

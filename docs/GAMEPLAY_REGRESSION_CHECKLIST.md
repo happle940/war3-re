@@ -180,6 +180,19 @@
 - [x] 缺失资产路径仍能为 worker/footman/townhall/barracks/farm/tower/goldmine 创建可见 fallback
 - [x] 显式 refresh 保留已有实体 position/rotation，且无严重 console error
 
+### 建造者代理自动化覆盖
+
+以下项目由 `tests/building-agency-regression.spec.ts` 自动验证（Playwright）：
+
+- [x] 单个选中农民进入建造放置模式后，放置建筑会由同一个选中农民建造
+- [x] 即使另一个空闲农民离建筑点更近，也不会抢走玩家指定农民的建造任务
+- [x] 多选农民时使用确定性 primary 规则：`SelectionModel.units[0]` -> `placementWorkers[0]` -> builder
+- [x] 进入放置模式后，若原选中农民死亡/失效，fallback 到最近存活空闲农民且不崩溃
+- [x] 成功放置后清空 `placementWorkers` / `placementMode`
+- [x] 取消/退出放置模式后清空 `placementWorkers` / ghost mesh
+- [x] Shift-style 追加选择进入放置模式时保留 selection order，不污染 remembered worker list
+- [x] 建造代理测试过程中无严重 console error
+
 ## 仍未被自动化覆盖（需人工验证）
 
 - [ ] 玩家手动操作的采集/建造/训练完整流程
@@ -192,6 +205,7 @@
 
 | 日期 | 验证人 | 结果 | 备注 |
 |------|--------|------|------|
+| 2026-04-11 | Codex | Building Agency Regression | `building-agency-regression.spec.ts`: 5 tests green. Fixed `building.builder` never being set and `findNearestIdlePeasant()` considering dead workers during fallback. Added the spec to `npm run test:runtime`. |
 | 2026-04-11 | Codex | Asset Pipeline Regression | `asset-pipeline-regression.spec.ts`: 4 tests green. Fixed `Material[]` clone isolation, browser-side fake asset refresh proof, and `dealDamage()` scale reset that would break glTF asset scale. Added the spec to `npm run test:runtime`. |
 | 2026-04-11 | GLM-5.1 + Codex | AI Economy Regression | `ai-economy-regression.spec.ts`: 9 tests green. Found and fixed AI second-wave deadlock plus `flashHit()` crash on nested/glTF materials. Codex tightened farm, queued-supply, first-wave, and second-wave assertions. |
 | 2026-04-11 | GLM-5.1 + Codex | Pathing/Footprint Regression | `pathing-footprint-regression.spec.ts`: 6 tests green. Codex tightened the PathFinder blocked-start assertion to test `findPath` directly instead of accepting `planPath` fallback. |
