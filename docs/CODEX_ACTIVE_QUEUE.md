@@ -54,8 +54,8 @@ GLM owns:
 | Task | Status | Last update | Why it matters |
 |---|---|---|---|
 | C01 — Dual queue operating model | done | 2026-04-11 | Fixes the root process bug: Codex had no explicit queue and drifted into GLM-waiting. |
-| C02 — Review GLM Resource/Supply Pack | watch | 2026-04-11 | Review found one weak test path; GLM is doing follow-up so this remains open. |
-| C03 — Worker Visibility Truth | ready | 2026-04-11 | User still reports workers are not visible after refresh; this is the highest product pain. |
+| C02 — Review GLM Resource/Supply Pack | done | 2026-04-11 | Accepted GLM follow-up commit `a64833d`; locked runtime pack reran 9/9 green. |
+| C03 — Worker Visibility Truth | done | 2026-04-11 | Added visibility regression pack and fixed W3X map-load camera reset that left player workers offscreen. |
 | C04 — Live Build Reality Check Protocol | ready | 2026-04-11 | Define how screenshots/human observations convert into reproducible contracts without overusing browser sessions. |
 | C05 — Human Decision Gates | done | 2026-04-11 | Defines when the user should intervene and what Codex/GLM must finish before each gate. |
 | C06 — PLAN.md stale queue cleanup | done | 2026-04-11 | PLAN now points to live queue/gate docs instead of carrying a stale inline GLM queue. |
@@ -90,7 +90,7 @@ git diff --check
 
 ### C02 — Review GLM Resource/Supply Pack
 
-Status: `watch`.
+Status: `done`.
 
 Trigger: GLM finishes Task 01.
 
@@ -106,9 +106,9 @@ Review checklist:
 - If GLM changed gameplay code, each change is backed by a failing test and narrow fix.
 - Queue docs are updated after closeout.
 
-Current review note:
+Final review note:
 
-- GLM commit `fb5caa2` added useful resource/supply coverage, but the stop/override resource test manually mutates fields instead of using the real command path. Follow-up has been dispatched to GLM; do not mark this review done until that path is proven or explicitly downgraded.
+- GLM commit `a64833d` replaced the weak stop/override proof with real command-path coverage. Codex reran `./scripts/run-runtime-tests.sh tests/resource-supply-regression.spec.ts --reporter=list`; result was 9/9 green.
 
 Allowed files for Codex review follow-up:
 
@@ -118,7 +118,7 @@ Allowed files for Codex review follow-up:
 
 ### C03 — Worker Visibility Truth
 
-Status: `ready`.
+Status: `done`.
 
 Goal: resolve the user's recurring report: workers appear during load, then become hard to see or invisible after asset/proxy refresh.
 
@@ -148,6 +148,13 @@ npx tsc --noEmit -p tsconfig.app.json
 Human gate:
 
 - User must confirm workers are visible on the live build at default zoom.
+
+Closeout:
+
+- Added `tests/unit-visibility-regression.spec.ts`.
+- Fixed W3X map-load camera reset by refocusing on player 0 base after entity spawn.
+- Fixed runtime-test lock script so parallel agents cannot release the lock before Playwright starts.
+- `npm run test:runtime` passed 33/33 locally after the fix.
 
 ### C04 — Live Build Reality Check Protocol
 

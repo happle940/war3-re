@@ -11,8 +11,10 @@
     "test:closeout": "./scripts/run-runtime-tests.sh tests/closeout.spec.ts --reporter=list",
     "test:first-five": "./scripts/run-runtime-tests.sh tests/first-five-minutes.spec.ts --reporter=list",
     "preview:ci": "vite preview --host 127.0.0.1 --port 4173",
-    "test:runtime": "./scripts/run-runtime-tests.sh tests/closeout.spec.ts tests/first-five-minutes.spec.ts tests/command-regression.spec.ts --reporter=list",
-    "test:command": "./scripts/run-runtime-tests.sh tests/command-regression.spec.ts --reporter=list"
+    "test:runtime": "./scripts/run-runtime-tests.sh tests/closeout.spec.ts tests/first-five-minutes.spec.ts tests/command-regression.spec.ts tests/resource-supply-regression.spec.ts tests/unit-visibility-regression.spec.ts --reporter=list",
+    "test:command": "./scripts/run-runtime-tests.sh tests/command-regression.spec.ts --reporter=list",
+    "test:resource": "./scripts/run-runtime-tests.sh tests/resource-supply-regression.spec.ts --reporter=list",
+    "test:visibility": "./scripts/run-runtime-tests.sh tests/unit-visibility-regression.spec.ts --reporter=list"
   },
   "dependencies": {
     "jszip": "^3.10.1",

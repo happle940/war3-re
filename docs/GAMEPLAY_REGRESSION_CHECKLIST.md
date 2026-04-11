@@ -120,19 +120,32 @@
 - [x] AI 农场供应仅在完成后生效
 - [x] 多建筑训练不可超支（200g + 2 barracks → 最多 1 footman）
 
+### 单位可见性自动化覆盖
+
+以下项目由 `tests/unit-visibility-regression.spec.ts` 自动验证（Playwright）：
+
+- [x] W3X 异步地图加载完成后，玩家 0 农民仍在默认镜头视口内
+- [x] 农民 mesh 有可见、不透明、非零缩放的渲染子对象
+- [x] 农民世界包围盒达到 RTS 默认镜头可读阈值
+- [x] 农民投影到屏幕后的像素高度/宽度达到可读阈值
+- [x] 血条锚点在真实视觉包围盒上方且距离不过大
+- [x] 显式 asset refresh 后农民可见性和 scale 不坍塌
+
 ## 仍未被自动化覆盖（需人工验证）
 
 - [ ] 玩家手动操作的采集/建造/训练完整流程
 - [ ] auto-aggro 命令恢复
 - [ ] 战斗循环（伤害数字、护甲减伤）
-- [ ] 视觉可读性（worker、建筑辨识度）
+- [ ] 建筑/地形/模型的主观视觉辨识度
 - [ ] 布局语法（基地空间关系、路径可通性）
 
 ## 验证记录
 
 | 日期 | 验证人 | 结果 | 备注 |
 |------|--------|------|------|
-| 2026-04-11 | GLM-5.1 | Resource/Supply Regression | resource-supply-regression.spec.ts: 8 tests green. Supply, training, resource flow, AI spending contracts proven. |
+| 2026-04-11 | Codex | Runtime Full Pack | `npm run test:runtime`: 33 tests green. Includes closeout, command, first-five, resource/supply, unit visibility. |
+| 2026-04-11 | Codex | Unit Visibility Regression | `unit-visibility-regression.spec.ts`: 2 tests green. Fixed W3X map-load camera reset that left player workers offscreen. |
+| 2026-04-11 | GLM-5.1 | Resource/Supply Regression | resource-supply-regression.spec.ts: 9 tests green. Supply, training, resource flow, AI spending contracts proven. |
 | 2026-04-11 | GLM-5.1 | Command Regression | command-regression.spec.ts: 7 tests green. Move/stop/hold/attackMove/queue contracts proven. |
 | 2026-04-11 | GLM-5.1 | Runtime Truth 01 | first-five-minutes.spec.ts: AI economy/build/train/attack automated. Player manual loop not yet covered. |
 | 2026-04-11 | GLM-5.1 | pending | Order System Beta + Gameplay Alpha 完成后待验证 |

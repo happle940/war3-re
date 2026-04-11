@@ -30,14 +30,18 @@ echo "Runtime test lock acquired."
 
 export WAR3_RUNTIME_LOCK_HELD=1
 
-cleanup() {
+cleanup_runtime_only() {
   ./scripts/cleanup-local-runtime.sh >/dev/null 2>&1 || true
+}
+
+cleanup() {
+  cleanup_runtime_only
   rm -f "$LOCK_DIR/pid" 2>/dev/null || true
   rmdir "$LOCK_DIR" 2>/dev/null || true
 }
 trap cleanup EXIT
 
-cleanup
+cleanup_runtime_only
 
 if [[ $# -eq 0 ]]; then
   set -- tests/closeout.spec.ts tests/first-five-minutes.spec.ts --reporter=list

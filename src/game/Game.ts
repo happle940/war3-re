@@ -2746,8 +2746,8 @@ export class Game {
     for (let i = 0; i < 5; i++) this.spawnUnit('worker', 1, far + i, far - 2)
 
     // 初始镜头：聚焦玩家基地中心，让 TH + 金矿 + 农民一屏尽收
-    this.cameraCtrl.setTarget(13, 14)
     this.cameraCtrl.distance = 24
+    this.cameraCtrl.setTarget(13, 14)
   }
 
   private spawnUnit(type: string, team: number, x: number, z: number): Unit {
@@ -3940,6 +3940,7 @@ export class Game {
     this.resources.init(0, 500, 200)
     this.resources.init(1, 500, 200)
     this.spawnMapEntities(mapData)
+    this.focusCameraOnPrimaryPlayerBase(mapData)
     this.createAI()
 
     this.phase.set(Phase.Playing)
@@ -4017,6 +4018,21 @@ export class Game {
         this.spawnUnit('worker', team, townhallX + i, townhallZ - 1)
       }
     }
+  }
+
+  /**
+   * W3X 地图加载会先按地图尺寸重置相机边界。实体生成后必须再把镜头拉回
+   * 玩家 0 基地，否则默认视图会停在地图中心，玩家看到的是空地和零散树木。
+   */
+  private focusCameraOnPrimaryPlayerBase(mapData: ParsedMap) {
+    const player = mapData.info?.players.find((p) => p.id === 0) ?? mapData.info?.players[0]
+    if (!player) return
+
+    const px = Math.round(player.startX / 128)
+    const pz = Math.round(player.startY / 128)
+
+    this.cameraCtrl.distance = 24
+    this.cameraCtrl.setTarget(px + 1, pz)
   }
 
   /** 出生点树木避让半径（tile 单位） */

@@ -27,10 +27,10 @@ Current queue state:
 
 | Task | Status | Owner | Last update | Notes |
 |---|---|---|---|---|
-| Task 01 — Resource/Supply Regression Pack | in_progress | GLM | 2026-04-11 | Commit `fb5caa2` passed 8/8, but Codex review found stop/override proof used manual field mutation; GLM follow-up dispatched. |
-| Task 02 — Unit Visibility Contract Pack | ready | Codex dispatch | 2026-04-11 | Highest next priority because user still reports invisible workers. |
+| Task 01 — Resource/Supply Regression Pack | completed | GLM | 2026-04-11 | Accepted at commit `a64833d`; Codex reran locked runtime pack, 9/9 passed. |
+| Task 02 — Unit Visibility Contract Pack | completed | Codex | 2026-04-11 | Added visibility runtime pack and fixed W3X camera reset; `npm run test:runtime` passed 33/33. |
 | Task 05 — Pathing/Footprint Contract Pack | ready | Codex dispatch | 2026-04-11 | Protects scale/layout/path blockers after visibility is stable. |
-| Task 04 — Selection/Input Contract Pack | ready | Codex dispatch | 2026-04-11 | Covers right-drag, mouseup commit, Tab ring mapping. |
+| Task 04 — Selection/Input Contract Pack | in_progress | GLM | 2026-04-11 | Dispatched after Task 01 acceptance; non-overlapping with Codex visibility work except minimal proven `Game.ts` fixes. |
 | Task 06 — AI First Five Minutes Deepening | ready | Codex dispatch | 2026-04-11 | Extends current AI smoke into real economy robustness. |
 | Task 07 — Asset Pipeline Contract Pack | ready | Codex dispatch | 2026-04-11 | Useful after worker visibility contract proves current failure mode. |
 | Task 03 — Building Placement Agency Pack | ready | Codex dispatch | 2026-04-11 | Lower priority because initial selected-worker fix already exists. |
@@ -85,17 +85,23 @@ Bad GLM tasks:
 
 ### Task 01 — Resource/Supply Regression Pack
 
-Status: `in_progress`.
+Status: `completed`.
 
 Owner: GLM.
 
 Started: 2026-04-11.
 
-Current artifact observed: `tests/resource-supply-regression.spec.ts`.
+Completed: 2026-04-11.
 
-Current review status: commit `fb5caa2` is not fully accepted yet. Codex review found the stop/override carried-resource test manually mutates worker fields rather than using the real command path. GLM has been asked for a follow-up commit that proves stop and normal move/override through the actual command path.
+Accepted commit: `a64833d` (`test: harden stop/move-override tests to use real command paths`).
 
-Do not dispatch again unless the current attempt is marked `failed`, `abandoned`, or `superseded`.
+Final review status: accepted. Codex reran:
+
+```bash
+./scripts/run-runtime-tests.sh tests/resource-supply-regression.spec.ts --reporter=list
+```
+
+Result: 9/9 passed. The previous weak stop/override proof was replaced with real command-path tests.
 
 Goal: prove resources, supply, training, and AI spending are not fake-green.
 
@@ -132,7 +138,13 @@ Implement Resource/Supply Regression Pack 01. Use deterministic runtime tests. W
 
 ### Task 02 — Unit Visibility Contract Pack
 
-Status: `ready`.
+Status: `completed`.
+
+Owner: Codex.
+
+Completed: 2026-04-11.
+
+Result: Codex added `tests/unit-visibility-regression.spec.ts`, fixed W3X map-load camera focus, and added the visibility pack to `npm run test:runtime`.
 
 Default next task after Task 01, unless Task 01 exposes a higher-severity resource/supply bug.
 
@@ -209,7 +221,11 @@ Implement Building Placement Agency Pack. The product contract is: the worker th
 
 ### Task 04 — Selection/Input Contract Pack
 
-Status: `ready`.
+Status: `in_progress`.
+
+Owner: GLM.
+
+Started: 2026-04-11.
 
 Goal: make box select/click semantics match RTS expectations and stop regressions like “mouseup does not feel committed”.
 
