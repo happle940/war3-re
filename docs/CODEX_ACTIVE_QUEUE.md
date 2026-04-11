@@ -63,8 +63,8 @@ GLM owns:
 | C08 — Game.ts Risk Map | done | 2026-04-11 | Added responsibility zones, coverage gaps, no-go zones, and safe extraction order. |
 | C09 — Continuous Execution Loop Hardening | done | 2026-04-11 | Root-cause fix for Codex stopping: operating model now requires next-task selection, GLM stall handling, and non-conflicting Codex work while GLM runs. |
 | C10 — M1 Gate Packet Prep | done | 2026-04-11 | Prepared concrete M1 playtest packet, controls, objective entry criteria, automated proof list, and failure routing. |
-| C11 — Review GLM Placement Controller Slice | watch | 2026-04-11 | GLM Task 10 is in progress. Codex must review file scope, behavior preservation, verification, and commit before accepting. |
-| C12 — M1 Candidate Audit | ready | 2026-04-11 | After GLM Task 10 is accepted or deferred, produce the final M1 candidate status: CI/deploy, runtime pack, local cleanup, remaining blockers. |
+| C11 — Review GLM Placement Controller Slice | done | 2026-04-11 | Accepted GLM commit `14bd7ba`; Codex reran build, app typecheck, and 17 affected runtime tests locally. |
+| C12 — M1 Candidate Audit | done | 2026-04-11 | Latest code commit `14bd7ba` is locally verified and GitHub Actions green; M1 is ready for user gate. |
 
 ## Task Cards
 
@@ -337,7 +337,7 @@ Closeout:
 
 ### C11 — Review GLM Placement Controller Slice
 
-Status: `watch`.
+Status: `done`.
 
 Trigger: GLM Task 10 completes or stops.
 
@@ -368,9 +368,28 @@ Allowed follow-up files:
 - `docs/GAME_TS_RISK_MAP.md`
 - GLM-touched files only if Codex needs a narrow correction.
 
+Closeout:
+
+- Accepted GLM commit `14bd7ba` (`refactor: extract placement controller slice`).
+- Scope was limited to `src/game/Game.ts` and `src/game/PlacementController.ts`.
+- `PlacementController` owns mode key, ghost mesh, saved workers, exit cleanup, and alive-worker filtering.
+- `Game.ts` kept `enterPlacementMode()`, `exitPlacementMode()`, and `placeBuilding()` behavior intact.
+- GLM added deprecated compatibility getters for placement state so existing runtime tests continue to inspect the same contract.
+- Codex reran:
+
+```bash
+npm run build
+npx tsc --noEmit -p tsconfig.app.json
+./scripts/run-runtime-tests.sh tests/building-agency-regression.spec.ts tests/selection-input-regression.spec.ts tests/pathing-footprint-regression.spec.ts --reporter=list
+```
+
+Result: build passed, app typecheck passed, 17/17 affected runtime tests passed.
+
+Note: the verification wrapper command ended with a zsh variable-name mistake during cleanup bookkeeping, but the test output itself was green. Codex then ran cleanup separately and confirmed no local browser/runtime leftovers.
+
 ### C12 — M1 Candidate Audit
 
-Status: `ready`.
+Status: `done`.
 
 Goal: decide whether the project is ready to present the M1 milestone packet to the user, or whether objective blockers remain.
 
@@ -396,6 +415,16 @@ Verification:
 ```bash
 git diff --check
 ```
+
+Closeout:
+
+- Target code commit: `14bd7ba` (`refactor: extract placement controller slice`).
+- Local build: passed.
+- Local app typecheck: passed.
+- Local affected runtime packs: 17/17 passed.
+- GitHub Actions for `14bd7ba`: success.
+- Local browser/runtime leftovers: none after cleanup.
+- Current next step is the documented M1 user gate, not another tactical bug review.
 
 ## Default Next Action Logic
 

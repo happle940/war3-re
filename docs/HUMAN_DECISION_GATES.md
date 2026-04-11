@@ -375,4 +375,16 @@ Before M6:
 
 Current next user milestone: `M1 — First Playable RTS Slice`.
 
-Do not ask the user to validate tactical items like “worker visibility” alone unless it blocks M1 and cannot be decided by measurement. Codex and GLM should finish the M1 objective bundles first, then present the M1 playtest packet.
+Status: `ready for user gate`.
+
+Target code commit: `14bd7ba` (`refactor: extract placement controller slice`).
+
+Objective gate status:
+
+- Local build passed.
+- Local app typecheck passed.
+- Local affected runtime packs passed: 17/17.
+- GitHub Actions for target code commit passed.
+- Local Vite, Playwright, Chromium, and `chrome-headless-shell` processes were cleaned.
+
+Do not ask the user to validate tactical items like “worker visibility” alone unless it blocks M1 and cannot be decided by measurement. Codex and GLM should now use the M1 decision packet above when asking for user playtest judgment.

@@ -35,7 +35,7 @@ Current queue state:
 | Task 07 — Asset Pipeline Contract Pack | completed | GLM + Codex takeover | 2026-04-11 | Accepted after Codex takeover. Asset pipeline runtime spec green; fixed `Material[]` clone and attack animation scale reset. |
 | Task 03 — Building Placement Agency Pack | completed | Codex takeover | 2026-04-11 | GLM stalled in exploration; Codex completed at commit `6290f90`. Runtime pack 57/57 passed locally. |
 | Task 09 — Death/Cleanup Contract Pack | completed | Codex takeover | 2026-04-11 | GLM stalled in broad exploration; Codex completed core pack directly. `death-cleanup-regression.spec.ts` 5/5 green. |
-| Task 10 — Placement Controller Development Slice | in_progress | GLM | 2026-04-11 | Development task, not test-only. Dispatched after death cleanup acceptance; strict micro-slice, no behavior changes. |
+| Task 10 — Placement Controller Development Slice | completed | GLM + Codex review | 2026-04-11 | Accepted at commit `14bd7ba`; Codex reran build, app typecheck, and 17 affected runtime tests locally. GitHub Actions for this commit was still in progress at acceptance update time. |
 | Task 08 — Game.ts Module Extraction Slice | ready | Codex dispatch | 2026-04-11 | Defer until death/cleanup and HUD cache gaps are covered. |
 
 ## Dispatch Rules
@@ -366,13 +366,34 @@ Implement Death/Cleanup Contract Pack. Use deterministic Playwright runtime test
 
 ### Task 10 — Placement Controller Development Slice
 
-Status: `in_progress`.
+Status: `completed`.
 
-Owner: GLM.
+Owner: GLM + Codex review.
 
 Started: 2026-04-11.
 
-Goal: reduce `Game.ts` coupling by moving placement-mode state and build placement operations into a bounded controller without changing behavior.
+Completed: 2026-04-11.
+
+Accepted commit: `14bd7ba` (`refactor: extract placement controller slice`).
+
+Final review status: accepted. Codex reran:
+
+```bash
+npm run build
+npx tsc --noEmit -p tsconfig.app.json
+./scripts/run-runtime-tests.sh tests/building-agency-regression.spec.ts tests/selection-input-regression.spec.ts tests/pathing-footprint-regression.spec.ts --reporter=list
+```
+
+Result: build passed, app typecheck passed, 17/17 affected runtime tests passed. Local runtime/browser cleanup was completed after verification.
+
+Implementation accepted:
+
+- Added `src/game/PlacementController.ts`.
+- Moved placement mode key, ghost mesh, saved workers, exit cleanup, and alive-worker filtering behind the controller.
+- Preserved `Game.enterPlacementMode()`, `Game.exitPlacementMode()`, and placement click behavior.
+- Added deprecated `Game` getter shims for old placement-state inspection used by runtime tests.
+
+Goal: reduce `Game.ts` coupling by moving placement-mode state into a bounded controller without changing behavior.
 
 This is a development task, not a test-only task.
 
