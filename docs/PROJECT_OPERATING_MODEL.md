@@ -55,11 +55,15 @@ Delegate freely when the scope is clear:
 
 - command semantics
 - queue / interrupt / restore behavior
+- narrow feature implementation with acceptance tests
 - AI opening economy
 - resource/supply correctness
 - Playwright regression tests
 - CI / GitHub Actions
 - asset loader/fallback/disposal
+- gameplay cleanup and reference invalidation
+- build/placement semantics
+- objectively assertable HUD state behavior
 - module extraction with fixed boundaries
 - docs/checklist sync
 
@@ -125,6 +129,61 @@ Before delegating, Codex should state:
 3. file ownership
 4. no-touch files
 5. verification required
+
+### 3.2 Continuous execution loop
+
+Codex must not treat "one task finished" as a stop condition.
+
+After every task closeout, Codex must immediately run this loop unless the user explicitly asks to pause:
+
+1. Check `git status --short --branch`.
+2. Check GitHub Actions status for the latest pushed commit.
+3. Check `./scripts/glm-watch.sh status`.
+4. If GLM is active, do non-conflicting Codex work from `docs/CODEX_ACTIVE_QUEUE.md`.
+5. If GLM is idle and no human gate is active, dispatch the highest-priority ready GLM task or do the task directly.
+6. If no safe implementation task exists, update the queues until at least one safe next task exists.
+7. Clean local browser/runtime leftovers before reporting or switching tasks.
+
+Valid stop conditions are narrow:
+
+- the next step requires human product judgment at a documented milestone gate
+- continuing would create a real file conflict with active GLM changes
+- a verification command is still running
+- credentials/account action is required
+- the user explicitly says to pause
+
+Invalid stop conditions:
+
+- GLM is thinking
+- CI is running but unrelated docs/task prep is available
+- one commit was pushed
+- a final report was written
+- the queue exists but the next task has not been selected
+
+### 3.3 GLM stall handling
+
+If GLM is active but not producing file changes:
+
+- after 60 seconds: inspect tmux and `git status`
+- after 120 seconds: send a narrowing prompt that requires writing one file first
+- after 180 seconds: interrupt and reframe into a smaller task
+- after two failed reframes: stop GLM and Codex takes over or rewrites the task into a smaller queue item
+
+Do not let GLM burn time in broad exploration when the task is implementation-scoped.
+
+### 3.4 Codex while GLM works
+
+When GLM is running, Codex should do one of these non-conflicting tracks:
+
+- prepare the next GLM prompt
+- update queue/handoff docs
+- inspect CI/deploy status
+- review recently changed code
+- implement a different module with disjoint write scope
+- write human milestone checklist
+- clean local runtime leftovers
+
+If none are possible, Codex must write the exact blocker in `docs/CODEX_ACTIVE_QUEUE.md` instead of silently waiting.
 
 ## 4. Task Prompt Requirements For glm
 
@@ -194,7 +253,54 @@ Not allowed:
 
 Codex should give `glm` enough repair room to stay productive, then review whether the repair preserved the contract.
 
-## 6. Review Rules
+## 6. glm Development Authority
+
+`glm` is allowed to develop product code, not only tests.
+
+The constraint is not "tests only"; the constraint is "contract-first, bounded ownership".
+
+### 6.1 Development task types GLM may own
+
+GLM may own these implementation tasks:
+
+- contract-first feature slices: write or extend a runtime contract, then implement the smallest code path that satisfies it
+- module-bounded implementation: one new module plus a narrow integration point in `Game.ts`
+- mechanical extraction: move existing behavior without changing semantics
+- deterministic gameplay fixes: command, economy, build, pathing, AI, death cleanup, target cleanup
+- CI/test harness improvements when scoped to one script or workflow
+
+Examples:
+
+- Death/Cleanup Contract Pack may fix stale `attackTarget`, `buildTarget`, selection, healthbar, outline, or occupancy cleanup.
+- Placement Controller Slice may extract placement mode state after building agency tests are green.
+- HUD Command State Slice may implement deterministic disabled/enabled command-card state and prove it through DOM/runtime assertions.
+
+### 6.2 Development task requirements
+
+Every GLM development task must include:
+
+- product contract in one sentence
+- allowed write files
+- forbidden write files
+- acceptance tests or deterministic runtime assertions
+- repair authority boundaries
+- verification command list
+- commit message
+
+GLM may not start from "make it better". It must start from an observable contract.
+
+### 6.3 What Codex must not do
+
+Codex must not reduce GLM to a passive tester. If GLM only receives regression packs forever, project velocity will degrade.
+
+Codex should use GLM for implementation when:
+
+- the desired behavior is objective
+- a failing or missing contract can be written
+- the write scope can be bounded
+- the final result can be reviewed from diff and tests
+
+## 7. Review Rules
 
 Codex reviews glm output using this order:
 
@@ -207,16 +313,16 @@ Codex reviews glm output using this order:
 
 Reports from glm are useful, but not authoritative.
 
-## 7. Verification Policy
+## 8. Verification Policy
 
-### 7.1 Always required after code changes
+### 8.1 Always required after code changes
 
 ```bash
 npm run build
 npx tsc --noEmit -p tsconfig.app.json
 ```
 
-### 7.2 Required for interaction logic
+### 8.2 Required for interaction logic
 
 ```bash
 npx playwright test tests/closeout.spec.ts --reporter=list
@@ -224,7 +330,7 @@ npx playwright test tests/closeout.spec.ts --reporter=list
 
 or a task-specific Playwright suite with real assertions.
 
-### 7.3 Required for visual feel
+### 8.3 Required for visual feel
 
 Human confirmation.
 
@@ -236,7 +342,7 @@ Automated tests cannot approve:
 - HUD atmosphere
 - Warcraft III likeness
 
-### 7.4 Mandatory runtime cleanup
+### 8.4 Mandatory runtime cleanup
 
 After any local browser, Vite, preview, or Playwright validation, Codex must clean up before leaving the turn or moving to another task.
 
@@ -265,7 +371,7 @@ Do not leave these running unless the user explicitly asks to keep a local serve
 - Chromium / `chrome-headless-shell`
 - visible Chrome tabs for `localhost` / `127.0.0.1` project ports
 
-### 7.5 Live build reality protocol
+### 8.5 Live build reality protocol
 
 Human feedback from the live build is product evidence. It must be converted into engineering work without pretending that screenshots are automated proof.
 
@@ -298,7 +404,7 @@ This prevents two recurring failures:
 - treating `npm run build` as product validation
 - making the user repeatedly inspect small tactical fixes instead of larger milestones
 
-## 8. Git Policy
+## 9. Git Policy
 
 Default branch: `main`.
 
@@ -317,44 +423,47 @@ Do not stage generated Playwright artifacts, local runtime logs, screenshots, or
 No force push.
 No history rewriting unless the user explicitly requests it.
 
-## 9. Current Recommended Parallelization
+## 10. Current Recommended Parallelization
 
 ### Track A - Codex owned
 
-`Worker Readability Truth`
+`M1 Integration And Gate Prep`
 
 Likely files:
 
-- `/Users/zhaocong/Documents/war3-re/src/game/UnitVisualFactory.ts`
-- `/Users/zhaocong/Documents/war3-re/src/game/AssetCatalog.ts`
+- `docs/HUMAN_DECISION_GATES.md`
+- `docs/CODEX_ACTIVE_QUEUE.md`
+- `docs/GAMEPLAY_REGRESSION_CHECKLIST.md`
+- targeted `Game.ts` fixes only when faster than delegation
 
 Goal:
 
-- make workers readable in default RTS camera
-- keep GLB only if it passes human readability
-- otherwise use stronger proxy
+- keep M1 entry criteria accurate
+- review GLM output
+- convert user-reported feel issues into contracts
+- do critical-path implementation when GLM stalls
 
 ### Track B - glm owned
 
-`Building Readability Proxy Pass`
+`Contract-First Gameplay Development`
 
-Allowed files:
+Current preferred task:
 
-- `/Users/zhaocong/Documents/war3-re/src/game/BuildingVisualFactory.ts`
-- optional docs update
+- `Task 09 — Death/Cleanup Contract Pack`
 
-Forbidden files:
+Allowed pattern:
 
-- `/Users/zhaocong/Documents/war3-re/src/game/UnitVisualFactory.ts`
-- `/Users/zhaocong/Documents/war3-re/src/game/AssetCatalog.ts`
-- `/Users/zhaocong/Documents/war3-re/src/game/Game.ts`
+- write deterministic runtime contract
+- implement minimal gameplay cleanup fix if contract fails
+- verify and push
 
-Goal:
+Forbidden pattern:
 
-- improve goldmine, tower, barracks proxy readability
-- no gameplay changes
+- broad exploration
+- visual taste work
+- refactor before contracts
 
-## 10. Stop Conditions
+## 11. Stop Conditions
 
 Stop and ask or escalate when:
 
@@ -364,7 +473,7 @@ Stop and ask or escalate when:
 - a “simple” fix requires changing product semantics
 - glm reports completion but evidence is only structural
 
-## 11. Operating Principle
+## 12. Operating Principle
 
 Codex defines contracts and validates truth.
 glm implements scoped modules quickly.

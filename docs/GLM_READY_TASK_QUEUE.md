@@ -34,7 +34,8 @@ Current queue state:
 | Task 06 — AI First Five Minutes Deepening | completed | GLM + Codex review | 2026-04-11 | Added AI economy regression pack; Codex tightened weak assertions, fixed flashHit crash, and integrated into `test:runtime`. |
 | Task 07 — Asset Pipeline Contract Pack | completed | GLM + Codex takeover | 2026-04-11 | Accepted after Codex takeover. Asset pipeline runtime spec green; fixed `Material[]` clone and attack animation scale reset. |
 | Task 03 — Building Placement Agency Pack | completed | Codex takeover | 2026-04-11 | GLM stalled in exploration; Codex completed at commit `6290f90`. Runtime pack 57/57 passed locally. |
-| Task 09 — Death/Cleanup Contract Pack | ready | Codex dispatch | 2026-04-11 | Next best GLM task: deterministic runtime contracts around stale target cleanup, selection cleanup, healthbar/ring disposal, and footprint release. |
+| Task 09 — Death/Cleanup Contract Pack | ready | Codex dispatch | 2026-04-11 | Previous high-effort attempt was stopped for broad exploration. Retry only as one-file core spec first, then allow minimal Game.ts fixes. |
+| Task 10 — Placement Controller Development Slice | ready | Codex dispatch | 2026-04-11 | Development task, not test-only: extract placement mode/build placement into a bounded controller after Task09 or when Codex owns cleanup. |
 | Task 08 — Game.ts Module Extraction Slice | ready | Codex dispatch | 2026-04-11 | Defer until death/cleanup and HUD cache gaps are covered. |
 
 ## Dispatch Rules
@@ -81,6 +82,34 @@ Bad GLM tasks:
 - Broad `Game.ts` rewrites without a narrow contract.
 - Asset sourcing/licensing decisions.
 - Tasks requiring long live human play-feel judgment.
+
+## GLM Development Task Policy
+
+GLM is not limited to tests.
+
+GLM may own product code when the task is contract-first and file-bounded:
+
+- one product contract
+- one small implementation slice
+- allowed files listed explicitly
+- forbidden files listed explicitly
+- acceptance tests or runtime assertions
+- repair authority for proven failures inside allowed files
+
+Good development examples:
+
+- build placement agency fix with runtime contract
+- death cleanup stale-reference fixes with runtime contract
+- placement controller extraction after build agency tests are green
+- HUD command enabled/disabled state if assertions can inspect DOM/state
+- AI recovery behavior with deterministic simulation proof
+
+Bad development examples:
+
+- "make controls feel better" without a measurable contract
+- "make it look like War3" without human gate
+- broad `Game.ts` rewrite
+- changing scale/camera/visual taste as a side effect of logic work
 
 ## Queue
 
@@ -254,6 +283,15 @@ Implement Building Placement Agency Pack. The product contract is: the worker th
 
 Status: `ready`.
 
+Dispatch note:
+
+The first high-effort attempt on 2026-04-11 was stopped because GLM spent multiple minutes in broad exploration and did not create files. Retry with a smaller prompt:
+
+1. Create only `tests/death-cleanup-regression.spec.ts`.
+2. First implement only selected-unit cleanup, attack-target cleanup, and building-footprint release.
+3. Do not edit `Game.ts` until those three tests run and show a real failure.
+4. Expand to build/resource/healthbar cleanup only after the core spec is green.
+
 Goal: harden the high-risk cleanup paths so dead units/buildings cannot leave stale selection, targets, healthbars, blockers, or build/resource references behind.
 
 Allowed write scope:
@@ -299,6 +337,60 @@ Dispatch prompt summary:
 
 ```text
 Implement Death/Cleanup Contract Pack. Use deterministic Playwright runtime tests that force unit/building death and then assert selection cleanup, target cleanup, footprint release, build/resource reference cleanup, healthbar/outline cleanup, and no severe console errors. Fix only proven bugs in Game.ts.
+```
+
+### Task 10 — Placement Controller Development Slice
+
+Status: `ready`.
+
+Goal: reduce `Game.ts` coupling by moving placement-mode state and build placement operations into a bounded controller without changing behavior.
+
+This is a development task, not a test-only task.
+
+Preconditions:
+
+- `tests/building-agency-regression.spec.ts` is green.
+- `tests/selection-input-regression.spec.ts` is green.
+- No active Codex work is touching `src/game/Game.ts`.
+
+Allowed write scope:
+
+- `src/game/PlacementController.ts`
+- `src/game/Game.ts`
+- `tests/building-agency-regression.spec.ts` only if an assertion needs a non-behavior-changing hook
+- `docs/GAME_TS_RISK_MAP.md` optional
+
+Forbidden files:
+
+- asset loader/factory/catalog files
+- `src/game/SimpleAI.ts`
+- `src/game/GameCommand.ts`
+- camera/terrain/visual tuning files
+- package/scripts/CI unless Codex explicitly approves
+
+Product contract:
+
+The user-selected worker remains the builder after placement, and placement/cancel mode state is cleaned exactly as before.
+
+Implementation direction:
+
+- Move placement mode fields/operations behind a small `PlacementController` or equivalent helper.
+- Preserve current public Game entry points: `enterPlacementMode()`, `exitPlacementMode()`, and the internal placement click path.
+- Do not change building sizes, costs, occupancy semantics, camera, visuals, or selection rules.
+- If extraction requires too many callbacks, stop and report; do not build a large framework.
+
+Required verification:
+
+```bash
+npm run build
+npx tsc --noEmit -p tsconfig.app.json
+./scripts/run-runtime-tests.sh tests/building-agency-regression.spec.ts tests/selection-input-regression.spec.ts tests/pathing-footprint-regression.spec.ts --reporter=list
+```
+
+Commit message:
+
+```text
+refactor: extract placement controller slice
 ```
 
 ### Task 04 — Selection/Input Contract Pack
@@ -566,6 +658,7 @@ Use this order unless current failures suggest otherwise:
 6. Task 07 Asset Pipeline Contract Pack
 7. Task 03 Building Placement Agency Pack
 8. Task 09 Death/Cleanup Contract Pack
-9. Task 08 Game.ts Module Extraction Slice
+9. Task 10 Placement Controller Development Slice
+10. Task 08 Game.ts Module Extraction Slice
 
 Reasoning: first protect economy/command/pathing contracts, then visual asset reliability, then refactor.

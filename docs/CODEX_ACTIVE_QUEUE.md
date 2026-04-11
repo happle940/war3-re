@@ -61,6 +61,7 @@ GLM owns:
 | C06 — PLAN.md stale queue cleanup | done | 2026-04-11 | PLAN now points to live queue/gate docs instead of carrying a stale inline GLM queue. |
 | C07 — CI Node 24 Migration | done | 2026-04-11 | Workflow now opts JavaScript actions and app verification into Node 24. |
 | C08 — Game.ts Risk Map | done | 2026-04-11 | Added responsibility zones, coverage gaps, no-go zones, and safe extraction order. |
+| C09 — Continuous Execution Loop Hardening | done | 2026-04-11 | Root-cause fix for Codex stopping: operating model now requires next-task selection, GLM stall handling, and non-conflicting Codex work while GLM runs. |
 
 ## Task Cards
 
@@ -267,12 +268,46 @@ Closeout:
 - Marked pathing/footprint, asset replacement/disposal, building agency edge cases, AI recovery, death cleanup, and HUD cache transitions as coverage gaps.
 - Defined safe extraction phases and M1 no-go zones.
 
+### C09 — Continuous Execution Loop Hardening
+
+Status: `done`.
+
+Goal: fix the process bug where Codex finished a scoped task, reported, and stopped even though the project had more safe work.
+
+Root cause:
+
+- Codex had queues but no mandatory closeout-to-next-task state machine.
+- GLM was treated too often as a test writer instead of an implementation lieutenant.
+- GLM stall handling was reactive instead of time-boxed.
+- The operating model still had stale visual parallelization guidance from an older phase.
+
+Changes:
+
+- `docs/PROJECT_OPERATING_MODEL.md` now requires a continuous execution loop after every closeout.
+- Stop conditions are now narrow and explicit.
+- GLM stall handling now has 60s / 120s / 180s escalation.
+- GLM development authority is explicit: contract-first product code is allowed, not only tests.
+- Current parallelization now points to M1 integration + contract-first gameplay development.
+
+Verification:
+
+```bash
+git diff --check
+```
+
+Closeout:
+
+- This task changes operating docs only.
+- No runtime verification required.
+
 ## Default Next Action Logic
 
 When Codex becomes free:
 
-1. If GLM has completed, run C02 review first.
-2. If user has a fresh pain report, map it to queue or add a task.
-3. If no GLM closeout is ready, start the highest `ready` Codex task that does not conflict with GLM's allowed files.
-4. If Codex changes queue state, commit the queue update before dispatching another GLM task.
-5. Never leave both queues without at least one `ready` next task.
+1. Check git status, CI status, and GLM status.
+2. If GLM has completed, review it before dispatching more GLM work.
+3. If user has a fresh pain report, map it to queue or add a task.
+4. If GLM is running, start the highest `ready` Codex task that does not conflict with GLM's allowed files.
+5. If GLM is idle and no human gate is active, dispatch or directly execute the highest-priority ready task.
+6. If Codex changes queue state, commit the queue update before dispatching another GLM task.
+7. Never leave both queues without at least one `ready` next task.
