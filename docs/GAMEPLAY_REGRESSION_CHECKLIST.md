@@ -260,6 +260,16 @@
 - [x] Moving 单位即使 suppression 为 0，也不会被 auto-aggro 打断
 - [x] 战斗控制测试过程无严重 console error
 
+### 命令模型边界自动化覆盖
+
+以下项目由 `tests/order-model-boundary-regression.spec.ts` 自动验证（Playwright）：
+
+- [x] move 命令通过 `g.issueCommand()` 正确设置 Moving 状态并清除所有 previous-chain 字段
+- [x] stop 命令通过 `g.issueCommand()` 正确设置 Idle 状态并清除所有命令字段
+- [x] attackMove 命令通过 `g.issueCommand()` 清除 aggro suppression（aggroSuppressUntil=0）
+- [x] issueCommand 对建筑单位（isBuilding）不产生任何状态变化
+- [x] issueCommand 对相同输入是确定性的（两次调用产生相同输出字段）
+
 ### M3 比例/布局测量自动化覆盖
 
 以下项目由 `tests/m3-scale-measurement.spec.ts` 自动验证（Playwright）：
@@ -312,5 +322,6 @@
 | 2026-04-11 | GLM-5.1 | Resource/Supply Regression | resource-supply-regression.spec.ts: 9 tests green. Supply, training, resource flow, AI spending contracts proven. |
 | 2026-04-11 | GLM-5.1 | Command Regression | command-regression.spec.ts: 7 tests green. Move/stop/hold/attackMove/queue contracts proven. |
 | 2026-04-11 | GLM-5.1 | Runtime Truth 01 | first-five-minutes.spec.ts: AI economy/build/train/attack automated. Player manual loop not yet covered. |
+| 2026-04-12 | GLM-5.1 | Order Model Boundary Regression | `order-model-boundary-regression.spec.ts`: 5 tests green. Proves `g.issueCommand()` dispatcher equivalence for move/stop/attackMove, isBuilding guard, and deterministic field mapping. |
 | 2026-04-11 | GLM-5.1 | pending | Order System Beta + Gameplay Alpha 完成后待验证 |
 | 2026-04-10 | GLM-5.1 | Partial: AI economy ✅, Player micro ❌ | Runtime Hardening Phase 3: AI gather/build/train verified via Playwright. Player commands structurally verified but not runtime-tested. |
