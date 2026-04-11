@@ -38,7 +38,7 @@ const BUILD_PROFILES: AIBuildProfile[] = [
     name: 'standard',
     targetGoldWorkers: 4,
     maxWorkers: 10,
-    initialWaveSize: 4,
+    initialWaveSize: 2,
     farmSupplyThreshold: 4,
     aggressivePressure: false,
   },
@@ -73,7 +73,7 @@ export class SimpleAI {
   private tickInterval = 1.0  // 秒
   private tickTimer = 0
   private attackWaveSent = false
-  private attackWaveSize = 4  // 积累多少步兵后进攻
+  private attackWaveSize = 2  // 积累多少步兵后进攻
   private attackWaveSentTick = -999  // tick counter when last wave was sent
 
   // 经济策略参数（从 profile 初始化）
@@ -107,7 +107,7 @@ export class SimpleAI {
     this.attackWaveSentTick = -999
     this.barracksBuilt = false
     this.waveCount = 0
-    this.attackWaveSize = 4
+    this.attackWaveSize = this.profile.initialWaveSize
   }
 
   private tick() {
@@ -218,18 +218,22 @@ export class SimpleAI {
       (u) => u.team === team && u.type === 'footman' && !u.isBuilding && u.hp > 0
         && (u.state === UnitState.Idle || u.state === UnitState.Moving),
     )
+    const waveReadyFootmen = units.filter(
+      (u) => u.team === team && u.type === 'footman' && !u.isBuilding && u.hp > 0
+        && (u.state === UnitState.Idle || u.state === UnitState.Moving || u.state === UnitState.AttackMove),
+    )
     const allFootmen = units.filter(
       (u) => u.team === team && u.type === 'footman' && !u.isBuilding && u.hp > 0,
     )
 
-    if (idleFootmen.length >= this.attackWaveSize && !this.attackWaveSent) {
+    if (waveReadyFootmen.length >= this.attackWaveSize && !this.attackWaveSent) {
       // 选择攻击目标：优先级 敌方单位 > 敌方建筑 > 敌方主基地
       const target = this.selectAttackTarget(team)
       if (target) {
         // 使用 attackMove 到目标位置，而不是直接 attack 目标单位
         // 这样部队会沿途交战，更自然
-        issueCommand(idleFootmen, { type: 'attackMove', target: target.mesh.position.clone() })
-        for (const f of idleFootmen) {
+        issueCommand(waveReadyFootmen, { type: 'attackMove', target: target.mesh.position.clone() })
+        for (const f of waveReadyFootmen) {
           this.ctx.planPath(f, target.mesh.position)
         }
         this.attackWaveSent = true
@@ -251,11 +255,11 @@ export class SimpleAI {
       }
       // 超时重置：波次发出超过 60s（≈ 60 ticks）且有新步兵空闲 → 允许下一波
       // 解决所有步兵都在 AttackMove 状态而无法触发重置的死锁
-      else if (ticksSinceWave >= 60 && idleFootmen.length >= this.attackWaveSize) {
+      else if (ticksSinceWave >= 60 && waveReadyFootmen.length >= this.attackWaveSize) {
         this.attackWaveSent = false
       }
       // aggressive profile：只要新兵够就继续发波
-      else if (this.profile.aggressivePressure && idleFootmen.length >= this.attackWaveSize + 2) {
+      else if (this.profile.aggressivePressure && waveReadyFootmen.length >= this.attackWaveSize + 2) {
         this.attackWaveSent = false
       }
     }

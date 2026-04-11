@@ -68,7 +68,8 @@ GLM owns:
 | C13 — M1 Result And M2 System Replan | done | 2026-04-11 | User selected `pass with visual debt`; next phase reframed from visual pass to War3 core systems alignment. |
 | C14 — Construction Lifecycle Pack Takeover | done | 2026-04-11 | GLM stalled without file changes; Codex implemented and verified resume/cancel/refund/builder cleanup directly. |
 | C15 — M2 Systems Architecture Slice | active | 2026-04-11 | Keep M2 source-of-truth docs synced with completed packs and add combat-control as the final objective contract before the M2 user gate. |
-| C16 — Review GLM Combat Control Contract | watch | 2026-04-11 | GLM is implementing Task 15. Codex must review tests, rerun affected packs, clean runtime processes, and accept/reject before M2 gate. |
+| C16 — Review GLM Combat Control Contract | done | 2026-04-11 | GLM drafted the test file but it initially failed 8/8; Codex took over, exposed the real command dispatcher for runtime tests, fixed HoldPosition state restoration, and verified 20/20 affected tests. |
+| C17 — Dispatch M2 Gate Packet | ready | 2026-04-11 | Send prepared Task 16 to GLM after Task 15 is committed and CI status is checked. |
 
 ## Task Cards
 

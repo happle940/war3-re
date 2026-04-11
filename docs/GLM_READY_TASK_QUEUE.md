@@ -40,6 +40,9 @@ Current queue state:
 | Task 12 — Static Defense Combat Contract Pack | completed | GLM + Codex review | 2026-04-11 | Accepted at commit `24eeea1`; 7/7 static defense tests + 5/5 death cleanup + 7/7 command regression passed. Codex integrated the spec into `test:runtime`. |
 | Task 13 — Command Disabled Reasons Pack | completed | Codex takeover | 2026-04-11 | GLM created an initial failing spec but refresh assertions needed correction; Codex completed explicit disabled reasons, cache invalidation, runtime proof, and `test:runtime` integration. |
 | Task 14 — Unit Collision Presence Pack | completed | GLM + Codex takeover | 2026-04-11 | GLM started the separation baseline; Codex corrected exact-overlap math, added runtime proof, and integrated the spec into `test:runtime`. |
+| Task 15 — Combat Control Contract Pack | completed | GLM + Codex takeover | 2026-04-11 | GLM drafted the regression pack but it initially failed 8/8; Codex exposed the real command dispatcher to runtime tests, fixed the HoldPosition chase/restore bug, and integrated the spec into `test:runtime`. |
+| Task 16 — M2 Gate Regression Packet | ready | GLM | 2026-04-11 | Add a consolidated M2 test command and Chinese user gate packet after Task 15 is accepted. Prompt prepared at `/tmp/war3_glm_task16_m2_gate_hardening_prompt.md`. |
+| Task 17 — M3 Scale/Layout Benchmark Spec | ready | GLM | 2026-04-11 | Research/spec-only task for the next milestone. Prompt prepared at `/tmp/war3_glm_task17_m3_scale_research_prompt.md`. |
 | Task 08 — Game.ts Module Extraction Slice | ready | Codex dispatch | 2026-04-11 | Defer until death/cleanup and HUD cache gaps are covered. |
 
 ## Dispatch Rules

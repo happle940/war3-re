@@ -26,7 +26,7 @@ import {
 import type { BuildingDef } from './GameData'
 import { TeamResources } from './TeamResources'
 import { GamePhase, Phase } from './GamePhase'
-import { issueCommand } from './GameCommand'
+import { issueCommand as dispatchGameCommand } from './GameCommand'
 import { SelectionModel } from './SelectionModel'
 import { ControlGroupManager } from './ControlGroupManager'
 import { SimpleAI } from './SimpleAI'
@@ -768,7 +768,7 @@ export class Game {
             this.planPath(spawned, unit.rallyTarget.mesh.position)
           } else {
             // 普通位置集结 → 移动到集结点
-            issueCommand([spawned], { type: 'move', target: unit.rallyPoint })
+            dispatchGameCommand([spawned], { type: 'move', target: unit.rallyPoint })
             this.planPath(spawned, unit.rallyPoint)
           }
         }
@@ -824,6 +824,16 @@ export class Game {
 
       const dist = unit.mesh.position.distanceTo(target.mesh.position)
 
+      // 驻守：只在攻击范围内打，超出范围就放弃（不追，也不恢复成 Idle）
+      // This must run before the generic CHASE_RANGE branch, otherwise hold
+      // position incorrectly falls through to restorePreviousOrder().
+      if (unit.state === UnitState.HoldPosition && dist > unit.attackRange + 0.3) {
+        unit.attackTarget = null
+        unit.moveTarget = null
+        unit.waypoints = []
+        continue
+      }
+
       // 超出追击范围
       if (dist > CHASE_RANGE && !isAttackMove) {
         unit.attackTarget = null
@@ -835,14 +845,6 @@ export class Game {
       if (isAttackMove && dist > CHASE_RANGE) {
         unit.attackTarget = null
         this.resumeAttackMove(unit)
-        continue
-      }
-
-      // 驻守：只在攻击范围内打，超出范围就放弃（不追）
-      if (unit.state === UnitState.HoldPosition && dist > unit.attackRange + 0.3) {
-        unit.attackTarget = null
-        unit.moveTarget = null
-        unit.waypoints = []
         continue
       }
 
@@ -1601,7 +1603,7 @@ export class Game {
     if (worker.team !== building.team) return false
 
     building.builder = worker
-    issueCommand([worker], { type: 'build', target: building })
+    dispatchGameCommand([worker], { type: 'build', target: building })
     this.planPath(worker, building.mesh.position)
     return true
   }
@@ -1658,6 +1660,17 @@ export class Game {
     for (const u of units) {
       u.aggroSuppressUntil = until
     }
+  }
+
+  /**
+   * Runtime-test command hook.
+   *
+   * The game already exposes `window.__war3Game` for Playwright contracts.
+   * Keeping this wrapper on Game lets tests exercise the real GameCommand
+   * dispatcher without duplicating command field mutations in the browser.
+   */
+  issueCommand(units: Unit[], cmd: Parameters<typeof dispatchGameCommand>[1]) {
+    dispatchGameCommand(units, cmd)
   }
 
   /** 清除所有模式（ESC 统一出口） */
@@ -1884,11 +1897,11 @@ export class Game {
 
       switch (e.key.toLowerCase()) {
         case 's':
-          issueCommand(controllable, { type: 'stop' })
+          dispatchGameCommand(controllable, { type: 'stop' })
           this.suppressAggroFor(controllable)
           break
         case 'h':
-          issueCommand(controllable, { type: 'holdPosition' })
+          dispatchGameCommand(controllable, { type: 'holdPosition' })
           break
         case 'a':
           this.enterAttackMoveMode()
@@ -2146,7 +2159,7 @@ export class Game {
         // 右键金矿 → 只派 worker 采金
         if (target.type === 'goldmine') {
           const workers = controllable.filter((u) => UNITS[u.type]?.canGather)
-          issueCommand(workers, { type: 'gather', resourceType: 'gold', target: target.mesh.position })
+          dispatchGameCommand(workers, { type: 'gather', resourceType: 'gold', target: target.mesh.position })
           for (const u of workers) {
             u.resourceTarget = { type: 'goldmine', mine: target }
           }
@@ -2154,7 +2167,7 @@ export class Game {
           // 非 worker 单位走到金矿旁（移动命令）
           const nonWorkers = controllable.filter((u) => !UNITS[u.type]?.canGather)
           if (nonWorkers.length > 0) {
-            issueCommand(nonWorkers, { type: 'move', target: target.mesh.position })
+            dispatchGameCommand(nonWorkers, { type: 'move', target: target.mesh.position })
             this.planPathForUnits(nonWorkers, target.mesh.position)
             this.suppressAggroFor(nonWorkers)
           }
@@ -2164,7 +2177,7 @@ export class Game {
 
         // 右键敌方 → 攻击
         if (target.team !== 0 && target.type !== 'goldmine') {
-          issueCommand(controllable, { type: 'attack', target })
+          dispatchGameCommand(controllable, { type: 'attack', target })
           this.planPathForUnits(controllable, target.mesh.position)
           return
         }
@@ -2183,7 +2196,7 @@ export class Game {
         }
 
         // 右键己方建筑 → 移动到建筑旁
-        issueCommand(controllable, { type: 'move', target: target.mesh.position })
+        dispatchGameCommand(controllable, { type: 'move', target: target.mesh.position })
         this.planPathForUnits(controllable, target.mesh.position)
         this.suppressAggroFor(controllable)
         this.showMoveIndicator(target.mesh.position.x, target.mesh.position.z)
@@ -2216,7 +2229,7 @@ export class Game {
     const nearestTree = this.treeManager.findNearest(groundTarget, 2)
     if (nearestTree) {
       const workers = controllable.filter((u) => UNITS[u.type]?.canGather)
-      issueCommand(workers, { type: 'gather', resourceType: 'lumber', target: nearestTree.mesh.position })
+      dispatchGameCommand(workers, { type: 'gather', resourceType: 'lumber', target: nearestTree.mesh.position })
       // 为每个 worker 设置明确的树目标
       for (const u of workers) {
         u.resourceTarget = { type: 'tree', entry: nearestTree }
@@ -2225,12 +2238,12 @@ export class Game {
       // 非 worker 单位走到目标位置（移动命令）
       const nonWorkers = controllable.filter((u) => !UNITS[u.type]?.canGather)
       if (nonWorkers.length > 0) {
-        issueCommand(nonWorkers, { type: 'move', target: nearestTree.mesh.position })
+        dispatchGameCommand(nonWorkers, { type: 'move', target: nearestTree.mesh.position })
         this.planPathForUnits(nonWorkers, nearestTree.mesh.position)
         this.suppressAggroFor(nonWorkers)
       }
     } else {
-      issueCommand(controllable, { type: 'move', target: groundTarget })
+      dispatchGameCommand(controllable, { type: 'move', target: groundTarget })
       this.planPathForUnits(controllable, groundTarget)
       this.suppressAggroFor(controllable)
     }
@@ -2261,7 +2274,7 @@ export class Game {
       return
     }
 
-    issueCommand(controllable, { type: 'attackMove', target })
+    dispatchGameCommand(controllable, { type: 'attackMove', target })
     for (const u of controllable) {
       this.planAttackMovePath(u, target)
     }
@@ -2325,7 +2338,7 @@ export class Game {
       )
       // 点击金矿 → 设为 goldmine rally
       if (target && target.type === 'goldmine') {
-        issueCommand([], { type: 'setRally', building, target: target.mesh.position, rallyTarget: target })
+        dispatchGameCommand([], { type: 'setRally', building, target: target.mesh.position, rallyTarget: target })
         this.showMoveIndicator(target.mesh.position.x, target.mesh.position.z)
         return
       }
@@ -2335,7 +2348,7 @@ export class Game {
     const groundHits = this.raycaster.intersectObject(this.terrain.groundPlane)
     if (groundHits.length === 0) return
     const target = groundHits[0].point
-    issueCommand([], { type: 'setRally', building, target })
+    dispatchGameCommand([], { type: 'setRally', building, target })
     this.showMoveIndicator(target.x, target.z)
   }
 
@@ -4203,7 +4216,7 @@ export class Game {
         label: '停止', cost: '—',
         onClick: () => {
           const sel = this.selectedUnits.filter((u) => u.team === 0 && !u.isBuilding)
-          issueCommand(sel, { type: 'stop' })
+          dispatchGameCommand(sel, { type: 'stop' })
           this.suppressAggroFor(sel)
         },
         hotkey: 'S',
@@ -4211,7 +4224,7 @@ export class Game {
       buttons.push({
         label: '驻守', cost: '—',
         onClick: () => {
-          issueCommand(this.selectedUnits.filter((u) => u.team === 0 && !u.isBuilding), { type: 'holdPosition' })
+          dispatchGameCommand(this.selectedUnits.filter((u) => u.team === 0 && !u.isBuilding), { type: 'holdPosition' })
         },
         hotkey: 'H',
       })
@@ -4338,7 +4351,7 @@ export class Game {
     if (supply.used + queuedSupply + def.supply > supply.total) return
 
     this.resources.spend(0, def.cost)
-    issueCommand([], { type: 'train', building, unitType, trainTime: def.trainTime })
+    dispatchGameCommand([], { type: 'train', building, unitType, trainTime: def.trainTime })
   }
 
   private updateTrainQueueUI() {

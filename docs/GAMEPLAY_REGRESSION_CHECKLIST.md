@@ -246,6 +246,20 @@
 - [x] 资源变化后，不重新选择单位也会刷新命令卡状态
 - [x] 命令卡状态测试过程无严重 console error
 
+### 战斗控制自动化覆盖
+
+以下项目由 `tests/combat-control-regression.spec.ts` 自动验证（Playwright）：
+
+- [x] 正在攻击的单位收到玩家移动命令后，会退出攻击并进入移动语义
+- [x] 玩家移动/停止后的 suppression 窗口内不会被 auto-aggro 立即抢回
+- [x] suppression 过期后，空闲单位仍可重新 auto-aggro
+- [x] attack-move 不继承 suppression，会沿途自动交战
+- [x] stop 会清空队列、攻击目标和 previous-order 恢复链
+- [x] hold position 会本地索敌，但目标离开攻击范围后不会追击或退回 Idle
+- [x] 明确 attack 命令会清除 suppression，代表进攻意图
+- [x] Moving 单位即使 suppression 为 0，也不会被 auto-aggro 打断
+- [x] 战斗控制测试过程无严重 console error
+
 ### 单位存在感/防堆叠自动化覆盖
 
 以下项目由 `tests/unit-presence-regression.spec.ts` 自动验证（Playwright）：
@@ -261,7 +275,6 @@
 ## 仍未被自动化覆盖（需人工验证）
 
 - [ ] 玩家手动操作的采集/建造/训练完整流程
-- [ ] auto-aggro 命令恢复
 - [ ] 战斗循环（伤害数字、护甲减伤）
 - [ ] 建筑/地形/模型的主观视觉辨识度
 - [ ] 布局语法（基地空间关系、路径可通性）
@@ -270,6 +283,8 @@
 
 | 日期 | 验证人 | 结果 | 备注 |
 |------|--------|------|------|
+| 2026-04-11 | Codex | AI Wave Regression Stabilization | `ai-economy-regression.spec.ts`: 9 tests green after fixing CI-reproduced wave timing/direction brittleness. Standard AI first pressure now launches at 2 footmen; wave timeout can reuse AttackMove footmen so later waves do not stay locked. |
+| 2026-04-11 | GLM-5.1 + Codex takeover | Combat Control Regression | `combat-control-regression.spec.ts`: 8 tests green after Codex takeover. Added a runtime-test wrapper for the real GameCommand dispatcher and fixed a true HoldPosition bug where the generic chase-range branch restored the unit to Idle instead of staying on hold. Added the spec to `npm run test:runtime`. |
 | 2026-04-11 | GLM-5.1 + Codex takeover | Unit Presence Regression | `unit-presence-regression.spec.ts`: 4 tests green. Added lightweight unit separation, formation offsets for group movement, exact-overlap deterministic push, blocker guard, and runtime proof. Added the spec to `npm run test:runtime`. |
 | 2026-04-11 | Codex | Command Card State Regression | `command-card-state-regression.spec.ts`: 7 tests green. Added explicit disabled reasons for supply/resource blocked commands and made command-card cache include resources, supply, and queued supply. Added the spec to `npm run test:runtime`. |
 | 2026-04-11 | GLM-5.1 + Codex | Static Defense Regression | `static-defense-regression.spec.ts`: 7 tests green from GLM. Codex review integrated the spec into `npm run test:runtime` and added `npm run test:static-defense`. |
