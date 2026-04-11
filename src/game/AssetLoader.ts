@@ -59,6 +59,22 @@ export async function loadAllAssets(): Promise<Map<string, AssetStatus>> {
 }
 
 /**
+ * Deep-clone per-mesh materials (handles single and array materials).
+ * Used by both getLoadedModel (production) and __testDeepCloneWithMaterials (tests).
+ */
+function deepCloneMaterials(group: THREE.Group): void {
+  group.traverse((child) => {
+    if (child instanceof THREE.Mesh && child.material) {
+      if (Array.isArray(child.material)) {
+        child.material = child.material.map((m: THREE.Material) => m.clone())
+      } else {
+        child.material = (child.material as THREE.Material).clone()
+      }
+    }
+  })
+}
+
+/**
  * 获取已加载模型的独立克隆。
  * 对每个 Mesh 的材质做 .clone()，避免多实例共享材质导致串色。
  */
@@ -66,15 +82,44 @@ export function getLoadedModel(key: string): THREE.Group | null {
   const asset = cache.get(key)
   if (!asset || asset.status !== 'loaded') return null
   const clone = asset.scene.clone()
-  // 深拷贝材质：每个实例独立，不会互相污染
-  clone.traverse((child) => {
-    if (child instanceof THREE.Mesh && child.material) {
-      child.material = (child.material as THREE.Material).clone()
-    }
-  })
+  deepCloneMaterials(clone)
   return clone
 }
 
 export function getAssetStatus(key: string): AssetStatus {
   return cache.get(key)?.status ?? 'pending'
+}
+
+// ==================== Test-only helpers ====================
+
+/**
+ * Deep-clone a Group with per-mesh material cloning.
+ * Uses the same deepCloneMaterials() as getLoadedModel() so tests prove the real path.
+ */
+export function __testDeepCloneWithMaterials(source: THREE.Group): THREE.Group {
+  const clone = source.clone()
+  deepCloneMaterials(clone)
+  return clone
+}
+
+/**
+ * Inject a fake loaded asset into the cache for deterministic refresh testing.
+ * Returns a cleanup function to remove it.
+ */
+export function __testInjectFakeAsset(
+  key: string,
+  scene: THREE.Group,
+  scale: number,
+  offsetY: number = 0,
+  kind: AssetEntry['kind'] = 'unit',
+): () => void {
+  const previous = cache.get(key)
+  scene.scale.setScalar(scale)
+  scene.position.y = offsetY
+  const entry: AssetEntry = { key, kind, path: '__test__', scale, offsetY }
+  cache.set(key, { entry, scene, status: 'loaded' })
+  return () => {
+    if (previous) cache.set(key, previous)
+    else cache.delete(key)
+  }
 }

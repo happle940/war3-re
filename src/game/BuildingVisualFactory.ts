@@ -37,7 +37,7 @@ const TEAM_COLOR_SLOTS: Record<string, string[]> = {
   tower: ['team_color', 'TeamColor'],
 }
 
-function applyTeamColorGLTF(group: THREE.Group, team: number, type: string): THREE.Group {
+export function applyTeamColorGLTF(group: THREE.Group, team: number, type: string): THREE.Group {
   const color = TEAM_COLORS[team]
   const slots = TEAM_COLOR_SLOTS[type] ?? ['team_color', 'TeamColor']
   const slotSet = new Set(slots)

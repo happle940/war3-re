@@ -4,7 +4,13 @@ import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js'
 import { OutlinePass } from 'three/examples/jsm/postprocessing/OutlinePass.js'
 import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js'
 import { CameraController } from './CameraController'
-import { loadAllAssets, getLoadedModel, getAssetStatus } from './AssetLoader'
+import {
+  loadAllAssets,
+  getLoadedModel,
+  getAssetStatus,
+  __testDeepCloneWithMaterials,
+  __testInjectFakeAsset,
+} from './AssetLoader'
 import { createUnitVisual } from './UnitVisualFactory'
 import { createBuildingVisual } from './BuildingVisualFactory'
 import { Terrain, TileType } from '../map/Terrain'
@@ -911,9 +917,10 @@ export class Game {
     const finalDamage = Math.max(1, Math.round(rawDamage * (1 - reduction)))
     target.hp -= finalDamage
 
-    // 攻击动画（简单的缩放抖动）
-    attacker.mesh.scale.setScalar(1.15)
-    setTimeout(() => { if (attacker.mesh) attacker.mesh.scale.setScalar(1) }, 100)
+    // 攻击动画不能把 glTF/root asset scale 重置成 1。
+    const originalScale = attacker.mesh.scale.clone()
+    attacker.mesh.scale.copy(originalScale).multiplyScalar(1.15)
+    setTimeout(() => { if (attacker.mesh) attacker.mesh.scale.copy(originalScale) }, 100)
 
     // 受击闪烁（增强版：闪红再闪白）
     this.flashHit(target)
@@ -2909,6 +2916,233 @@ export class Game {
   private findNearestTree(pos: THREE.Vector3): THREE.Object3D | null {
     const tree = this.treeManager.findNearest(pos)
     return tree ? tree.mesh : null
+  }
+
+  // ==================== Regression test hooks ====================
+
+  /**
+   * Browser-side asset pipeline contracts for Playwright.
+   *
+   * These hooks deliberately run inside the live built game bundle, not in the
+   * Node test process, so they exercise the same AssetLoader cache and visual
+   * factories that the runtime uses.
+   */
+  public __testRunAssetPipelineContracts() {
+    const source = this.createAssetPipelineFixture(2.5)
+    const cloneA = __testDeepCloneWithMaterials(source)
+    const cloneB = __testDeepCloneWithMaterials(source)
+    const sourceMesh = this.getFirstMesh(source)
+    const meshA = this.getFirstMesh(cloneA)
+    const meshB = this.getFirstMesh(cloneB)
+    const sourceMaterials = this.asMaterialArray(sourceMesh.material)
+    const materialsA = this.asMaterialArray(meshA.material)
+    const materialsB = this.asMaterialArray(meshB.material)
+
+    const materialArrayIsolated =
+      Array.isArray(meshA.material) &&
+      Array.isArray(meshB.material) &&
+      meshA.material !== meshB.material &&
+      meshA.material !== sourceMesh.material
+    const materialObjectsIsolated = materialsA.every((mat, idx) =>
+      mat !== sourceMaterials[idx] && mat !== materialsB[idx],
+    )
+
+    const cleanupTeamAsset = __testInjectFakeAsset('footman', this.createAssetPipelineFixture(2.5), 2.5, 0, 'unit')
+    let teamBlue = 0
+    let teamRed = 0
+    let teamMaterialObjectsIsolated = false
+    let factoryScale = 0
+    let visualBlue: THREE.Group | null = null
+    let visualRed: THREE.Group | null = null
+    try {
+      visualBlue = createUnitVisual('footman', 0)
+      visualRed = createUnitVisual('footman', 1)
+      factoryScale = visualBlue.scale.x
+      const blueTeamMat = this.findNamedMaterial(visualBlue, 'team_color')
+      const redTeamMat = this.findNamedMaterial(visualRed, 'team_color')
+      teamBlue = blueTeamMat?.color.getHex() ?? 0
+      teamRed = redTeamMat?.color.getHex() ?? 0
+      teamMaterialObjectsIsolated = !!blueTeamMat && !!redTeamMat && blueTeamMat !== redTeamMat
+    } finally {
+      if (visualBlue) disposeObject3DDeep(visualBlue)
+      if (visualRed) disposeObject3DDeep(visualRed)
+      cleanupTeamAsset()
+    }
+
+    const refresh = this.__testRunRefreshScaleContract()
+
+    disposeObject3DDeep(source)
+    disposeObject3DDeep(cloneA)
+    disposeObject3DDeep(cloneB)
+
+    return {
+      materialArrayIsolated,
+      materialObjectsIsolated,
+      sourceMaterialCount: sourceMaterials.length,
+      cloneMaterialCount: materialsA.length,
+      teamBlue,
+      teamRed,
+      teamMaterialObjectsIsolated,
+      factoryScale,
+      refresh,
+    }
+  }
+
+  public __testCreateAssetVisualSummary(type: string, isBuilding: boolean, team = 0) {
+    const visual = isBuilding ? createBuildingVisual(type, team) : createUnitVisual(type, team)
+    const summary = this.summarizeObject3D(visual)
+    disposeObject3DDeep(visual)
+    return summary
+  }
+
+  private __testRunRefreshScaleContract() {
+    if (this.units.some(u => u.type === 'footman' && !u.isBuilding)) {
+      return { ok: false, reason: 'footman already exists; refresh contract requires isolated temporary footman' }
+    }
+
+    const unit = this.spawnUnit('footman', 0, 22, 22)
+    const oldMesh = unit.mesh
+    const oldMeshId = oldMesh.id
+    const oldChildIds = new Set<number>()
+    oldMesh.traverse(child => oldChildIds.add(child.id))
+    oldMesh.scale.setScalar(0.2)
+
+    const cleanupAsset = __testInjectFakeAsset('footman', this.createAssetPipelineFixture(2.5), 2.5, 0, 'unit')
+    let result: {
+      ok: boolean
+      oldScale: number
+      replacementScale: number
+      scaleAfterDealDamage: number
+      oldRootStillInScene: boolean
+      sharedOldChildCount: number
+      directChildCount: number
+      renderableMeshCount: number
+      flashHitError: string | null
+      dealDamageError: string | null
+      reason?: string
+    }
+    try {
+      this.refreshVisualsAfterAssetLoad()
+      const replacementScale = unit.mesh.scale.x
+      const newChildIds: number[] = []
+      unit.mesh.traverse(child => newChildIds.push(child.id))
+      let flashHitError: string | null = null
+      let dealDamageError: string | null = null
+      try {
+        this.flashHit(unit)
+      } catch (err) {
+        flashHitError = err instanceof Error ? err.message : String(err)
+      }
+      try {
+        this.dealDamage(unit, unit)
+      } catch (err) {
+        dealDamageError = err instanceof Error ? err.message : String(err)
+      }
+      result = {
+        ok: Math.abs(replacementScale - 2.5) < 0.001 && !this.scene.getObjectById(oldMeshId),
+        oldScale: 0.2,
+        replacementScale,
+        scaleAfterDealDamage: unit.mesh.scale.x,
+        oldRootStillInScene: !!this.scene.getObjectById(oldMeshId),
+        sharedOldChildCount: newChildIds.filter(id => oldChildIds.has(id)).length,
+        directChildCount: unit.mesh.children.length,
+        renderableMeshCount: this.countRenderableMeshes(unit.mesh),
+        flashHitError,
+        dealDamageError,
+      }
+    } finally {
+      cleanupAsset()
+      this.removeTestUnit(unit)
+    }
+    return result
+  }
+
+  private createAssetPipelineFixture(scale: number): THREE.Group {
+    const root = new THREE.Group()
+    root.name = 'asset-pipeline-fixture-root'
+    root.scale.setScalar(scale)
+
+    const materialLessGroup = new THREE.Group()
+    materialLessGroup.name = 'asset-pipeline-material-less-group'
+
+    const baseMat = new THREE.MeshStandardMaterial({ color: 0x334455 })
+    baseMat.name = 'base'
+    const teamMat = new THREE.MeshStandardMaterial({ color: 0x111111 })
+    teamMat.name = 'team_color'
+
+    const mesh = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), [baseMat, teamMat])
+    mesh.name = 'asset-pipeline-array-material-mesh'
+    materialLessGroup.add(mesh)
+    root.add(materialLessGroup)
+    return root
+  }
+
+  private summarizeObject3D(root: THREE.Object3D) {
+    root.updateWorldMatrix(true, true)
+    const box = new THREE.Box3().setFromObject(root)
+    const size = new THREE.Vector3()
+    box.getSize(size)
+    return {
+      visibleMeshCount: this.countRenderableMeshes(root),
+      bboxHeight: size.y,
+      bboxWidth: size.x,
+      bboxDepth: size.z,
+      directChildCount: root.children.length,
+      scale: { x: root.scale.x, y: root.scale.y, z: root.scale.z },
+    }
+  }
+
+  private countRenderableMeshes(root: THREE.Object3D): number {
+    let count = 0
+    root.traverse(child => {
+      if (child instanceof THREE.Mesh && child.visible !== false) count++
+    })
+    return count
+  }
+
+  private getFirstMesh(root: THREE.Object3D): THREE.Mesh {
+    let mesh: THREE.Mesh | null = null
+    root.traverse(child => {
+      if (!mesh && child instanceof THREE.Mesh) mesh = child
+    })
+    if (!mesh) throw new Error('asset pipeline fixture has no mesh')
+    return mesh
+  }
+
+  private asMaterialArray(material: THREE.Material | THREE.Material[]): THREE.Material[] {
+    return Array.isArray(material) ? material : [material]
+  }
+
+  private findNamedMaterial(root: THREE.Object3D, name: string): THREE.MeshStandardMaterial | null {
+    let found: THREE.MeshStandardMaterial | null = null
+    root.traverse(child => {
+      if (found || !(child instanceof THREE.Mesh) || !child.material) return
+      const materials = this.asMaterialArray(child.material)
+      for (const material of materials) {
+        if (material.name === name && 'color' in material) {
+          found = material as THREE.MeshStandardMaterial
+          return
+        }
+      }
+    })
+    return found
+  }
+
+  private removeTestUnit(unit: Unit) {
+    const idx = this.units.indexOf(unit)
+    if (idx >= 0) this.units.splice(idx, 1)
+
+    const oi = this.outlineObjects.indexOf(unit.mesh)
+    if (oi >= 0) this.outlineObjects.splice(oi, 1)
+
+    const bars = this.healthBars.get(unit)
+    if (bars) {
+      disposeObject3DDeep(bars.bg.parent!)
+      this.healthBars.delete(unit)
+    }
+
+    this.scene.remove(unit.mesh)
+    disposeObject3DDeep(unit.mesh)
   }
 
   // ==================== AI ====================

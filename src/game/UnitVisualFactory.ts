@@ -40,8 +40,9 @@ const TEAM_COLOR_SLOTS: Record<string, string[]> = {
 
 /**
  * 对 glTF 模型应用团队色
+ * Exported for regression testing of per-instance color isolation.
  */
-function applyTeamColorGLTF(group: THREE.Group, team: number, type: string): THREE.Group {
+export function applyTeamColorGLTF(group: THREE.Group, team: number, type: string): THREE.Group {
   const color = TEAM_COLORS[team]
   const slots = TEAM_COLOR_SLOTS[type] ?? ['team_color', 'TeamColor']
   const slotSet = new Set(slots)

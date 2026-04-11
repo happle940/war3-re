@@ -167,6 +167,19 @@
 - [x] AI 建筑放置失败不会产生无限建筑 spam
 - [x] 5 分钟 AI 模拟无严重 console error
 
+### 资产管线自动化覆盖
+
+以下项目由 `tests/asset-pipeline-regression.spec.ts` 自动验证（Playwright）：
+
+- [x] 浏览器侧 fake glTF 资产使用真实 `AssetLoader -> Factory -> refresh` 路径，不用 Node-side cache 假证明
+- [x] `Material[]` 会按实例深拷贝，蓝/红队伍实例不共享可变材质对象
+- [x] `team_color` 材质在 team 0/team 1 克隆上分别变蓝/红，且不会串色
+- [x] fallback scale 不会覆盖 replacement asset scale（0.2 fallback -> 2.5 replacement）
+- [x] `dealDamage()` 攻击缩放动画不会把 glTF/root asset scale 重置为 1
+- [x] refresh 移除旧视觉 root，不留下旧 child 混在新 root 下
+- [x] 缺失资产路径仍能为 worker/footman/townhall/barracks/farm/tower/goldmine 创建可见 fallback
+- [x] 显式 refresh 保留已有实体 position/rotation，且无严重 console error
+
 ## 仍未被自动化覆盖（需人工验证）
 
 - [ ] 玩家手动操作的采集/建造/训练完整流程
@@ -179,6 +192,7 @@
 
 | 日期 | 验证人 | 结果 | 备注 |
 |------|--------|------|------|
+| 2026-04-11 | Codex | Asset Pipeline Regression | `asset-pipeline-regression.spec.ts`: 4 tests green. Fixed `Material[]` clone isolation, browser-side fake asset refresh proof, and `dealDamage()` scale reset that would break glTF asset scale. Added the spec to `npm run test:runtime`. |
 | 2026-04-11 | GLM-5.1 + Codex | AI Economy Regression | `ai-economy-regression.spec.ts`: 9 tests green. Found and fixed AI second-wave deadlock plus `flashHit()` crash on nested/glTF materials. Codex tightened farm, queued-supply, first-wave, and second-wave assertions. |
 | 2026-04-11 | GLM-5.1 + Codex | Pathing/Footprint Regression | `pathing-footprint-regression.spec.ts`: 6 tests green. Codex tightened the PathFinder blocked-start assertion to test `findPath` directly instead of accepting `planPath` fallback. |
 | 2026-04-11 | Codex | Runtime Full Pack | `npm run test:runtime`: 45 tests green. Includes closeout, command, first-five, resource/supply, unit visibility, selection/input, pathing/footprint. |

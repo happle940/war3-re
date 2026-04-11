@@ -32,7 +32,7 @@ Current queue state:
 | Task 04 — Selection/Input Contract Pack | completed | GLM + Codex review | 2026-04-11 | Accepted at commit `96d9d4a`; Codex integrated it into `test:runtime`. |
 | Task 05 — Pathing/Footprint Contract Pack | completed | GLM + Codex review | 2026-04-11 | Accepted at commit `edd0bde`; Codex tightened blocked-start proof and integrated spec into `test:runtime`. |
 | Task 06 — AI First Five Minutes Deepening | completed | GLM + Codex review | 2026-04-11 | Added AI economy regression pack; Codex tightened weak assertions, fixed flashHit crash, and integrated into `test:runtime`. |
-| Task 07 — Asset Pipeline Contract Pack | in_progress | GLM | 2026-04-11 | Dispatched after AI economy pack acceptance; protects drop-in glB asset replacement before more visual work. |
+| Task 07 — Asset Pipeline Contract Pack | completed | GLM + Codex takeover | 2026-04-11 | Accepted after Codex takeover. Asset pipeline runtime spec green; fixed `Material[]` clone and attack animation scale reset. |
 | Task 03 — Building Placement Agency Pack | ready | Codex dispatch | 2026-04-11 | Lower priority because initial selected-worker fix already exists. |
 | Task 08 — Game.ts Module Extraction Slice | ready | Codex dispatch | 2026-04-11 | Only after gameplay contracts are better covered. |
 
@@ -389,11 +389,28 @@ Implement AI First Five Minutes Deepening. Add runtime tests for AI worker assig
 
 ### Task 07 — Asset Pipeline Contract Pack
 
-Status: `in_progress`.
+Status: `completed`.
 
-Owner: GLM.
+Owner: GLM + Codex takeover.
 
 Started: 2026-04-11.
+
+Completed: 2026-04-11.
+
+Final review status: accepted after Codex takeover. GLM's first pass produced weak tests and then conflicted on the same files, so Codex paused GLM, implemented the browser-side hook, tightened the assertions, and ran verification.
+
+Accepted commit: pending.
+
+Codex reran:
+
+```bash
+npm run build
+npx tsc --noEmit -p tsconfig.app.json
+./scripts/run-runtime-tests.sh tests/asset-pipeline-regression.spec.ts --reporter=list
+./scripts/run-runtime-tests.sh tests/unit-visibility-regression.spec.ts tests/ai-economy-regression.spec.ts --reporter=list
+```
+
+Result: asset pipeline 4/4 passed; neighboring visibility/AI pack 11/11 passed.
 
 Priority reason: asset replacement has already caused worker invisibility, scale override, material sharing, and glTF material-shape crashes. Before sourcing more assets, the pipeline needs deterministic runtime contracts.
 
