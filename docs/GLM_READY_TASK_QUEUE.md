@@ -287,7 +287,7 @@ Owner: Codex takeover.
 
 Completed: 2026-04-11.
 
-Accepted commit: pending.
+Accepted commit: `c5dc3ab` (`test: add death cleanup regression pack`).
 
 Final review status: accepted locally.
 
