@@ -43,7 +43,7 @@ Current queue state:
 | Task 15 — Combat Control Contract Pack | completed | GLM + Codex takeover | 2026-04-11 | GLM drafted the regression pack but it initially failed 8/8; Codex exposed the real command dispatcher to runtime tests, fixed the HoldPosition chase/restore bug, and integrated the spec into `test:runtime`. |
 | Task 16 — M2 Gate Regression Packet | completed | GLM + Codex review | 2026-04-11 | Added `npm run test:m2` and `docs/M2_GATE_PACKET.zh-CN.md`; Codex reran `npm run test:m2`, 32/32 passed. |
 | Task 17 — M3 Scale/Layout Benchmark Spec | completed | GLM + Codex review | 2026-04-11 | Added `docs/M3_WAR3_FEEL_BENCHMARK.zh-CN.md`; Codex corrected the Farm footprint recommendation to avoid fractional occupancy. |
-| Task 18 — M3 Scale Measurement Baseline | ready | GLM | 2026-04-11 | Measurement-only runtime pack for M3 objective ratios. Prompt prepared at `/tmp/war3_glm_task18_m3_measurement_pack_prompt.md`. |
+| Task 18 — M3 Scale Measurement Baseline | completed | GLM-5.1 | 2026-04-12 | Measurement-only runtime pack for M3 objective ratios. Tests pass. |
 | Task 19 — Order Model Boundary Inventory | ready | GLM | 2026-04-11 | Code-inventory + narrow proof task for the future order/ability framework. Prompt prepared at `/tmp/war3_glm_task19_order_model_inventory_prompt.md`. |
 | Task 08 — Game.ts Module Extraction Slice | ready | Codex dispatch | 2026-04-11 | Defer until death/cleanup and HUD cache gaps are covered. |
 

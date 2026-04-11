@@ -260,6 +260,18 @@
 - [x] Moving 单位即使 suppression 为 0，也不会被 auto-aggro 打断
 - [x] 战斗控制测试过程无严重 console error
 
+### M3 比例/布局测量自动化覆盖
+
+以下项目由 `tests/m3-scale-measurement.spec.ts` 自动验证（Playwright）：
+
+- [x] Worker/Footman 视觉包围盒非零，两者均为可见实体
+- [x] 建筑占地层级：Farm < Barracks <= GoldMine <= TownHall（footprint area）
+- [x] Tower 具有竖向防御轮廓：高度 > 宽度
+- [x] 开局农民不在任何建筑/金矿 blocker footprint 内
+- [x] 默认镜头视口包含玩家基地锚点组：TownHall + GoldMine + 至少一个 Worker
+- [x] 选择圈半径在实体 footprint 的合理因子范围内，不会坍缩为极小值
+- [x] 输出结构化 JSON 比例摘要供 Codex review（非 snapshot/screenshot）
+
 ### 单位存在感/防堆叠自动化覆盖
 
 以下项目由 `tests/unit-presence-regression.spec.ts` 自动验证（Playwright）：
