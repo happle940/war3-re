@@ -138,7 +138,7 @@
 - [x] 左键拖框在 mouseup 当帧完成选择，不需要再点一下
 - [x] 右键拖动/右键点击不启动 box selection
 - [x] 右键拖动释放后不留下 ghost selection state
-- [x] Shift+框选追加选择，HUD cache 重置（code-path reviewed）
+- [x] Shift+框选追加选择；HUD cache 重置为代码路径审查项
 - [x] Tab subgroup 切换后 selection ring 仍贴在正确对象上
 - [x] Control group restore 后 selection ring/object mapping 正确
 
@@ -154,8 +154,8 @@
 
 | 日期 | 验证人 | 结果 | 备注 |
 |------|--------|------|------|
-| 2026-04-11 | GLM-5.1 | Selection/Input Regression | selection-input-regression.spec.ts: 6 tests green. Box select, right-drag guard, Shift+append, Tab subgroup rings, control group rings. Fixed finishBoxSelect to use e.shiftKey for robust Shift+box. |
-| 2026-04-11 | Codex | Runtime Full Pack | `npm run test:runtime`: 33 tests green. Includes closeout, command, first-five, resource/supply, unit visibility. |
+| 2026-04-11 | Codex | Runtime Full Pack | `npm run test:runtime`: 39 tests green. Includes closeout, command, first-five, resource/supply, unit visibility, selection/input. |
+| 2026-04-11 | GLM-5.1 + Codex | Selection/Input Regression | `selection-input-regression.spec.ts`: 6 tests green. Box select, right-drag guard, Shift+append via mouseup modifier state, Tab subgroup rings, control group rings. Codex added the spec to `npm run test:runtime`. |
 | 2026-04-11 | Codex | Unit Visibility Regression | `unit-visibility-regression.spec.ts`: 2 tests green. Fixed W3X map-load camera reset that left player workers offscreen. |
 | 2026-04-11 | GLM-5.1 | Resource/Supply Regression | resource-supply-regression.spec.ts: 9 tests green. Supply, training, resource flow, AI spending contracts proven. |
 | 2026-04-11 | GLM-5.1 | Command Regression | command-regression.spec.ts: 7 tests green. Move/stop/hold/attackMove/queue contracts proven. |

@@ -7,9 +7,8 @@
  * Input paths used per test:
  *  - Tests 1,3: real canvas mouse events (page.mouse down/move/up)
  *  - Test 2: real canvas mouse events with right button
- *  - Test 4: evaluate-calls finishBoxSelect (page.mouse loses Shift
- *    state during drag; the Game.ts fix passes e.shiftKey into
- *    finishBoxSelect so real mouse events work at runtime)
+ *  - Test 4: real Shift keyboard + real canvas mouse events; Game.ts
+ *    passes e.shiftKey into finishBoxSelect so mouseup commits append mode.
  *  - Tests 5,6: evaluate for setup, real keyboard Tab/digit events
  *
  * Selection setup uses page.evaluate() where raycasting is not the
@@ -20,7 +19,7 @@
  *  1. Left-drag box selects on mouseup without another click
  *  2. Right-click/right-drag never starts box selection
  *  3. Right-drag release leaves no ghost selection state
- *  4. Shift+box-select appends without stale HUD cache
+ *  4. Shift+box-select appends via real mouseup modifier state
  *  5. Tab subgroup switch keeps selection rings mapped to correct objects
  *  6. Control group restore keeps selection rings mapped to correct objects
  */
@@ -277,11 +276,11 @@ test.describe('Selection/Input Contract', () => {
   })
 
   // ----------------------------------------------------------
-  // 4. Shift+box-select appends without stale HUD cache
+  // 4. Shift+box-select appends through real mouseup modifier state
   // Uses real Shift keyboard + real canvas mouse events.
   // Game.ts fix: finishBoxSelect receives e.shiftKey from mouseup.
   // ----------------------------------------------------------
-  test('Shift+box-select appends to existing selection and resets HUD cache', async ({ page }) => {
+  test('Shift+box-select appends to existing selection through real mouseup state', async ({ page }) => {
     await waitForGame(page)
 
     const units = await spawnUnits(page, [

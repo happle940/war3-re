@@ -29,8 +29,8 @@ Current queue state:
 |---|---|---|---|---|
 | Task 01 — Resource/Supply Regression Pack | completed | GLM | 2026-04-11 | Accepted at commit `a64833d`; Codex reran locked runtime pack, 9/9 passed. |
 | Task 02 — Unit Visibility Contract Pack | completed | Codex | 2026-04-11 | Added visibility runtime pack and fixed W3X camera reset; `npm run test:runtime` passed 33/33. |
+| Task 04 — Selection/Input Contract Pack | completed | GLM + Codex review | 2026-04-11 | Accepted at commit `96d9d4a`; Codex integrated it into `test:runtime`. |
 | Task 05 — Pathing/Footprint Contract Pack | ready | Codex dispatch | 2026-04-11 | Protects scale/layout/path blockers after visibility is stable. |
-| Task 04 — Selection/Input Contract Pack | in_progress | GLM | 2026-04-11 | Dispatched after Task 01 acceptance; non-overlapping with Codex visibility work except minimal proven `Game.ts` fixes. |
 | Task 06 — AI First Five Minutes Deepening | ready | Codex dispatch | 2026-04-11 | Extends current AI smoke into real economy robustness. |
 | Task 07 — Asset Pipeline Contract Pack | ready | Codex dispatch | 2026-04-11 | Useful after worker visibility contract proves current failure mode. |
 | Task 03 — Building Placement Agency Pack | ready | Codex dispatch | 2026-04-11 | Lower priority because initial selected-worker fix already exists. |
@@ -221,11 +221,25 @@ Implement Building Placement Agency Pack. The product contract is: the worker th
 
 ### Task 04 — Selection/Input Contract Pack
 
-Status: `in_progress`.
+Status: `completed`.
 
 Owner: GLM.
 
 Started: 2026-04-11.
+
+Completed: 2026-04-11.
+
+Accepted commit: `96d9d4a` (`test: add selection input regression pack`).
+
+Final review status: accepted after Codex tightened `finishBoxSelect` fallback semantics and added the spec to `npm run test:runtime`.
+
+Codex reran:
+
+```bash
+./scripts/run-runtime-tests.sh tests/selection-input-regression.spec.ts --reporter=list
+```
+
+Result: 6/6 passed before integration. Codex then added the spec to `npm run test:runtime`; full runtime pack passed 39/39.
 
 Goal: make box select/click semantics match RTS expectations and stop regressions like “mouseup does not feel committed”.
 

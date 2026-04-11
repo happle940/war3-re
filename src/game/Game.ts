@@ -2102,7 +2102,8 @@ export class Game {
     this.selBoxEl.style.height = `${h}px`
   }
 
-  private finishBoxSelect(ex: number, ey: number, appendSelection: boolean = false) {
+  private finishBoxSelect(ex: number, ey: number, appendSelection?: boolean) {
+    const shouldAppend = appendSelection ?? this.shiftHeld
     const x1 = Math.min(this.dragStart.x, ex)
     const y1 = Math.min(this.dragStart.y, ey)
     const x2 = Math.max(this.dragStart.x, ex)
@@ -2116,7 +2117,7 @@ export class Game {
     }
 
     // 如果没有 Shift，先清除现有选择
-    if (!appendSelection) {
+    if (!shouldAppend) {
       this.clearSelection()
       this.clearSelectionRings()
     }
@@ -2129,7 +2130,7 @@ export class Game {
       const sy = (-screenPos.y + 1) / 2 * window.innerHeight
       if (sx >= x1 && sx <= x2 && sy >= y1 && sy <= y2) {
         // Shift+框选时避免重复添加
-        if (!appendSelection || !this.selectionModel.contains(unit)) {
+        if (!shouldAppend || !this.selectionModel.contains(unit)) {
           this.selectUnit(unit)
         }
       }
