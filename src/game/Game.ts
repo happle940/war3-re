@@ -32,6 +32,7 @@ import { ControlGroupManager } from './ControlGroupManager'
 import { SimpleAI } from './SimpleAI'
 import type { AIContext } from './SimpleAI'
 import { OccupancyGrid, PlacementValidator } from './OccupancyGrid'
+import { PlacementController } from './PlacementController'
 import { PathingGrid } from './PathingGrid'
 import { findPath, pathToWorldWaypoints } from './PathFinder'
 import { TreeManager } from './TreeManager'
@@ -189,10 +190,14 @@ export class Game {
   private static readonly DOUBLE_CLICK_MS = 350
 
   // 建造放置模式
-  private placementMode: string | null = null
-  private ghostMesh: THREE.Group | null = null
-  // 进入建造模式时被选中的 worker 列表（保证放置时用选中的工人建造）
-  private placementWorkers: Unit[] = []
+  private placement = new PlacementController()
+
+  /** @deprecated Use placement.mode — kept for test backward compatibility */
+  get placementMode(): string | null { return this.placement.mode }
+  /** @deprecated Use placement.currentGhost — kept for test backward compatibility */
+  get ghostMesh(): THREE.Group | null { return this.placement.currentGhost }
+  /** @deprecated Use placement.currentWorkers — kept for test backward compatibility */
+  get placementWorkers(): readonly Unit[] { return this.placement.currentWorkers }
 
   // 攻击移动目标模式
   private attackMoveMode = false
@@ -1335,23 +1340,23 @@ export class Game {
     if (!this.resources.canAfford(0, def.cost)) return
 
     // 保存当前选中的可控 worker（进入放置模式后选择会被清除）
-    this.placementWorkers = this.selectedUnits.filter(
+    const savedWorkers = this.selectedUnits.filter(
       (u) => u.team === 0 && u.type === 'worker' && !u.isBuilding,
     )
 
-    this.placementMode = buildingKey
     this.clearSelection()
 
     // 创建幽灵建筑
-    this.ghostMesh = this.createBuildingMesh(buildingKey, 0x00ff00, 0.5)
-    this.ghostMesh.visible = false
-    this.scene.add(this.ghostMesh)
+    const ghostMesh = this.createBuildingMesh(buildingKey, 0x00ff00, 0.5)
+    ghostMesh.visible = false
+    this.scene.add(ghostMesh)
+    this.placement.begin(buildingKey, savedWorkers, ghostMesh)
     this.updateModeHint(`放置 ${def.name} — 左键放置，右键/Esc取消`)
   }
 
   /** 更新幽灵建筑位置 + 合法性颜色反馈 */
   private updateGhostPlacement() {
-    if (!this.placementMode || !this.ghostMesh) return
+    if (!this.placement.mode || !this.placement.currentGhost) return
 
     this.raycaster.setFromCamera(this.mouseNDC, this.camera)
     const hits = this.raycaster.intersectObject(this.terrain.groundPlane)
@@ -1359,18 +1364,18 @@ export class Game {
       const p = hits[0].point
       const tx = Math.round(p.x)
       const tz = Math.round(p.z)
-      this.ghostMesh.position.set(
+      this.placement.currentGhost.position.set(
         tx + 0.5,
         this.getWorldHeight(tx, tz) + 0.01,
         tz + 0.5,
       )
-      this.ghostMesh.visible = true
+      this.placement.currentGhost.visible = true
 
       // 合法性颜色反馈：绿色=可放置，红色=不可放置（更鲜明的对比）
-      const def = BUILDINGS[this.placementMode]
+      const def = BUILDINGS[this.placement.mode!]
       const valid = def && this.placementValidator.canPlace(tx, tz, def.size).ok
       const color = valid ? 0x44ff44 : 0xff3333
-      this.ghostMesh.traverse((child) => {
+      this.placement.currentGhost.traverse((child) => {
         if (child instanceof THREE.Mesh) {
           const mat = child.material as THREE.MeshLambertMaterial | THREE.LineBasicMaterial
           if ('color' in mat) mat.color.setHex(color)
@@ -1381,13 +1386,13 @@ export class Game {
 
   /** 放置建筑 */
   private placeBuilding() {
-    if (!this.placementMode || !this.ghostMesh) return
+    if (!this.placement.mode || !this.placement.currentGhost) return
 
-    const key = this.placementMode
+    const key = this.placement.mode
     const def = BUILDINGS[key]
 
     // 放置合法性校验
-    const pos = this.ghostMesh.position.clone()
+    const pos = this.placement.currentGhost.position.clone()
     const tx = Math.round(pos.x - 0.5)
     const tz = Math.round(pos.z - 0.5)
     const result = this.placementValidator.canPlace(tx, tz, def.size)
@@ -1410,9 +1415,7 @@ export class Game {
     let peasant: Unit | null = null
 
     // 从已保存的选中 worker 中找：优先 primary（第一个），然后其他选中的
-    const savedWorkers = this.placementWorkers.filter(
-      (u) => u.hp > 0 && u.state !== UnitState.Building && this.units.includes(u),
-    )
+    const savedWorkers = this.placement.aliveWorkers(this.units)
     if (savedWorkers.length > 0) {
       // 如果只有一个选中的 worker → 它就是建造者
       // 如果多个选中的 → 用 primary（第一个）
@@ -1433,12 +1436,7 @@ export class Game {
   }
 
   exitPlacementMode() {
-    if (this.ghostMesh) {
-      this.scene.remove(this.ghostMesh)
-      this.ghostMesh = null
-    }
-    this.placementMode = null
-    this.placementWorkers = []
+    this.placement.exit(this.scene)
     this.updateModeHint('')
   }
 
@@ -1472,7 +1470,7 @@ export class Game {
 
   /** 清除所有模式（ESC 统一出口） */
   private cancelAllModes() {
-    if (this.placementMode) {
+    if (this.placement.mode) {
       this.exitPlacementMode()
     }
     if (this.attackMoveMode) {
@@ -1505,7 +1503,7 @@ export class Game {
       if (e.button !== 0) return
 
       // 建造模式：放置建筑
-      if (this.placementMode) {
+      if (this.placement.mode) {
         this.placeBuilding()
         return
       }
@@ -1537,7 +1535,7 @@ export class Game {
 
     canvas.addEventListener('mouseup', (e) => {
       if (e.button !== 0) return
-      if (this.placementMode) return
+      if (this.placement.mode) return
       if (this.attackMoveMode) return
       if (this.rallyMode) return
 
@@ -1565,7 +1563,7 @@ export class Game {
       e.preventDefault()
 
       // 右键取消建造模式
-      if (this.placementMode) {
+      if (this.placement.mode) {
         this.exitPlacementMode()
         return
       }
@@ -1627,7 +1625,7 @@ export class Game {
       // 控制组：1..9 召回编组
       if (digit >= 1 && digit <= 9 && !e.ctrlKey && !e.altKey) {
         // 建造/攻击移动/集结模式时不响应数字键（避免误触）
-        if (this.placementMode || this.attackMoveMode || this.rallyMode) return
+        if (this.placement.mode || this.attackMoveMode || this.rallyMode) return
 
         const recalled = this.controlGroups.recall(digit, this.units)
         if (recalled.length > 0) {
@@ -1658,7 +1656,7 @@ export class Game {
       }
 
       // 建造/攻击移动/集结模式时不响应快捷键
-      if (this.placementMode || this.attackMoveMode || this.rallyMode) return
+      if (this.placement.mode || this.attackMoveMode || this.rallyMode) return
       if (this.selectedUnits.length === 0) return
 
       // Tab = 子组切换
@@ -4067,7 +4065,7 @@ export class Game {
   // ==================== 地块信息 ====================
 
   private updateTileInfo() {
-    if (this.placementMode) return
+    if (this.placement.mode) return
     this.raycaster.setFromCamera(this.mouseNDC, this.camera)
     const hits = this.raycaster.intersectObject(this.terrain.groundPlane)
     if (hits.length > 0) {
