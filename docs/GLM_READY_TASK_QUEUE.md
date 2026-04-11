@@ -34,7 +34,7 @@ Current queue state:
 | Task 06 — AI First Five Minutes Deepening | completed | GLM + Codex review | 2026-04-11 | Added AI economy regression pack; Codex tightened weak assertions, fixed flashHit crash, and integrated into `test:runtime`. |
 | Task 07 — Asset Pipeline Contract Pack | completed | GLM + Codex takeover | 2026-04-11 | Accepted after Codex takeover. Asset pipeline runtime spec green; fixed `Material[]` clone and attack animation scale reset. |
 | Task 03 — Building Placement Agency Pack | completed | Codex takeover | 2026-04-11 | GLM stalled in exploration; Codex completed at commit `6290f90`. Runtime pack 57/57 passed locally. |
-| Task 09 — Death/Cleanup Contract Pack | ready | Codex dispatch | 2026-04-11 | Previous high-effort attempt was stopped for broad exploration. Retry only as one-file core spec first, then allow minimal Game.ts fixes. |
+| Task 09 — Death/Cleanup Contract Pack | completed | Codex takeover | 2026-04-11 | GLM stalled in broad exploration; Codex completed core pack directly. `death-cleanup-regression.spec.ts` 5/5 green. |
 | Task 10 — Placement Controller Development Slice | ready | Codex dispatch | 2026-04-11 | Development task, not test-only: extract placement mode/build placement into a bounded controller after Task09 or when Codex owns cleanup. |
 | Task 08 — Game.ts Module Extraction Slice | ready | Codex dispatch | 2026-04-11 | Defer until death/cleanup and HUD cache gaps are covered. |
 
@@ -281,7 +281,32 @@ Implement Building Placement Agency Pack. The product contract is: the worker th
 
 ### Task 09 — Death/Cleanup Contract Pack
 
-Status: `ready`.
+Status: `completed`.
+
+Owner: Codex takeover.
+
+Completed: 2026-04-11.
+
+Accepted commit: pending.
+
+Final review status: accepted locally.
+
+Codex verified:
+
+```bash
+npm run build
+./scripts/run-runtime-tests.sh tests/death-cleanup-regression.spec.ts --reporter=list
+```
+
+Result: 5/5 passed.
+
+Coverage landed:
+
+- selected-unit death removes selection, selection rings, healthbar, outline, and scene mesh refs
+- attack-target death clears attacker `attackTarget` and exits Attacking
+- building death releases footprint occupancy
+- under-construction building death clears builder build state
+- invalid resource target recovery clears `resourceTarget` without crashing
 
 Dispatch note:
 

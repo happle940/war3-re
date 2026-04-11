@@ -62,6 +62,7 @@ GLM owns:
 | C07 — CI Node 24 Migration | done | 2026-04-11 | Workflow now opts JavaScript actions and app verification into Node 24. |
 | C08 — Game.ts Risk Map | done | 2026-04-11 | Added responsibility zones, coverage gaps, no-go zones, and safe extraction order. |
 | C09 — Continuous Execution Loop Hardening | done | 2026-04-11 | Root-cause fix for Codex stopping: operating model now requires next-task selection, GLM stall handling, and non-conflicting Codex work while GLM runs. |
+| C10 — M1 Gate Packet Prep | ready | 2026-04-11 | Next Codex-owned work after cleanup contracts: prepare the first playable slice decision packet and identify remaining objective blockers before asking the user to play. |
 
 ## Task Cards
 
@@ -299,6 +300,32 @@ Closeout:
 
 - This task changes operating docs only.
 - No runtime verification required.
+
+### C10 — M1 Gate Packet Prep
+
+Status: `ready`.
+
+Goal: prepare the large milestone packet for `M1 — First Playable RTS Slice` so the user is only asked to judge the project at a meaningful node.
+
+Allowed files:
+
+- `docs/HUMAN_DECISION_GATES.md`
+- `docs/GAMEPLAY_REGRESSION_CHECKLIST.md`
+- `docs/SMOKE_CHECKLIST.md`
+- `README.md` if controls/live URL need clarification
+
+Done when:
+
+- M1 entry criteria are current against the latest runtime packs.
+- Remaining objective blockers are listed separately from human visual/taste questions.
+- The user checklist is concrete and limited to 5-7 questions.
+- Live URL and expected controls are included.
+
+Verification:
+
+```bash
+git diff --check
+```
 
 ## Default Next Action Logic
 

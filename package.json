@@ -11,7 +11,7 @@
     "test:closeout": "./scripts/run-runtime-tests.sh tests/closeout.spec.ts --reporter=list",
     "test:first-five": "./scripts/run-runtime-tests.sh tests/first-five-minutes.spec.ts --reporter=list",
     "preview:ci": "vite preview --host 127.0.0.1 --port 4173",
-    "test:runtime": "./scripts/run-runtime-tests.sh tests/closeout.spec.ts tests/first-five-minutes.spec.ts tests/command-regression.spec.ts tests/resource-supply-regression.spec.ts tests/unit-visibility-regression.spec.ts tests/pathing-footprint-regression.spec.ts tests/ai-economy-regression.spec.ts tests/asset-pipeline-regression.spec.ts tests/building-agency-regression.spec.ts --reporter=list",
+    "test:runtime": "./scripts/run-runtime-tests.sh tests/closeout.spec.ts tests/first-five-minutes.spec.ts tests/command-regression.spec.ts tests/resource-supply-regression.spec.ts tests/unit-visibility-regression.spec.ts tests/pathing-footprint-regression.spec.ts tests/ai-economy-regression.spec.ts tests/asset-pipeline-regression.spec.ts tests/building-agency-regression.spec.ts tests/death-cleanup-regression.spec.ts --reporter=list",
     "test:command": "./scripts/run-runtime-tests.sh tests/command-regression.spec.ts --reporter=list",
     "test:resource": "./scripts/run-runtime-tests.sh tests/resource-supply-regression.spec.ts --reporter=list",
     "test:visibility": "./scripts/run-runtime-tests.sh tests/unit-visibility-regression.spec.ts --reporter=list",
@@ -19,7 +19,8 @@
     "test:pathing": "./scripts/run-runtime-tests.sh tests/pathing-footprint-regression.spec.ts --reporter=list",
     "test:ai": "./scripts/run-runtime-tests.sh tests/ai-economy-regression.spec.ts --reporter=list",
     "test:assets": "./scripts/run-runtime-tests.sh tests/asset-pipeline-regression.spec.ts --reporter=list",
-    "test:building-agency": "./scripts/run-runtime-tests.sh tests/building-agency-regression.spec.ts --reporter=list"
+    "test:building-agency": "./scripts/run-runtime-tests.sh tests/building-agency-regression.spec.ts --reporter=list",
+    "test:death-cleanup": "./scripts/run-runtime-tests.sh tests/death-cleanup-regression.spec.ts --reporter=list"
   },
   "dependencies": {
     "jszip": "^3.10.1",

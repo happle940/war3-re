@@ -193,6 +193,18 @@
 - [x] Shift-style 追加选择进入放置模式时保留 selection order，不污染 remembered worker list
 - [x] 建造代理测试过程中无严重 console error
 
+### 死亡/清理自动化覆盖
+
+以下项目由 `tests/death-cleanup-regression.spec.ts` 自动验证（Playwright）：
+
+- [x] 选中单位死亡后从 `selectionModel` 和 selection rings 中移除
+- [x] 死亡单位的 healthbar、outline 引用和 scene mesh 引用被清理
+- [x] 攻击目标死亡后，攻击者 `attackTarget` 清空并退出 Attacking 状态
+- [x] 建筑死亡后释放 footprint occupancy，同一 tile 可再次放置
+- [x] 建造中建筑死亡后，builder 的 `buildTarget` / move target / build state 被清理
+- [x] 资源目标失效后，采集状态恢复路径清空 `resourceTarget` 且不崩溃
+- [x] 强制死亡/清理场景无严重 console error
+
 ## 仍未被自动化覆盖（需人工验证）
 
 - [ ] 玩家手动操作的采集/建造/训练完整流程
@@ -205,6 +217,7 @@
 
 | 日期 | 验证人 | 结果 | 备注 |
 |------|--------|------|------|
+| 2026-04-11 | Codex | Death/Cleanup Regression | `death-cleanup-regression.spec.ts`: 5 tests green. Selection/ring/healthbar/outline cleanup, attack target cleanup, building footprint release, builder cleanup, and invalid resource target recovery are now runtime-proven. Added the spec to `npm run test:runtime`. |
 | 2026-04-11 | Codex | Building Agency Regression | `building-agency-regression.spec.ts`: 5 tests green. Fixed `building.builder` never being set and `findNearestIdlePeasant()` considering dead workers during fallback. Added the spec to `npm run test:runtime`. |
 | 2026-04-11 | Codex | Asset Pipeline Regression | `asset-pipeline-regression.spec.ts`: 4 tests green. Fixed `Material[]` clone isolation, browser-side fake asset refresh proof, and `dealDamage()` scale reset that would break glTF asset scale. Added the spec to `npm run test:runtime`. |
 | 2026-04-11 | GLM-5.1 + Codex | AI Economy Regression | `ai-economy-regression.spec.ts`: 9 tests green. Found and fixed AI second-wave deadlock plus `flashHit()` crash on nested/glTF materials. Codex tightened farm, queued-supply, first-wave, and second-wave assertions. |
