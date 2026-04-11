@@ -2,6 +2,40 @@
 
 Purpose: keep GLM continuously useful without letting it collide with Codex or weaken product contracts. These are pre-shaped tasks that can be sent with small situational edits.
 
+## Queue Maintenance Contract
+
+This file is operational state, not archive prose. Codex must update it whenever GLM starts, completes, abandons, or materially changes a task.
+
+Required update points:
+
+- Before dispatch: mark exactly one task as `in_progress`, add owner, start date, allowed files, and current reason for priority.
+- After GLM closeout: mark the task as `completed`, `failed`, `abandoned`, or `superseded`; record commit hash, verification result, and follow-up task IDs.
+- Before sending the next task: re-rank the queue against current user pain and latest test failures.
+- After any user-reported runtime issue: either map it to an existing task or add a new task card near the top.
+- After Codex changes shared tooling, CI, scripts, or test harnesses: update task verification commands before GLM receives another prompt.
+
+Status vocabulary:
+
+- `ready`: safe to dispatch when GLM is idle.
+- `in_progress`: GLM is currently working on it; do not dispatch another implementation task.
+- `blocked`: cannot continue without a missing dependency or human confirmation.
+- `completed`: merged/pushed and verification passed.
+- `failed`: attempted but closeout failed; requires Codex review before retry.
+- `superseded`: no longer needed because another task or direct fix covered it.
+
+Current queue state:
+
+| Task | Status | Owner | Last update | Notes |
+|---|---|---|---|---|
+| Task 01 — Resource/Supply Regression Pack | in_progress | GLM | 2026-04-11 | GLM has created `tests/resource-supply-regression.spec.ts`; awaiting verification/closeout. |
+| Task 02 — Unit Visibility Contract Pack | ready | Codex dispatch | 2026-04-11 | Highest next priority because user still reports invisible workers. |
+| Task 05 — Pathing/Footprint Contract Pack | ready | Codex dispatch | 2026-04-11 | Protects scale/layout/path blockers after visibility is stable. |
+| Task 04 — Selection/Input Contract Pack | ready | Codex dispatch | 2026-04-11 | Covers right-drag, mouseup commit, Tab ring mapping. |
+| Task 06 — AI First Five Minutes Deepening | ready | Codex dispatch | 2026-04-11 | Extends current AI smoke into real economy robustness. |
+| Task 07 — Asset Pipeline Contract Pack | ready | Codex dispatch | 2026-04-11 | Useful after worker visibility contract proves current failure mode. |
+| Task 03 — Building Placement Agency Pack | ready | Codex dispatch | 2026-04-11 | Lower priority because initial selected-worker fix already exists. |
+| Task 08 — Game.ts Module Extraction Slice | ready | Codex dispatch | 2026-04-11 | Only after gameplay contracts are better covered. |
+
 ## Dispatch Rules
 
 Before sending any task, Codex must check:
@@ -51,7 +85,15 @@ Bad GLM tasks:
 
 ### Task 01 — Resource/Supply Regression Pack
 
-Status: dispatched to GLM on 2026-04-11. Do not dispatch again unless it fails or is abandoned.
+Status: `in_progress`.
+
+Owner: GLM.
+
+Started: 2026-04-11.
+
+Current artifact observed: `tests/resource-supply-regression.spec.ts`.
+
+Do not dispatch again unless the current attempt is marked `failed`, `abandoned`, or `superseded`.
 
 Goal: prove resources, supply, training, and AI spending are not fake-green.
 
@@ -87,6 +129,10 @@ Implement Resource/Supply Regression Pack 01. Use deterministic runtime tests. W
 ```
 
 ### Task 02 — Unit Visibility Contract Pack
+
+Status: `ready`.
+
+Default next task after Task 01, unless Task 01 exposes a higher-severity resource/supply bug.
 
 Goal: solve the recurring “农民刷新后看不到 / blood bar visible but body invisible” class of bugs with runtime assertions, not screenshots.
 
@@ -127,6 +173,8 @@ Implement Unit Visibility Contract Pack. Focus on the reported bug: workers are 
 
 ### Task 03 — Building Placement Agency Pack
 
+Status: `ready`.
+
 Goal: harden the contract that the selected worker performs the build order and no unrelated idle worker steals the command.
 
 Allowed write scope:
@@ -158,6 +206,8 @@ Implement Building Placement Agency Pack. The product contract is: the worker th
 ```
 
 ### Task 04 — Selection/Input Contract Pack
+
+Status: `ready`.
 
 Goal: make box select/click semantics match RTS expectations and stop regressions like “mouseup does not feel committed”.
 
@@ -192,6 +242,8 @@ Implement Selection/Input Contract Pack. Add deterministic runtime tests for mou
 
 ### Task 05 — Pathing/Footprint Contract Pack
 
+Status: `ready`.
+
 Goal: prevent “unit spawned inside blocker / path fallback through blocker / building footprint drift” regressions.
 
 Allowed write scope:
@@ -224,6 +276,8 @@ Implement Pathing/Footprint Contract Pack. Build runtime tests for spawn blocker
 ```
 
 ### Task 06 — AI First Five Minutes Deepening
+
+Status: `ready`.
 
 Goal: move from “AI does something” to “AI can sustain a playable first five minutes”.
 
@@ -258,6 +312,8 @@ Implement AI First Five Minutes Deepening. Add runtime tests for AI worker assig
 
 ### Task 07 — Asset Pipeline Contract Pack
 
+Status: `ready`.
+
 Goal: make drop-in `.glb` replacement reliable without subjective visual judgment.
 
 Allowed write scope:
@@ -290,6 +346,8 @@ Implement Asset Pipeline Contract Pack. Add runtime tests for fallback, async re
 ```
 
 ### Task 08 — Game.ts Module Extraction Slice
+
+Status: `ready`.
 
 Goal: reduce `Game.ts` risk by extracting one mechanical subsystem with zero behavior changes.
 
