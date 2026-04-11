@@ -415,6 +415,45 @@ TH-worker 距离: 1 tile (z 方向)
 目标: 紧贴 TH                                      ✓
 ```
 
+### 6.3 运行时测量快照
+
+来源：`npm run test:m3-scale`，提交 `e39a6cf`。这组数据来自实际运行后的 bbox，不等同于源码里的 proxy 几何体静态预估。
+
+```
+Worker:    1.240w × 1.865h × 0.963d
+Footman:   0.860w × 1.360h × 0.640d
+Town Hall: 2.976w × 1.893h × 2.740d
+Gold Mine: 2.840w × 3.160h × 2.840d
+Barracks:  5.657w × 2.750h × 5.657d
+Farm:      1.500w × 1.000h × 2.200d
+Tower:     1.320w × 3.500h × 1.320d
+
+Measured ratios:
+  Farm / TH area       = 0.405
+  Barracks / TH area   = 3.925
+  GoldMine / TH area   = 0.989
+  Tower / TH area      = 0.214
+  Tower height / TH    = 1.849
+  Footman silhouette / Worker silhouette = 0.506
+```
+
+Interpretation:
+
+- Default camera currently contains Town Hall, Gold Mine, and at least one Worker. This is a usable baseline.
+- Workers are outside blockers and selection rings have nonzero sane radii. This is a usable baseline.
+- Runtime scale is not the same as static proxy scale. The loaded asset/fallback path must be measured before every M3 tuning task.
+- Footman currently measures smaller than Worker by bbox silhouette. This violates the readability contract that military units should read heavier than workers.
+- Barracks currently measures much larger than Town Hall in runtime bbox area. This breaks the intended base anchor hierarchy.
+- Tower has a clear vertical profile, but runtime height is far above Town Hall height. This may be acceptable only if human visual review says the tower still reads as a defensive landmark rather than a giant prop.
+- Gold Mine currently measures taller than Town Hall. This supports resource landmark readability, but may weaken Town Hall as the base anchor.
+
+Immediate M3 implication:
+
+1. Do not tune from source constants alone.
+2. First normalize runtime visual scale for Worker, Footman, Town Hall, Barracks, Gold Mine, Tower.
+3. Keep footprint/pathing sizes stable until visual scale and `GameData.size` are separated.
+4. Only after runtime ratios are sane should camera and terrain be tuned.
+
 ---
 
 ## 7. 参考文档
