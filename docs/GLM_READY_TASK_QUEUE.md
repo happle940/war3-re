@@ -33,8 +33,9 @@ Current queue state:
 | Task 05 — Pathing/Footprint Contract Pack | completed | GLM + Codex review | 2026-04-11 | Accepted at commit `edd0bde`; Codex tightened blocked-start proof and integrated spec into `test:runtime`. |
 | Task 06 — AI First Five Minutes Deepening | completed | GLM + Codex review | 2026-04-11 | Added AI economy regression pack; Codex tightened weak assertions, fixed flashHit crash, and integrated into `test:runtime`. |
 | Task 07 — Asset Pipeline Contract Pack | completed | GLM + Codex takeover | 2026-04-11 | Accepted after Codex takeover. Asset pipeline runtime spec green; fixed `Material[]` clone and attack animation scale reset. |
-| Task 03 — Building Placement Agency Pack | in_progress | GLM | 2026-04-11 | Dispatched after Task07 acceptance; hardens selected-worker build agency before more gameplay work. |
-| Task 08 — Game.ts Module Extraction Slice | ready | Codex dispatch | 2026-04-11 | Only after gameplay contracts are better covered. |
+| Task 03 — Building Placement Agency Pack | completed | Codex takeover | 2026-04-11 | GLM stalled in exploration; Codex completed at commit `6290f90`. Runtime pack 57/57 passed locally. |
+| Task 09 — Death/Cleanup Contract Pack | ready | Codex dispatch | 2026-04-11 | Next best GLM task: deterministic runtime contracts around stale target cleanup, selection cleanup, healthbar/ring disposal, and footprint release. |
+| Task 08 — Game.ts Module Extraction Slice | ready | Codex dispatch | 2026-04-11 | Defer until death/cleanup and HUD cache gaps are covered. |
 
 ## Dispatch Rules
 
@@ -187,11 +188,37 @@ Implement Unit Visibility Contract Pack. Focus on the reported bug: workers are 
 
 ### Task 03 — Building Placement Agency Pack
 
-Status: `in_progress`.
+Status: `completed`.
 
-Owner: GLM.
+Owner: Codex takeover.
 
 Started: 2026-04-11.
+
+Completed: 2026-04-11.
+
+Accepted commit: `6290f90` (`test: add building agency regression pack`).
+
+Final review status: accepted. GLM stalled in exploration, so Codex stopped GLM and completed the pack directly.
+
+Codex verified:
+
+```bash
+npm run build
+npx tsc --noEmit -p tsconfig.app.json
+./scripts/run-runtime-tests.sh tests/building-agency-regression.spec.ts tests/closeout.spec.ts tests/selection-input-regression.spec.ts --reporter=list
+npm run test:runtime
+```
+
+Results:
+
+- Building agency pack: 5/5 passed.
+- Affected closeout + selection pack: 20/20 passed.
+- Full runtime pack: 57/57 passed.
+
+Fixes landed:
+
+- `placeBuilding()` now records `building.builder = peasant`.
+- `findNearestIdlePeasant()` ignores dead workers (`hp <= 0`).
 
 Goal: harden the contract that the selected worker performs the build order and no unrelated idle worker steals the command.
 
@@ -221,6 +248,57 @@ Dispatch prompt summary:
 
 ```text
 Implement Building Placement Agency Pack. The product contract is: the worker the player selected to build must be the worker assigned after placement. Add runtime tests for selected worker, multiple selected workers, invalid selected worker fallback, and placementWorkers cleanup.
+```
+
+### Task 09 — Death/Cleanup Contract Pack
+
+Status: `ready`.
+
+Goal: harden the high-risk cleanup paths so dead units/buildings cannot leave stale selection, targets, healthbars, blockers, or build/resource references behind.
+
+Allowed write scope:
+
+- `tests/death-cleanup-regression.spec.ts`
+- `src/game/Game.ts` only for minimal proven fixes
+- `docs/GAMEPLAY_REGRESSION_CHECKLIST.md`
+
+Forbidden files:
+
+- `package.json`
+- `scripts/*`
+- `.github/*`
+- asset loader/factory/catalog files
+- visual/camera/layout tuning
+- broad Game.ts refactor
+
+Must prove with Playwright runtime assertions:
+
+- Killing a selected unit removes it from `selectionModel` and selection rings after `handleDeadUnits()` / update.
+- Killing an attack target clears all attackers' `attackTarget` references and does not leave them stuck attacking a dead unit.
+- Killing a building releases its footprint occupancy so `placementValidator.canPlace()` can place on the same tiles afterward.
+- Killing an under-construction building clears builder `buildTarget` / build state without crashing.
+- Killing a resource target clears workers' `resourceTarget` references and does not crash the gather loop.
+- Healthbar/outline references for dead units are removed or no longer point at removed meshes.
+- No severe console errors during forced death/cleanup scenarios.
+
+Verification:
+
+```bash
+npm run build
+npx tsc --noEmit -p tsconfig.app.json
+./scripts/run-runtime-tests.sh tests/death-cleanup-regression.spec.ts --reporter=list
+```
+
+Suggested extra verification if `Game.ts` changes:
+
+```bash
+./scripts/run-runtime-tests.sh tests/command-regression.spec.ts tests/pathing-footprint-regression.spec.ts tests/selection-input-regression.spec.ts --reporter=list
+```
+
+Dispatch prompt summary:
+
+```text
+Implement Death/Cleanup Contract Pack. Use deterministic Playwright runtime tests that force unit/building death and then assert selection cleanup, target cleanup, footprint release, build/resource reference cleanup, healthbar/outline cleanup, and no severe console errors. Fix only proven bugs in Game.ts.
 ```
 
 ### Task 04 — Selection/Input Contract Pack
@@ -487,6 +565,7 @@ Use this order unless current failures suggest otherwise:
 4. Task 06 AI First Five Minutes Deepening
 6. Task 07 Asset Pipeline Contract Pack
 7. Task 03 Building Placement Agency Pack
-8. Task 08 Game.ts Module Extraction Slice
+8. Task 09 Death/Cleanup Contract Pack
+9. Task 08 Game.ts Module Extraction Slice
 
 Reasoning: first protect economy/command/pathing contracts, then visual asset reliability, then refactor.
