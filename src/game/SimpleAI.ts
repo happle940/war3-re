@@ -64,9 +64,18 @@ const BUILD_PROFILES: AIBuildProfile[] = [
  * 6. 步兵积累到阈值 → 向敌方基地进攻
  * 7. 集结点：自动设金矿 rally
  *
+ * 金矿饱和契约：
+ * - 单金矿有效采集容量 = GOLDMINE_SATURATION_CAP
+ * - 超过饱和后，idle worker 优先分配 lumber/build/reserve
+ * - 如果 gold worker 因死亡/被拉走而低于饱和，补回 gold
+ *
  * 所有主动决策通过 issueCommand() 下发。
  * tick 频率由外部控制，不每帧跑。
  */
+
+/** 单金矿有效采集容量上限（超过此数边际收益极低） */
+const GOLDMINE_SATURATION_CAP = 5
+
 export class SimpleAI {
   private ctx: AIContext
   private profile: AIBuildProfile
@@ -264,11 +273,35 @@ export class SimpleAI {
       }
     }
 
-    // ===== 7. 集结点：自动设金矿 rally =====
-    if (townhall.rallyTarget === null || townhall.rallyPoint === null) {
+    // ===== 7. 集结点：根据金矿饱和状态动态调整 =====
+    // 饱和契约：当前 gold workers >= goldEffectiveCap → 把 rally 改到最近树
+    //   这样新 worker 出生就走向伐木，不会假移动到 TH 中心
+    // 未饱和 → 设金矿 rally，新 worker 自动进入采金
+    {
+      const goldWorkers = units.filter(
+        (u) => u.team === team && u.type === 'worker' && !u.isBuilding
+          && u.gatherType === 'gold' && u.hp > 0
+          && (u.state === UnitState.MovingToGather || u.state === UnitState.Gathering
+            || u.state === UnitState.MovingToReturn),
+      )
+      const goldEffectiveCap = Math.min(this.targetGoldWorkers, GOLDMINE_SATURATION_CAP)
       const mine = this.ctx.findNearestGoldmine(townhall)
-      if (mine) {
-        issueCommand([], { type: 'setRally', building: townhall, target: mine.mesh.position, rallyTarget: mine })
+
+      if (goldWorkers.length >= goldEffectiveCap) {
+        // 饱和 → 把 rally 从金矿切换到最近树（新 worker 自动伐木）
+        if (townhall.rallyTarget && townhall.rallyTarget.type === 'goldmine') {
+          const tree = this.ctx.findNearestTreeEntry(townhall.mesh.position, 30)
+          if (tree) {
+            issueCommand([], { type: 'setRally', building: townhall, target: tree.mesh.position })
+          }
+          // 无树可切 → 保留金矿 rally（容忍小幅超额，好过假移动）
+        }
+      } else if (townhall.rallyTarget === null || townhall.rallyPoint === null
+        || townhall.rallyTarget.type !== 'goldmine') {
+        // 未饱和且无金矿 rally → 设金矿 rally
+        if (mine) {
+          issueCommand([], { type: 'setRally', building: townhall, target: mine.mesh.position, rallyTarget: mine })
+        }
       }
     }
   }
@@ -316,6 +349,12 @@ export class SimpleAI {
 
   /**
    * 分配空闲农民：按需分配采金和伐木
+   *
+   * 金矿饱和契约：
+   *   goldEffectiveCap = min(targetGoldWorkers, GOLDMINE_SATURATION_CAP)
+   *   当前 gold worker 数 < goldEffectiveCap → 补金
+   *   当前 gold worker 数 >= goldEffectiveCap → 优先伐木
+   *   如果找不到树 → fallback 采金（不浪费 worker）
    */
   private assignIdleWorkers(idleWorkers: Unit[], townhall: Unit) {
     const { team, units, resources } = this.ctx
@@ -336,8 +375,11 @@ export class SimpleAI {
           || u.state === UnitState.MovingToReturn),
     ).length
 
+    // 金矿饱和上限：取 profile target 和硬上限的较小值
+    const goldEffectiveCap = Math.min(this.targetGoldWorkers, GOLDMINE_SATURATION_CAP)
+
     for (const w of idleWorkers) {
-      if (goldCount < this.targetGoldWorkers) {
+      if (goldCount < goldEffectiveCap) {
         // 需要更多采金农民
         const mine = this.ctx.findNearestGoldmine(w)
         if (mine && mine.remainingGold > 0) {
@@ -349,7 +391,7 @@ export class SimpleAI {
         }
       }
 
-      // 伐木（默认分配）
+      // 金矿饱和或未达目标但无可用矿 → 伐木（默认分配）
       const tree = this.ctx.findNearestTreeEntry(w.mesh.position, 30)
       if (tree) {
         issueCommand([w], { type: 'gather', resourceType: 'lumber', target: tree.mesh.position })
@@ -359,7 +401,7 @@ export class SimpleAI {
         continue
       }
 
-      // 找不到树 → 尝试采金（fallback）
+      // 找不到树 → 尝试采金（fallback，不浪费 worker）
       const mine = this.ctx.findNearestGoldmine(w)
       if (mine && mine.remainingGold > 0) {
         issueCommand([w], { type: 'gather', resourceType: 'gold', target: mine.mesh.position })

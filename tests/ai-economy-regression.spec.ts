@@ -546,4 +546,108 @@ test.describe('AI Economy Deepening', () => {
       `Unexpected console errors:\n${severeErrors.join('\n')}`,
     ).toBe(0)
   })
+
+  // ----------------------------------------------------------
+  // 10. Gold mine saturation: AI never exceeds 5 gold workers
+  //     over an extended simulation. Excess workers go to lumber.
+  // ----------------------------------------------------------
+  test('AI gold workers stay within mine saturation cap (≤5)', async ({ page }) => {
+    await waitForGame(page)
+
+    // Sample at multiple time points to ensure cap is not just a timing artifact
+    const violations: string[] = []
+
+    // Advance to t=45 and check
+    await advanceGameTime(page, 45)
+    let snap = await getAISnapshot(page)
+    if (!snap) { violations.push('t=45: no snapshot') }
+    else if (snap.goldWorkers > 5) {
+      violations.push(
+        `t=${snap.gameTime}s: ${snap.goldWorkers} gold workers (>5). ` +
+        `total=${snap.workersTotal} lumber=${snap.lumberWorkers} idle=${snap.idleWorkers}`,
+      )
+    }
+
+    // Advance to t=90 and check
+    await advanceGameTime(page, 45)
+    snap = await getAISnapshot(page)
+    if (!snap) { violations.push('t=90: no snapshot') }
+    else if (snap.goldWorkers > 5) {
+      violations.push(
+        `t=${snap.gameTime}s: ${snap.goldWorkers} gold workers (>5). ` +
+        `total=${snap.workersTotal} lumber=${snap.lumberWorkers} idle=${snap.idleWorkers}`,
+      )
+    }
+
+    // Advance to t=120 and check
+    await advanceGameTime(page, 30)
+    snap = await getAISnapshot(page)
+    if (!snap) { violations.push('t=120: no snapshot') }
+    else if (snap.goldWorkers > 5) {
+      violations.push(
+        `t=${snap.gameTime}s: ${snap.goldWorkers} gold workers (>5). ` +
+        `total=${snap.workersTotal} lumber=${snap.lumberWorkers} idle=${snap.idleWorkers}`,
+      )
+    }
+
+    expect(
+      violations,
+      `Gold saturation violations:\n${violations.join('\n')}`,
+    ).toHaveLength(0)
+  })
+
+  // ----------------------------------------------------------
+  // 11. AI maintains at least 1 lumber worker at midgame
+  //     (proves saturation logic doesn't starve lumber)
+  // ----------------------------------------------------------
+  test('AI maintains at least 1 lumber worker through midgame', async ({ page }) => {
+    await waitForGame(page)
+    await advanceGameTime(page, 90)
+
+    const snap = await getAISnapshot(page)
+    if (!snap) await diagnose(page, 't11-no-game')
+    expect(snap).not.toBeNull()
+
+    expect(
+      snap!.lumberWorkers,
+      `AI has 0 lumber workers at t=${snap!.gameTime}s. ` +
+      `gold=${snap!.goldWorkers} total=${snap!.workersTotal} idle=${snap!.idleWorkers}`,
+    ).toBeGreaterThanOrEqual(1)
+  })
+
+  // ----------------------------------------------------------
+  // 12. AI early loop still works: farm + barracks + footman
+  //     at 90s despite saturation logic
+  // ----------------------------------------------------------
+  test('AI completes early build loop (farm+barracks+footman) with saturation logic', async ({ page }) => {
+    await waitForGame(page)
+    await advanceGameTime(page, 90)
+
+    const snap = await getAISnapshot(page)
+    if (!snap) await diagnose(page, 't12-no-game')
+    expect(snap).not.toBeNull()
+
+    // Farm
+    expect(
+      snap!.farmsComplete,
+      `No completed farm at t=${snap!.gameTime}s with saturation logic active`,
+    ).toBeGreaterThanOrEqual(1)
+
+    // Barracks
+    expect(
+      snap!.barracksComplete,
+      `No completed barracks at t=${snap!.gameTime}s with saturation logic active`,
+    ).toBeGreaterThanOrEqual(1)
+
+    // Footman (trained or in training)
+    const hasFootmen = snap!.footmenTotal > 0
+    const hasFootmanTraining = snap!.trainingDetails.some(
+      (t: any) => t.queue.some((q: any) => q.type === 'footman'),
+    )
+    expect(
+      hasFootmen || hasFootmanTraining,
+      `No footmen at t=${snap!.gameTime}s with saturation logic. ` +
+      `footmen=${snap!.footmenTotal} training=${JSON.stringify(snap!.trainingDetails)}`,
+    ).toBe(true)
+  })
 })

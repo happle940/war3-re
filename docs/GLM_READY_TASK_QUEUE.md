@@ -51,6 +51,7 @@ Current queue state:
 | Task 23 — M3 Scale Contract Implementation | completed | GLM + Codex correction | 2026-04-12 | Completed locally; Codex corrected the farm measurement flaw so M3 measures completed buildings only. Verification green: build, app typecheck, M3 spec, visibility/pathing/selection affected pack. |
 | Task 24 — M4 Player-Reported UX Reality Pack | completed | GLM + Codex correction | 2026-04-12 | M4 spec added and corrected. Verification green: build, app typecheck, M4 pack 6/6, affected construction/static-defense/resource/unit-presence pack 29/29. |
 | Task 25 — M4 War3 Command Surface Matrix | completed | GLM | 2026-04-12 | 11/11 command surface tests green. Game.ts fixes: tower weapon stats in HUD, crowded goldmine right-click target priority, findUnitByObject parent-chain helper. |
+| Task 26 — AI Gold Saturation Contract | completed | GLM | 2026-04-12 | 12/12 AI economy tests green. SimpleAI saturation cap + dynamic rally; 3 new saturation/lumber/build-loop tests. |
 | Task 08 — Game.ts Module Extraction Slice | ready | Codex dispatch | 2026-04-11 | Defer until death/cleanup and HUD cache gaps are covered. |
 
 ## Dispatch Rules
@@ -128,9 +129,71 @@ Bad development examples:
 
 ## Queue
 
+### Task 26 — AI Gold Saturation Contract
+
+Status: `completed`.
+
+Owner: GLM.
+
+Started: 2026-04-12.
+
+Completed: 2026-04-12.
+
+Priority: prevents AI from oversaturating goldmine and starving lumber; directly impacts AI economy realism.
+
+Goal:
+
+Change AI gold/lumber allocation from fixed threshold to mine-saturation-based strategy. Cap = 5 workers per goldmine. Excess workers go to lumber/build.
+
+Implementation:
+
+- Added `GOLDMINE_SATURATION_CAP = 5` constant in SimpleAI.ts.
+- `goldEffectiveCap = Math.min(this.targetGoldWorkers, GOLDMINE_SATURATION_CAP)` — profile target and hard cap both respected.
+- `assignIdleWorkers()`: new idle workers assigned to gold only when `goldCount < goldEffectiveCap`; otherwise default to lumber.
+- Dynamic rally: when gold workers ≥ cap, rally switches from goldmine to nearest tree so new workers auto-lumber. When below cap, rally switches back to goldmine. No fake `rallyPoint = townhall.position` — always uses a real resource target.
+
+New contracts (3 tests):
+
+- T10: AI gold workers never exceed 5 across t=45/90/120 sampling.
+- T11: AI maintains ≥1 lumber worker at t=90 (saturation logic doesn't starve lumber).
+- T12: AI completes early build loop (farm+barracks+footman) at t=90 with saturation logic active.
+
+Allowed files:
+
+- `src/game/SimpleAI.ts`
+- `tests/ai-economy-regression.spec.ts`
+- `docs/GAMEPLAY_REGRESSION_CHECKLIST.md`
+- `docs/GLM_READY_TASK_QUEUE.md`
+
+Verification:
+
+```bash
+npm run build
+npx tsc --noEmit -p tsconfig.app.json
+./scripts/run-runtime-tests.sh tests/ai-economy-regression.spec.ts --reporter=list
+FORCE_RUNTIME_CLEANUP=1 ./scripts/cleanup-local-runtime.sh
+ps aux | egrep 'node .*vite|playwright test|chrome-headless-shell' | grep -v egrep || true
+```
+
+Result: 12/12 passed, 2.5m. No residual processes after cleanup.
+
+Commit message:
+
+```text
+gameplay: enforce AI gold saturation cap with dynamic rally
+```
+
 ### Task 25 — M4 War3 Command Surface Matrix
 
-Status: `in_progress`.
+Status: `completed`.
+
+Owner: GLM.
+
+Started: 2026-04-12.
+
+Completed: 2026-04-12.
+
+Accepted commit: `6f03a1f` (`gameplay: add command surface regression matrix`).
 
 Owner: GLM.
 
