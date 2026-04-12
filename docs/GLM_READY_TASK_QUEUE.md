@@ -49,7 +49,7 @@ Current queue state:
 | Task 21 — Runtime Harness Fast-Start | completed | GLM | 2026-04-12 | Partial infrastructure improvement. `?runtimeTest=1` skips W3X auto-load, per-test time ~8-9s -> ~5.8-6.5s. Individual M4 specs pass. Full `npm run test:runtime` still >10min, not a stable local gate. |
 | Task 22 — Runtime Sharded Gate | completed | GLM + Codex closeout | 2026-04-12 | Completed at commit `2e7421d`; `npm run test:runtime` replaced with sharded script. 5/5 shards passed, 103 tests, 13m total. Replaces old single-command runtime. |
 | Task 23 — M3 Scale Contract Implementation | completed | GLM + Codex correction | 2026-04-12 | Completed locally; Codex corrected the farm measurement flaw so M3 measures completed buildings only. Verification green: build, app typecheck, M3 spec, visibility/pathing/selection affected pack. |
-| Task 24 — M4 Player-Reported UX Reality Pack | ready | GLM dispatch | 2026-04-12 | Convert latest human complaints into deterministic runtime/DOM proofs and minimal fixes: construction resume/cancel discoverability, tower attack reality, supply-block command feedback, and unit collision baseline. |
+| Task 24 — M4 Player-Reported UX Reality Pack | in_progress | GLM | 2026-04-12 | Convert latest human complaints into deterministic runtime/DOM proofs and minimal fixes: construction resume/cancel discoverability, tower attack reality, supply-block command feedback, and unit collision baseline. |
 | Task 08 — Game.ts Module Extraction Slice | ready | Codex dispatch | 2026-04-11 | Defer until death/cleanup and HUD cache gaps are covered. |
 
 ## Dispatch Rules
@@ -129,9 +129,11 @@ Bad development examples:
 
 ### Task 24 — M4 Player-Reported UX Reality Pack
 
-Status: `ready`.
+Status: `in_progress`.
 
-Owner: GLM dispatch.
+Owner: GLM.
+
+Started: 2026-04-12.
 
 Priority: next after Task23 because the user reported concrete live-play blockers after the M3 scale pass.
 
