@@ -53,7 +53,7 @@ Current queue state:
 | Task 25 — M4 War3 Command Surface Matrix | completed | GLM | 2026-04-12 | 11/11 command surface tests green. Game.ts fixes: tower weapon stats in HUD, crowded goldmine right-click target priority, findUnitByObject parent-chain helper. |
 | Task 26 — AI Gold Saturation Contract | completed | GLM | 2026-04-12 | 12/12 AI economy tests green. SimpleAI saturation cap + dynamic rally; 3 new saturation/lumber/build-loop tests. |
 | Task 27 — Goldmine Clickability Contract | completed | Codex takeover | 2026-04-12 | GLM stalled twice without file changes. Codex added left-click crowded-goldmine contracts and a selection-priority fix; command-surface spec now passes 13/13. |
-| Task 08 — Game.ts Module Extraction Slice | ready | Codex dispatch | 2026-04-11 | Defer until death/cleanup and HUD cache gaps are covered. |
+| Task 08 — Game.ts Module Extraction Slice | in_progress | GLM | 2026-04-12 | Narrowed to Option B only: extract feedback/effect helpers from `Game.ts` with zero behavior change. |
 
 ## Dispatch Rules
 
@@ -1405,7 +1405,11 @@ Implement Asset Pipeline Contract Pack. Add runtime tests for fallback, async re
 
 ### Task 08 — Game.ts Module Extraction Slice
 
-Status: `ready`.
+Status: `in_progress`.
+
+Owner: GLM.
+
+Started: 2026-04-12.
 
 Goal: reduce `Game.ts` risk by extracting one mechanical subsystem with zero behavior changes.
 
@@ -1414,6 +1418,12 @@ Allowed write scope depends on slice. Start with one slice only:
 - Option A: `src/game/SelectionController.ts` plus `src/game/Game.ts`
 - Option B: `src/game/FeedbackEffects.ts` plus `src/game/Game.ts`
 - Option C: `src/game/PlacementController.ts` plus `src/game/Game.ts`
+
+Current dispatch:
+
+- Option B only.
+- Extract feedback/effect helpers such as selection flash / move indicator / attack-move indicator / build-complete effect into `src/game/FeedbackEffects.ts`.
+- Keep public behavior and test outcomes unchanged.
 
 Hard rule: no behavior change unless an existing test fails and requires a compatibility fix.
 
