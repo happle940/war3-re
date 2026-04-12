@@ -14,7 +14,7 @@ PASSED_SHARDS=0
 FAILED_SHARD=""
 
 # Shard definitions: name followed by spec files.
-# Covers the same 17 specs as test:runtime:single.
+# Covers the same 18 specs as test:runtime:single.
 shards=(
   core-controls
     tests/closeout.spec.ts
@@ -25,6 +25,7 @@ shards=(
   ui-economy
     tests/command-card-state-regression.spec.ts
     tests/resource-supply-regression.spec.ts
+    tests/rally-contract-regression.spec.ts
 
   presence-pathing
     tests/unit-presence-regression.spec.ts

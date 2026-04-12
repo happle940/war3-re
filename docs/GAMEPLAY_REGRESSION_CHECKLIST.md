@@ -49,6 +49,7 @@
 - [x] 人口上限（10 无农场）→ 训练被拒绝（HUD 显示人口阻塞原因且不扣资源）
 - [x] 建农场后人口增加 → 可以继续训练
 - [ ] 集结点（金矿）→ 新农民自动采金
+- [ ] 清除集结点后，新农民不应出现“假 rally 移动”
 
 ## AI 对手行为（观察 AI 阵营）
 
@@ -118,6 +119,14 @@
 - [x] 人口上限拒绝训练，不扣资源
 - [x] 成功训练精确扣一次资源（worker 75g, footman 135g）
 - [x] 农民返还资源路径：carryAmount → resources.earn → carryAmount=0
+
+### 集结点自动化覆盖
+
+以下项目由 `tests/rally-contract-regression.spec.ts` 自动验证（Playwright）：
+
+- [x] goldmine rally 仍然让新农民自动进入采金循环
+- [x] `clearRally` 会同时清空 `rallyPoint` 与 `rallyTarget`
+- [x] clear 后的新农民出生为 Idle，不会产生“朝 townhall 中心假移动”的伪 rally 状态
 - [x] stop 丢弃携带资源（不重复存入）
 - [x] AI 有效人口（used + queued）不超过 total
 - [x] AI 农场供应仅在完成后生效
