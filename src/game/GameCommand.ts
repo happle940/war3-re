@@ -14,6 +14,7 @@ export type GameCommand =
   | { type: 'holdPosition' }
   | { type: 'attackMove'; target: THREE.Vector3 }
   | { type: 'setRally'; building: Unit; target: THREE.Vector3; rallyTarget?: Unit }
+  | { type: 'clearRally'; building: Unit }
 
 // ===== 命令分发器 =====
 
@@ -190,6 +191,11 @@ export function issueCommand(units: Unit[], cmd: GameCommand) {
     case 'setRally':
       cmd.building.rallyPoint = cmd.target.clone()
       cmd.building.rallyTarget = cmd.rallyTarget ?? null
+      break
+
+    case 'clearRally':
+      cmd.building.rallyPoint = null
+      cmd.building.rallyTarget = null
       break
   }
 }
