@@ -19,6 +19,10 @@
  *     9. Barracks at supply cap -> Footman disabled with 人口 reason
  *    10. Tower HUD shows readable weapon stats (attackDamage or range or cooldown)
  *
+ *   Selection targetability:
+ *    11. Left-clicking into a crowded goldmine still selects the goldmine
+ *    12. Left-clicking a worker beside a goldmine still selects the worker
+ *
  * Proof rules:
  *   - Setup may spawn entities directly.
  *   - Behavior under test MUST use live-like paths:
@@ -967,6 +971,162 @@ test.describe('Command Surface Regression Matrix', () => {
     expect(result.idleWorkerGatherType, 'worker should have gatherType gold').toBe('gold')
     expect(result.idleWorkerResourceTargetType, 'worker resourceTarget type should be goldmine').toBe('goldmine')
     expect(result.idleWorkerResourceTargetMine, 'worker resourceTarget should point to the mine').toBe(result.mineIdx)
+    expect(severeConsoleErrors(page)).toHaveLength(0)
+  })
+
+  // ============================================================
+  // R8: Crowded goldmine remains selectable by left-click
+  // ============================================================
+  test('left-click: crowded goldmine still selects the goldmine', async ({ page }) => {
+    await waitForGame(page)
+
+    const result = await page.evaluate(() => {
+      const g = (window as any).__war3Game
+      if (!g) return { ok: false, reason: 'no game' }
+
+      let mine = g.units.find((u: any) => u.type === 'goldmine' && u.hp > 0 && u.remainingGold > 0)
+      if (!mine) {
+        mine = g.spawnBuilding('goldmine', -1, 16, 8)
+        mine.remainingGold = 10000
+      }
+      const mineIdx = g.units.indexOf(mine)
+      const mx = mine.mesh.position.x
+      const mz = mine.mesh.position.z
+
+      const offsets = [
+        [1.2, 0], [-1.2, 0], [0, 1.2], [0, -1.2], [0.8, 0.8],
+      ]
+      for (const [ox, oz] of offsets) {
+        const w = g.spawnUnit('worker', 0, mx + ox, mz + oz)
+        w.state = 3
+        w.gatherType = 'gold'
+        w.resourceTarget = { type: 'goldmine', mine }
+      }
+
+      g.selectionModel.clear()
+      g.clearSelectionRings()
+      g.camera.updateMatrixWorld(true)
+      g.scene.updateMatrixWorld(true)
+
+      const allMeshes = g.units.map((u: any) => u.mesh)
+      const mineScreen = mine.mesh.position.clone()
+      mineScreen.y += 1.5
+      mineScreen.project(g.camera)
+
+      let clickedMine = false
+      for (const dx of [0, -0.01, 0.01, -0.02, 0.02]) {
+        for (const dy of [0, -0.01, 0.01, -0.02, 0.02]) {
+          g.mouseNDC.set(mineScreen.x + dx, mineScreen.y + dy)
+          g.raycaster.setFromCamera(g.mouseNDC, g.camera)
+          const hits = g.raycaster.intersectObjects(allMeshes, true)
+          if (hits.length === 0) continue
+          g.handleClick()
+          if (g.selectionModel.primary === mine) {
+            clickedMine = true
+            break
+          }
+          g.selectionModel.clear()
+          g.clearSelectionRings()
+        }
+        if (clickedMine) break
+      }
+
+      return {
+        ok: true,
+        clickedMine,
+        mineIdx,
+        selectedIdx: g.selectionModel.primary ? g.units.indexOf(g.selectionModel.primary) : -1,
+        selectedType: g.selectionModel.primary?.type ?? null,
+        selectedCount: g.selectionModel.count,
+      }
+    })
+
+    expect(result.ok).toBe(true)
+    expect(result.clickedMine, 'left-clicking mine center through mining workers should still select the goldmine').toBe(true)
+    expect(result.selectedType).toBe('goldmine')
+    expect(result.selectedIdx).toBe(result.mineIdx)
+    expect(result.selectedCount).toBe(1)
+    expect(severeConsoleErrors(page)).toHaveLength(0)
+  })
+
+  // ============================================================
+  // R9: Worker selection near goldmine is not stolen by mine priority
+  // ============================================================
+  test('left-click: worker near a goldmine still selects the worker', async ({ page }) => {
+    await waitForGame(page)
+
+    const clickFound = await page.evaluate(() => {
+      const g = (window as any).__war3Game
+      if (!g) return false
+
+      let mine = g.units.find((u: any) => u.type === 'goldmine' && u.hp > 0 && u.remainingGold > 0)
+      if (!mine) {
+        mine = g.spawnBuilding('goldmine', -1, 16, 8)
+        mine.remainingGold = 10000
+      }
+      const mx = mine.mesh.position.x
+      const mz = mine.mesh.position.z
+
+      const worker = g.spawnUnit('worker', 0, mx + 2.2, mz + 0.2)
+      worker.state = 0
+      worker.moveTarget = null
+      ;(window as any).__goldmineClickWorkerIdx = g.units.indexOf(worker)
+
+      g.camera.updateMatrixWorld(true)
+      g.scene.updateMatrixWorld(true)
+      const allMeshes = g.units.map((u: any) => u.mesh)
+      const resolveUnit = (hitObj: any) => {
+        let obj = hitObj
+        while (obj) {
+          const found = g.units.find((u: any) => u.mesh === obj)
+          if (found) return found
+          obj = obj.parent
+        }
+        return null
+      }
+
+      for (const yOff of [0.25, 0.5, 0.85, 1.2, 1.6]) {
+        const probe = worker.mesh.position.clone()
+        probe.y += yOff
+        probe.project(g.camera)
+        for (const dx of [0, -0.02, 0.02, -0.04, 0.04, -0.08, 0.08]) {
+          for (const dy of [0, -0.02, 0.02, -0.04, 0.04, -0.08, 0.08]) {
+            g.mouseNDC.set(probe.x + dx, probe.y + dy)
+            g.raycaster.setFromCamera(g.mouseNDC, g.camera)
+            const hits = g.raycaster.intersectObjects(allMeshes, true)
+            const first = hits.length > 0 ? resolveUnit(hits[0].object) : null
+            if (first === worker) {
+              g.shiftHeld = false
+              return true
+            }
+          }
+        }
+      }
+      return false
+    })
+
+    expect(clickFound, 'must find a worker click point near the goldmine').toBe(true)
+
+    const result = await page.evaluate(() => {
+      const g = (window as any).__war3Game
+      const worker = g.units[(window as any).__goldmineClickWorkerIdx]
+      const workerIdx = (window as any).__goldmineClickWorkerIdx
+
+      g.selectionModel.clear()
+      g.clearSelectionRings()
+      g.handleClick()
+
+      return {
+        workerIdx,
+        selectedIdx: g.selectionModel.primary ? g.units.indexOf(g.selectionModel.primary) : -1,
+        selectedType: g.selectionModel.primary?.type ?? null,
+        selectedCount: g.selectionModel.count,
+      }
+    })
+
+    expect(result.selectedType).toBe('worker')
+    expect(result.selectedIdx).toBe(result.workerIdx)
+    expect(result.selectedCount).toBe(1)
     expect(severeConsoleErrors(page)).toHaveLength(0)
   })
 })

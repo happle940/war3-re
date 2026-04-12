@@ -52,6 +52,7 @@ Current queue state:
 | Task 24 — M4 Player-Reported UX Reality Pack | completed | GLM + Codex correction | 2026-04-12 | M4 spec added and corrected. Verification green: build, app typecheck, M4 pack 6/6, affected construction/static-defense/resource/unit-presence pack 29/29. |
 | Task 25 — M4 War3 Command Surface Matrix | completed | GLM | 2026-04-12 | 11/11 command surface tests green. Game.ts fixes: tower weapon stats in HUD, crowded goldmine right-click target priority, findUnitByObject parent-chain helper. |
 | Task 26 — AI Gold Saturation Contract | completed | GLM | 2026-04-12 | 12/12 AI economy tests green. SimpleAI saturation cap + dynamic rally; 3 new saturation/lumber/build-loop tests. |
+| Task 27 — Goldmine Clickability Contract | completed | Codex takeover | 2026-04-12 | GLM stalled twice without file changes. Codex added left-click crowded-goldmine contracts and a selection-priority fix; command-surface spec now passes 13/13. |
 | Task 08 — Game.ts Module Extraction Slice | ready | Codex dispatch | 2026-04-11 | Defer until death/cleanup and HUD cache gaps are covered. |
 
 ## Dispatch Rules
@@ -128,6 +129,52 @@ Bad development examples:
 - changing scale/camera/visual taste as a side effect of logic work
 
 ## Queue
+
+### Task 27 — Goldmine Clickability Contract
+
+Status: `completed`.
+
+Owner: Codex takeover.
+
+Started: 2026-04-12.
+
+Completed: 2026-04-12.
+
+Priority: converts the user's current pain into a direct contract. Right-click gather priority is fixed, but left-click/resource targetability under worker crowding is still not locked.
+
+Goal:
+
+Make goldmine selection/interaction reliable when workers crowd the mine, without making generic ground clicks or ordinary unit selection regress.
+
+Outcome:
+
+- GLM received an initial broad prompt and one narrowed spec-first retry.
+- After two reframes and no file changes, Codex stopped GLM and took over.
+- Codex added two selection contracts:
+  - crowded goldmine left-click still selects the goldmine
+  - worker near a goldmine still selects the worker
+- Codex fixed `handleClick()` to resolve the full hit list and prefer the goldmine only when earlier hits are workers already mining that same mine.
+
+Changed files:
+
+- `src/game/Game.ts`
+- `tests/command-surface-regression.spec.ts`
+
+Verification:
+
+```bash
+npm run build
+npx tsc --noEmit -p tsconfig.app.json
+./scripts/run-runtime-tests.sh tests/command-surface-regression.spec.ts --reporter=list
+FORCE_RUNTIME_CLEANUP=1 ./scripts/cleanup-local-runtime.sh
+ps aux | egrep 'node .*vite|playwright|chrome-headless-shell' | grep -v egrep || true
+```
+
+Result:
+
+- `npm run build` passed
+- `npx tsc --noEmit -p tsconfig.app.json` passed
+- `tests/command-surface-regression.spec.ts` passed 13/13
 
 ### Task 26 — AI Gold Saturation Contract
 

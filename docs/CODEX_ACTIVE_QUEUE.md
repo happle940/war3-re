@@ -683,7 +683,7 @@ Closeout:
 
 ### C22 — Dispatch M4 Command Surface Matrix
 
-Status: `active`.
+Status: `done`.
 
 Goal: turn the user's higher-level complaint into a command-surface matrix so War3-like behavior is defined by selected unit + target + command card state, not by ad hoc fixes.
 
@@ -703,6 +703,41 @@ Verification:
 ```bash
 git diff --check
 ```
+
+Closeout:
+
+- Task25 completed and accepted at commit `6f03a1f`.
+- Command-surface matrix is now guarded by 11/11 runtime tests.
+
+### C23 — Dispatch Goldmine Clickability Contract
+
+Status: `done`.
+
+Goal: turn the user's resource-click pain into a stable interaction contract: workers crowding a goldmine must not make the mine effectively unclickable or unselectable.
+
+Inputs:
+
+- User explicitly reported that goldmine interaction remains frustrating when workers surround the mine.
+- Task25 fixed right-click gather target priority, but left-click selection / targetability under crowding still needs a higher-level contract.
+
+Codex responsibilities:
+
+- Keep GLM scoped to a minimal spec-first slice.
+- Review whether the proof uses real click/selection resolve paths rather than synthetic state writes.
+- If GLM stalls again, take over the critical-path fix directly.
+- Continue queue maintenance and non-conflicting review work while GLM writes the first failing contract.
+
+Verification:
+
+```bash
+git diff --check
+./scripts/glm-watch.sh status
+```
+
+Closeout:
+
+- GLM received an initial broad prompt and then a narrowed spec-first retry, but produced no file changes after two reframes.
+- Codex stopped GLM per stall policy, implemented the fix directly, and verified `tests/command-surface-regression.spec.ts` 13/13 green.
 
 ## Default Next Action Logic
 

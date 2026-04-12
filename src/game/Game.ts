@@ -2082,6 +2082,47 @@ export class Game {
     return undefined
   }
 
+  /** Deduplicate all unit hits resolved from a raycast hit list. */
+  private resolveHitUnits(hits: readonly THREE.Intersection<THREE.Object3D>[]): Unit[] {
+    const hitUnits: Unit[] = []
+    const seen = new Set<Unit>()
+    for (const hit of hits) {
+      const unit = this.findUnitByObject(hit.object)
+      if (unit && !seen.has(unit)) {
+        hitUnits.push(unit)
+        seen.add(unit)
+      }
+    }
+    return hitUnits
+  }
+
+  /**
+   * Left-click selection priority:
+   * if a goldmine is only blocked by workers already mining that same mine,
+   * prefer the mine so crowded mining does not make the resource node
+   * effectively unselectable.
+   */
+  private resolveClickSelectionTarget(hitUnits: readonly Unit[]): Unit | undefined {
+    if (hitUnits.length === 0) return undefined
+    const first = hitUnits[0]
+    const goldmineIdx = hitUnits.findIndex((u) => u.type === 'goldmine')
+    if (goldmineIdx <= 0) return first
+
+    const mine = hitUnits[goldmineIdx]
+    const blockers = hitUnits.slice(0, goldmineIdx)
+    const blockersAreMiningWorkers = blockers.every((u) =>
+      u.type === 'worker' &&
+      u.gatherType === 'gold' &&
+      (u.state === UnitState.MovingToGather
+        || u.state === UnitState.Gathering
+        || u.state === UnitState.MovingToReturn) &&
+      u.resourceTarget?.type === 'goldmine' &&
+      u.resourceTarget.mine === mine,
+    )
+
+    return blockersAreMiningWorkers ? mine : first
+  }
+
   // ==================== 左键选择 ====================
 
   private handleClick() {
@@ -2090,8 +2131,7 @@ export class Game {
     const hits = this.raycaster.intersectObjects(unitMeshes, true)
 
     if (hits.length > 0) {
-      const hitObj = hits[0].object
-      const unit = this.findUnitByObject(hitObj)
+      const unit = this.resolveClickSelectionTarget(this.resolveHitUnits(hits))
       if (unit) {
         // Shift+click: add/remove toggle
         if (this.shiftHeld) {
