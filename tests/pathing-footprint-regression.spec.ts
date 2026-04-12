@@ -16,7 +16,7 @@
 import { test, expect, type Page } from '@playwright/test'
 import { findPath } from '../src/game/PathFinder'
 
-const BASE = 'http://127.0.0.1:4173'
+const BASE = 'http://127.0.0.1:4173/?runtimeTest=1'
 
 // Building sizes from GameData.ts
 const BUILDING_SIZES: Record<string, number> = {

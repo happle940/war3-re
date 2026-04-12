@@ -26,19 +26,31 @@ updateFPS()
 
 // ===== 自动加载测试地图 =====
 const mapStatus = document.getElementById('map-status')!
-;(async () => {
-  try {
-    mapStatus.textContent = '正在加载测试地图...'
-    const base = import.meta.env.BASE_URL || '/'
-    const parsed = await loadMapFromURL(`${base}maps/turtle_rock_test.w3x`)
-    game.loadMap(parsed)
-    mapStatus.textContent = `已加载: 测试地图 (${parsed.terrain.width}x${parsed.terrain.height})`
-    console.log('Test map loaded:', parsed.terrain.width, 'x', parsed.terrain.height)
-  } catch (err) {
-    mapStatus.textContent = `测试地图加载失败: ${(err as Error).message}`
-    console.warn('Test map load failed:', err)
-  }
-})()
+
+// Runtime fast-start: skip W3X auto-load when ?runtimeTest=1 is present.
+// This eliminates the async map fetch that makes Playwright tests slow/flaky.
+// Normal visitors (no query param) still get the full auto-load experience.
+const urlParams = new URLSearchParams(window.location.search)
+const isRuntimeTest = urlParams.get('runtimeTest') === '1'
+
+if (isRuntimeTest) {
+  mapStatus.textContent = 'Runtime test mode: procedural map'
+  console.log('[RuntimeTest] Skipping W3X auto-load, using procedural terrain.')
+} else {
+  ;(async () => {
+    try {
+      mapStatus.textContent = '正在加载测试地图...'
+      const base = import.meta.env.BASE_URL || '/'
+      const parsed = await loadMapFromURL(`${base}maps/turtle_rock_test.w3x`)
+      game.loadMap(parsed)
+      mapStatus.textContent = `已加载: 测试地图 (${parsed.terrain.width}x${parsed.terrain.height})`
+      console.log('Test map loaded:', parsed.terrain.width, 'x', parsed.terrain.height)
+    } catch (err) {
+      mapStatus.textContent = `测试地图加载失败: ${(err as Error).message}`
+      console.warn('Test map load failed:', err)
+    }
+  })()
+}
 
 // ===== W3X 地图加载（用户手动上传）=====
 const mapInput = document.getElementById('map-file-input') as HTMLInputElement

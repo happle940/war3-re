@@ -12,7 +12,7 @@
  */
 import { test, expect, type Page } from '@playwright/test'
 
-const BASE = 'http://127.0.0.1:4173'
+const BASE = 'http://127.0.0.1:4173/?runtimeTest=1'
 
 const S = {
   Idle: 0,

@@ -44,7 +44,9 @@ Current queue state:
 | Task 16 — M2 Gate Regression Packet | completed | GLM + Codex review | 2026-04-11 | Added `npm run test:m2` and `docs/M2_GATE_PACKET.zh-CN.md`; Codex reran `npm run test:m2`, 32/32 passed. |
 | Task 17 — M3 Scale/Layout Benchmark Spec | completed | GLM + Codex review | 2026-04-11 | Added `docs/M3_WAR3_FEEL_BENCHMARK.zh-CN.md`; Codex corrected the Farm footprint recommendation to avoid fractional occupancy. |
 | Task 18 — M3 Scale Measurement Baseline | completed | GLM-5.1 | 2026-04-12 | Measurement-only runtime pack for M3 objective ratios. Tests pass. |
-| Task 19 — Order Model Boundary Inventory | ready | GLM | 2026-04-11 | Code-inventory + narrow proof task for the future order/ability framework. Prompt prepared at `/tmp/war3_glm_task19_order_model_inventory_prompt.md`. |
+| Task 19 — Order Model Boundary Inventory | completed | GLM + Codex review | 2026-04-12 | Completed at commit `8e8d017`; added order-model boundary inventory and regression proof. |
+| Task 20 — Builder-Stealing Fix | completed | GLM + Codex review | 2026-04-12 | Completed at commit `7fa441e`; fixed active construction builder stealing and added 3 construction lifecycle tests. Codex verified build, app typecheck, and four M4 specs individually green. |
+| Task 21 — Runtime Harness Fast-Start | completed | GLM | 2026-04-12 | Partial infrastructure improvement. `?runtimeTest=1` skips W3X auto-load, per-test time ~8-9s -> ~5.8-6.5s. Individual M4 specs pass. Full `npm run test:runtime` still >10min, not a stable local gate. |
 | Task 08 — Game.ts Module Extraction Slice | ready | Codex dispatch | 2026-04-11 | Defer until death/cleanup and HUD cache gaps are covered. |
 
 ## Dispatch Rules
@@ -121,6 +123,86 @@ Bad development examples:
 - changing scale/camera/visual taste as a side effect of logic work
 
 ## Queue
+
+### Task 21 — Runtime Harness Fast-Start
+
+Status: `completed`.
+
+Owner: GLM.
+
+Started: 2026-04-12.
+
+Completed: 2026-04-12.
+
+Accepted commit: `test: add runtime fast-start mode`.
+
+Final review status: partial infrastructure improvement accepted. Not a full runtime harness fix.
+
+Result:
+
+- Added `?runtimeTest=1` query-param to `src/main.ts`: skips W3X auto-load, sets `map-status` to fast-start text immediately.
+- Updated all 18 `tests/*.spec.ts` BASE constants to include `?runtimeTest=1`.
+- Per-test startup time reduced from ~8-9s to ~5.8-6.5s.
+- Individual M4 specs all pass: command-card (7/7), construction (9/9), static-defense (7/7), resource (9/9).
+- `npm run test:runtime` still exceeds 10 minutes; Codex stopped it. Not a stable local gate.
+- Normal live demo URL (no query param) unchanged; user map upload unchanged.
+
+Remaining risk:
+
+- Full runtime harness needs separate task for sharding or local gate.
+- `npm run test:runtime` cannot be used as a blocking CI gate without further work.
+
+Priority: immediate infrastructure fix.
+
+Why now:
+
+Codex verification of M4 found that individual gameplay specs pass, but long Playwright runs can hit false `waitForGame()` timeouts. The common startup path loads the W3X test map for every test page, making each test cost roughly 8-10 seconds and making `npm run test:runtime` fragile.
+
+Goal:
+
+Add a test-only fast-start mode so runtime regression tests use the procedural initial map and skip automatic W3X test-map loading.
+
+Allowed files:
+
+- `src/main.ts`
+- `tests/*.spec.ts`
+- `package.json`
+- `scripts/run-runtime-tests.sh` only if needed for stable sharding or cleanup
+- `docs/GAMEPLAY_REGRESSION_CHECKLIST.md`
+
+Forbidden files:
+
+- `src/game/Game.ts`
+- `src/game/GameCommand.ts`
+- `src/game/SimpleAI.ts`
+- `src/game/TeamResources.ts`
+- visual factories, assets, screenshots, camera/terrain tuning
+
+Required verification:
+
+```bash
+npm run build
+npx tsc --noEmit -p tsconfig.app.json
+time npm run test:command-card
+time npm run test:construction
+time npm run test:resource
+time npm run test:static-defense
+time npm run test:runtime
+./scripts/cleanup-local-runtime.sh
+```
+
+Acceptance:
+
+- Normal live demo URL behavior is unchanged.
+- Tests use `?runtimeTest=1` or equivalent explicit test mode.
+- Runtime assertions remain real; only automatic W3X loading is skipped.
+- If full runtime still times out, GLM must report the remaining slow spec instead of claiming full pass.
+
+Commit message:
+
+```text
+test: add runtime fast-start mode
+```
 
 ### Task 11 — Construction Lifecycle Contract Pack
 

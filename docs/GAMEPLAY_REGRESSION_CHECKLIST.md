@@ -304,6 +304,21 @@
 - [ ] 建筑/地形/模型的主观视觉辨识度
 - [ ] 布局语法（基地空间关系、路径可通性）
 
+## Runtime Test Harness
+
+Runtime regression tests 使用 `?runtimeTest=1` query-param 快速启动模式：
+- 跳过 W3X 异步地图加载（省去 ~3s/测试的网络请求和解析）
+- 使用程序化 Terrain 作为默认地图（Game constructor 生成的 64x64 地形）
+- `map-status` 立即设为 `Runtime test mode: procedural map`，`waitForGame` 无需等待
+- 线上 demo（不带 query param）不受影响，仍自动加载测试地图
+- 用户手动上传地图功能保持原样
+
+**当前状态（partial improvement，非终局）：**
+- 单测启动时间从 ~8-9s 降到 ~5.8-6.5s（每测试节省约 3s）
+- command-card、construction、static-defense、resource 各自单独运行均通过
+- `npm run test:runtime` 仍超过 10 分钟，曾被 Codex 止损；不可作为稳定本地交互门禁
+- 后续需要单独任务做 runtime sharding 或 local gate（拆分 spec 组、增加并行 worker、或加超时）
+
 ## 验证记录
 
 | 日期 | 验证人 | 结果 | 备注 |
