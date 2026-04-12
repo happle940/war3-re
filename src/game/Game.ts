@@ -19,9 +19,10 @@ import { MapRuntime } from '../map/MapRuntime'
 import type { ParsedMap, W3ETerrain } from '../map/W3XParser'
 import { disposeObject3DDeep } from '../utils/dispose'
 import {
-  UnitState, BUILDINGS, UNITS, GATHER_TIME,
-  GOLD_PER_TRIP, LUMBER_PER_TRIP, TREE_LUMBER, GOLDMINE_GOLD,
-  PEASANT_BUILD_MENU, MELEE_RANGE, AGGRO_RANGE, CHASE_RANGE,
+  UnitState, BUILDINGS, UNITS, GOLD_GATHER_TIME, LUMBER_GATHER_TIME,
+  GOLD_PER_TRIP, GOLDMINE_MAX_WORKERS,
+  LUMBER_PER_TRIP, TREE_LUMBER, GOLDMINE_GOLD,
+  PEASANT_BUILD_MENU, MELEE_RANGE, AGGRO_RANGE, CHASE_RANGE, GATHER_RANGE,
 } from './GameData'
 import type { BuildingDef } from './GameData'
 import { TeamResources } from './TeamResources'
@@ -555,14 +556,24 @@ export class Game {
 
     switch (unit.state) {
       case UnitState.MovingToGather: {
-        if (unit.moveTarget) return // 还在走
+        if (unit.moveTarget && !this.hasReachedGatherInteraction(unit)) return
+        if (unit.moveTarget) {
+          unit.moveTarget = null
+          unit.waypoints = []
+        }
         // 到达资源点 → 验证资源目标仍有效
         if (!this.validateResourceTarget(unit)) {
           this.startGatherNearest(unit)
           break
         }
+        if (!this.canStartGoldGather(unit)) {
+          // Gold mines are saturated at five active workers. Extra workers
+          // wait at the mine until a gathering slot opens.
+          unit.gatherTimer = 0
+          break
+        }
         unit.state = UnitState.Gathering
-        unit.gatherTimer = GATHER_TIME
+        unit.gatherTimer = unit.gatherType === 'gold' ? GOLD_GATHER_TIME : LUMBER_GATHER_TIME
         break
       }
 
@@ -591,7 +602,17 @@ export class Game {
       }
 
       case UnitState.MovingToReturn: {
-        if (unit.moveTarget) return // 还在走
+        const hall = this.findNearest(unit, 'townhall', unit.team)
+        if (unit.moveTarget && !this.hasReachedDropoffHall(unit, hall)) return
+        if (unit.moveTarget) {
+          unit.moveTarget = null
+          unit.waypoints = []
+        }
+        if (!hall) {
+          unit.state = UnitState.Idle
+          unit.carryAmount = 0
+          break
+        }
         // 到达主基地，存入资源
         if (unit.gatherType === 'gold') {
           this.resources.earn(unit.team, unit.carryAmount, 0)
@@ -1408,6 +1429,48 @@ export class Game {
       return rt.mine.hp > 0 && rt.mine.remainingGold > 0
     }
     return false
+  }
+
+  /** 建筑的交互半径按 footprint 边界计算，不要求走到中心点。 */
+  private getBuildingInteractionRadius(target: Unit): number {
+    const size = BUILDINGS[target.type]?.size ?? 1
+    return Math.max(GATHER_RANGE, size * 0.5)
+  }
+
+  /** 采集型交互使用资源节点边界，而不是精确 path target。 */
+  private hasReachedGatherInteraction(unit: Unit): boolean {
+    const rt = unit.resourceTarget
+    if (!rt) return false
+    if (rt.type === 'tree') {
+      return unit.mesh.position.distanceTo(rt.entry.mesh.position) <= GATHER_RANGE
+    }
+    if (rt.type === 'goldmine') {
+      return unit.mesh.position.distanceTo(rt.mine.mesh.position) <= this.getBuildingInteractionRadius(rt.mine)
+    }
+    return false
+  }
+
+  /** 回本同样按 Town Hall 边界判定，避免多工人卡在中心点/编队落点。 */
+  private hasReachedDropoffHall(unit: Unit, hall: Unit | null): boolean {
+    if (!hall) return false
+    return unit.mesh.position.distanceTo(hall.mesh.position) <= this.getBuildingInteractionRadius(hall)
+  }
+
+  /** 金矿采集槽位：同一座金矿最多 5 个农民同时真正采集。 */
+  private canStartGoldGather(unit: Unit): boolean {
+    const rt = unit.resourceTarget
+    if (unit.gatherType !== 'gold' || rt?.type !== 'goldmine') return true
+
+    const activeGatherers = this.units.filter(other =>
+      other !== unit &&
+      other.hp > 0 &&
+      other.gatherType === 'gold' &&
+      other.state === UnitState.Gathering &&
+      other.resourceTarget?.type === 'goldmine' &&
+      other.resourceTarget.mine === rt.mine,
+    ).length
+
+    return activeGatherers < GOLDMINE_MAX_WORKERS
   }
 
   /**
