@@ -82,7 +82,8 @@ GLM Task25 已加入 `Crowded goldmine targetability`：
 
 当前代码：
 
-- `GATHER_TIME = 3`
+- `GOLD_GATHER_TIME = 5`
+- `LUMBER_GATHER_TIME = 3`
 - `GOLD_PER_TRIP = 10`
 - worker speed = `3.5`
 - 默认 Town Hall：tile `(10,12)`，size `4`

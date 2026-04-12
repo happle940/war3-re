@@ -123,6 +123,15 @@
 - [x] AI 农场供应仅在完成后生效
 - [x] 多建筑训练不可超支（200g + 2 barracks → 最多 1 footman）
 
+### 采矿饱和自动化覆盖
+
+以下项目由 `tests/mining-saturation-regression.spec.ts` 自动验证（Playwright）：
+
+- [x] 单座 goldmine 的并发 `Gathering` 工人数不会超过 `GOLDMINE_MAX_WORKERS = 5`
+- [x] 溢出的第 6 个工人会在矿边等待可用槽位，而不是打开第 6 个有效采集槽
+- [x] 默认 Town Hall / Gold Mine 经济尺度下，1..6 个采金工人的 gold curve 单调不降
+- [x] 默认尺度下第 5 个工人仍有可测边际收益，第 6 个工人进入明显递减收益区间
+
 ### 单位可见性自动化覆盖
 
 以下项目由 `tests/unit-visibility-regression.spec.ts` 自动验证（Playwright）：

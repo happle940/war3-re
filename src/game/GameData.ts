@@ -122,8 +122,11 @@ export const UNITS: Record<string, UnitDef> = {
 }
 
 // ===== 采集参数 =====
-export const GATHER_TIME = 3           // 采集一次耗时（秒）
+export const GOLD_GATHER_TIME = 5      // 金矿内单次采集耗时（秒）
+export const LUMBER_GATHER_TIME = 3    // 伐木单次采集耗时（秒）
+export const GATHER_TIME = LUMBER_GATHER_TIME  // 兼容旧引用：共享采集时间已拆分
 export const GOLD_PER_TRIP = 10        // 每次采金量
+export const GOLDMINE_MAX_WORKERS = 5  // 单个金矿有效采集容量（War3-like 饱和）
 export const LUMBER_PER_TRIP = 10      // 每次伐木量
 export const TREE_LUMBER = 50          // 每棵树的木材量
 export const GOLDMINE_GOLD = 2000      // 每座金矿的初始金量
