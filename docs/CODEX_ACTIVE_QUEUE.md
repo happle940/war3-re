@@ -71,6 +71,8 @@ GLM owns:
 | C16 — Review GLM Combat Control Contract | done | 2026-04-11 | GLM drafted the test file but it initially failed 8/8; Codex took over, exposed the real command dispatcher for runtime tests, fixed HoldPosition state restoration, and verified 20/20 affected tests. |
 | C17 — Dispatch M2 Gate Packet | done | 2026-04-11 | GLM added `npm run test:m2` and `docs/M2_GATE_PACKET.zh-CN.md`; Codex reran `npm run test:m2` locally, 32/32 passed. |
 | C18 — War3 Rule System Roadmap | done | 2026-04-11 | Converted the user's bug list into a durable S1-S7 system roadmap so future work is contract-first, not patch-first. |
+| C19 — Runtime Harness Sharding Review | active | 2026-04-12 | GLM is implementing Task22. Codex must prevent false completion, verify spec coverage, runtime cleanup, and CI compatibility before accepting it. |
+| C20 — M3/M4 Next Work Packet Prep | ready | 2026-04-12 | Prepare the next product-level task packet after harness stabilization: either War3 scale/readability integration or Human-vs-AI alpha loop, depending on M2 gate result. |
 
 ## Task Cards
 
@@ -524,7 +526,7 @@ Closeout:
 
 ### C15 — M2 Systems Architecture Slice
 
-Status: `ready`.
+Status: `done`.
 
 Goal: define the medium-term architecture direction for War3-like systems before too many one-off fixes accumulate.
 
@@ -545,6 +547,82 @@ Allowed files:
 - `docs/WAR3_SYSTEM_ALIGNMENT_01.md`
 - `docs/GAME_TS_RISK_MAP.md`
 - `docs/CODEX_ACTIVE_QUEUE.md`
+
+Verification:
+
+```bash
+git diff --check
+```
+
+Closeout:
+
+- M2 system architecture has been captured in `docs/WAR3_RULE_SYSTEM_ROADMAP.zh-CN.md`.
+- The roadmap maps user-reported issues into S1-S7 durable system directions.
+- GLM development policy now allows product-code fixes when they are contract-first, file-bounded, and runtime-proven.
+- M2 completed baseline packs now cover construction lifecycle, static defense, command-card disabled reasons, unit collision baseline, and combat-control contract.
+
+### C19 — Runtime Harness Sharding Review
+
+Status: `active`.
+
+Trigger: GLM Task22 is in progress.
+
+Goal: accept or reject the sharded runtime gate based on actual script correctness and verification, not the final report.
+
+Review checklist:
+
+- `scripts/run-runtime-suite.sh` covers every spec from `test:runtime:single`.
+- No misspelled spec paths.
+- Each shard prints name, spec list, elapsed seconds, and pass/fail result.
+- Failure exits non-zero at the failing shard.
+- `package.json` default `test:runtime` uses the sharded script.
+- The old single-command path remains available as `test:runtime:single`.
+- `npm run build` passes.
+- `npx tsc --noEmit -p tsconfig.app.json` passes.
+- `time npm run test:runtime` completes or reports a real failing shard.
+- Local Vite, Playwright, Chromium, and OpenClaw browser leftovers are cleaned.
+
+Allowed follow-up files:
+
+- `scripts/run-runtime-suite.sh`
+- `package.json`
+- `docs/GAMEPLAY_REGRESSION_CHECKLIST.md`
+- `docs/GLM_READY_TASK_QUEUE.md`
+- `docs/CODEX_ACTIVE_QUEUE.md`
+
+Acceptance command set:
+
+```bash
+npm run build
+npx tsc --noEmit -p tsconfig.app.json
+time npm run test:runtime
+FORCE_RUNTIME_CLEANUP=1 ./scripts/cleanup-local-runtime.sh
+ps aux | egrep 'node .*vite|playwright|chrome-headless-shell|\.openclaw/browser' | grep -v egrep || true
+```
+
+Closeout requirement:
+
+- If GLM pushes Task22, Codex must inspect the diff and rerun at least build, app typecheck, and the sharded runtime suite before marking C19 done.
+
+### C20 — M3/M4 Next Work Packet Prep
+
+Status: `ready`.
+
+Goal: keep the next product-level work ready so GLM does not idle after Task22.
+
+Decision boundary:
+
+- If M2 gate still has objective runtime failures, continue M2 repair.
+- If M2 is objectively green but user has not confirmed the milestone, prepare a compact M2 human gate packet.
+- If M2 is accepted, start M3 scale/readability integration before deeper M4 AI work.
+- If user prioritizes a playable match over visuals, start M4 Human-vs-AI Alpha loop.
+
+Likely next GLM task shapes:
+
+- M3 Scale Contract Implementation: unify data sources for footprint, collision radius, selection ring radius, health bar width, and model scale.
+- M3 Base Grammar Measurement: add deterministic checks for townhall, mine, barracks, tree line, and exit spacing without claiming visual approval.
+- M4 Win/Loss Baseline: add victory/defeat state, AI/player base destruction detection, and end-state HUD.
+- M4 AI Recovery Pack: prove AI can recover after worker/building loss without bypassing normal rules.
 
 Verification:
 
