@@ -178,6 +178,9 @@ async function getAISnapshot(page: Page) {
     // Player TH position (for attack direction check)
     const playerTH = units.find((u: any) => u.team === 0 && u.type === 'townhall' && u.hp > 0)
     const aiTH = units.find((u: any) => u.team === 1 && u.type === 'townhall' && u.hp > 0)
+    const aiTownhallRallyMode = aiTH?.rallyTarget?.type === 'goldmine'
+      ? 'goldmine'
+      : (aiTH?.rallyPoint ? 'point' : 'none')
 
     // Footmen moving toward player half
     let footmenNearPlayer = 0
@@ -230,6 +233,7 @@ async function getAISnapshot(page: Page) {
       trainingDetails,
       aiWaveCount: g.ai?.waveCount ?? 0,
       aiAttackWaveSent: g.ai?.attackWaveSent ?? false,
+      aiTownhallRallyMode,
       playerTHX: playerTH?.mesh.position.x,
       aiTHX: aiTH?.mesh.position.x,
     }
@@ -549,9 +553,10 @@ test.describe('AI Economy Deepening', () => {
 
   // ----------------------------------------------------------
   // 10. Gold mine saturation: AI never exceeds 5 gold workers
-  //     over an extended simulation. Excess workers go to lumber.
+  //     over an extended simulation. Once saturated, TH must not keep
+  //     a gold rally active.
   // ----------------------------------------------------------
-  test('AI gold workers stay within mine saturation cap (≤5)', async ({ page }) => {
+  test('AI gold workers stay within mine saturation cap and clear gold rally when saturated', async ({ page }) => {
     await waitForGame(page)
 
     // Sample at multiple time points to ensure cap is not just a timing artifact
@@ -561,33 +566,57 @@ test.describe('AI Economy Deepening', () => {
     await advanceGameTime(page, 45)
     let snap = await getAISnapshot(page)
     if (!snap) { violations.push('t=45: no snapshot') }
-    else if (snap.goldWorkers > 5) {
-      violations.push(
-        `t=${snap.gameTime}s: ${snap.goldWorkers} gold workers (>5). ` +
-        `total=${snap.workersTotal} lumber=${snap.lumberWorkers} idle=${snap.idleWorkers}`,
-      )
+    else {
+      if (snap.goldWorkers > 5) {
+        violations.push(
+          `t=${snap.gameTime}s: ${snap.goldWorkers} gold workers (>5). ` +
+          `total=${snap.workersTotal} lumber=${snap.lumberWorkers} idle=${snap.idleWorkers}`,
+        )
+      }
+      if (snap.goldWorkers >= 5 && snap.aiTownhallRallyMode === 'goldmine') {
+        violations.push(
+          `t=${snap.gameTime}s: townhall still has gold rally while saturated ` +
+          `(gold=${snap.goldWorkers}, rally=${snap.aiTownhallRallyMode})`,
+        )
+      }
     }
 
     // Advance to t=90 and check
     await advanceGameTime(page, 45)
     snap = await getAISnapshot(page)
     if (!snap) { violations.push('t=90: no snapshot') }
-    else if (snap.goldWorkers > 5) {
-      violations.push(
-        `t=${snap.gameTime}s: ${snap.goldWorkers} gold workers (>5). ` +
-        `total=${snap.workersTotal} lumber=${snap.lumberWorkers} idle=${snap.idleWorkers}`,
-      )
+    else {
+      if (snap.goldWorkers > 5) {
+        violations.push(
+          `t=${snap.gameTime}s: ${snap.goldWorkers} gold workers (>5). ` +
+          `total=${snap.workersTotal} lumber=${snap.lumberWorkers} idle=${snap.idleWorkers}`,
+        )
+      }
+      if (snap.goldWorkers >= 5 && snap.aiTownhallRallyMode === 'goldmine') {
+        violations.push(
+          `t=${snap.gameTime}s: townhall still has gold rally while saturated ` +
+          `(gold=${snap.goldWorkers}, rally=${snap.aiTownhallRallyMode})`,
+        )
+      }
     }
 
     // Advance to t=120 and check
     await advanceGameTime(page, 30)
     snap = await getAISnapshot(page)
     if (!snap) { violations.push('t=120: no snapshot') }
-    else if (snap.goldWorkers > 5) {
-      violations.push(
-        `t=${snap.gameTime}s: ${snap.goldWorkers} gold workers (>5). ` +
-        `total=${snap.workersTotal} lumber=${snap.lumberWorkers} idle=${snap.idleWorkers}`,
-      )
+    else {
+      if (snap.goldWorkers > 5) {
+        violations.push(
+          `t=${snap.gameTime}s: ${snap.goldWorkers} gold workers (>5). ` +
+          `total=${snap.workersTotal} lumber=${snap.lumberWorkers} idle=${snap.idleWorkers}`,
+        )
+      }
+      if (snap.goldWorkers >= 5 && snap.aiTownhallRallyMode === 'goldmine') {
+        violations.push(
+          `t=${snap.gameTime}s: townhall still has gold rally while saturated ` +
+          `(gold=${snap.goldWorkers}, rally=${snap.aiTownhallRallyMode})`,
+        )
+      }
     }
 
     expect(

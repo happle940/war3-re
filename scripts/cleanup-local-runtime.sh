@@ -5,6 +5,15 @@ SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd -- "$SCRIPT_DIR/.." && pwd)"
 LOCK_DIR="${WAR3_RUNTIME_LOCK_DIR:-${TMPDIR:-/tmp}/war3-re-runtime-tests.lockdir}"
 LOCK_INIT_GRACE_SEC="${WAR3_RUNTIME_LOCK_INIT_GRACE_SEC:-5}"
+KILL_PLAYWRIGHT_PROCS="${WAR3_RUNTIME_KILL_PLAYWRIGHT_PROCS:-}"
+
+if [[ -z "$KILL_PLAYWRIGHT_PROCS" ]]; then
+  if [[ "${WAR3_RUNTIME_LOCK_HELD:-0}" == "1" ]]; then
+    KILL_PLAYWRIGHT_PROCS=0
+  else
+    KILL_PLAYWRIGHT_PROCS=1
+  fi
+fi
 
 lock_mtime() {
   local path="$1"
@@ -48,8 +57,10 @@ fi
 
 # Stop local dev/preview servers and Playwright runs launched from this repo.
 pkill -f "$ROOT_DIR/node_modules/.bin/vite" 2>/dev/null || true
-pkill -f "$ROOT_DIR/node_modules/playwright" 2>/dev/null || true
-pkill -f "playwright test" 2>/dev/null || true
+if [[ "$KILL_PLAYWRIGHT_PROCS" == "1" ]]; then
+  pkill -f "$ROOT_DIR/node_modules/playwright" 2>/dev/null || true
+  pkill -f "playwright test" 2>/dev/null || true
+fi
 
 # Playwright's headless shell can keep GPU/renderer processes alive after an
 # interrupted test. These are test-only processes, not the user's normal Chrome.

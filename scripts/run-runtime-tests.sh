@@ -60,7 +60,9 @@ echo "Runtime test lock acquired."
 export WAR3_RUNTIME_LOCK_HELD=1
 
 cleanup_runtime_only() {
-  ./scripts/cleanup-local-runtime.sh >/dev/null 2>&1 || true
+  local kill_playwright="${1:-0}"
+  WAR3_RUNTIME_KILL_PLAYWRIGHT_PROCS="$kill_playwright" \
+    ./scripts/cleanup-local-runtime.sh >/dev/null 2>&1 || true
 }
 
 cleanup() {
@@ -70,7 +72,7 @@ cleanup() {
 }
 trap cleanup EXIT
 
-cleanup_runtime_only
+cleanup_runtime_only 1
 
 if [[ $# -eq 0 ]]; then
   set -- tests/closeout.spec.ts tests/first-five-minutes.spec.ts --reporter=list

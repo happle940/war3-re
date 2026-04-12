@@ -274,9 +274,10 @@ export class SimpleAI {
     }
 
     // ===== 7. 集结点：根据金矿饱和状态动态调整 =====
-    // 饱和契约：当前 gold workers >= goldEffectiveCap → 把 rally 改到最近树
-    //   这样新 worker 出生就走向伐木，不会假移动到 TH 中心
-    // 未饱和 → 设金矿 rally，新 worker 自动进入采金
+    // 饱和契约：当前 gold workers >= goldEffectiveCap → 清掉 gold rally。
+    //   这样新 worker 不会被继续灌进矿线，后续由 assignIdleWorkers() 在 AI tick 中
+    //   重新分配到 lumber / build / reserve。这里不用“树坐标 point rally”伪装资源语义。
+    // 未饱和 → 设金矿 rally，新 worker 自动进入采金。
     {
       const goldWorkers = units.filter(
         (u) => u.team === team && u.type === 'worker' && !u.isBuilding
@@ -288,13 +289,9 @@ export class SimpleAI {
       const mine = this.ctx.findNearestGoldmine(townhall)
 
       if (goldWorkers.length >= goldEffectiveCap) {
-        // 饱和 → 把 rally 从金矿切换到最近树（新 worker 自动伐木）
-        if (townhall.rallyTarget && townhall.rallyTarget.type === 'goldmine') {
-          const tree = this.ctx.findNearestTreeEntry(townhall.mesh.position, 30)
-          if (tree) {
-            issueCommand([], { type: 'setRally', building: townhall, target: tree.mesh.position })
-          }
-          // 无树可切 → 保留金矿 rally（容忍小幅超额，好过假移动）
+        // 饱和 → 任何 gold / point rally 都清掉，避免继续向矿线加压。
+        if (townhall.rallyTarget?.type === 'goldmine' || townhall.rallyPoint !== null) {
+          issueCommand([], { type: 'clearRally', building: townhall })
         }
       } else if (townhall.rallyTarget === null || townhall.rallyPoint === null
         || townhall.rallyTarget.type !== 'goldmine') {
