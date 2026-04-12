@@ -22,7 +22,7 @@ import {
   UnitState, BUILDINGS, UNITS, GOLD_GATHER_TIME, LUMBER_GATHER_TIME,
   GOLD_PER_TRIP, GOLDMINE_MAX_WORKERS,
   LUMBER_PER_TRIP, TREE_LUMBER, GOLDMINE_GOLD,
-  PEASANT_BUILD_MENU, MELEE_RANGE, AGGRO_RANGE, CHASE_RANGE, GATHER_RANGE,
+  PEASANT_BUILD_MENU, MELEE_RANGE, AGGRO_RANGE, CHASE_RANGE, GATHER_RANGE, BUILD_RANGE,
 } from './GameData'
 import type { BuildingDef } from './GameData'
 import { TeamResources } from './TeamResources'
@@ -30,10 +30,12 @@ import { GamePhase, Phase } from './GamePhase'
 import { issueCommand as dispatchGameCommand } from './GameCommand'
 import { SelectionModel } from './SelectionModel'
 import { ControlGroupManager } from './ControlGroupManager'
+import { SelectionController } from './SelectionController'
 import { SimpleAI } from './SimpleAI'
 import type { AIContext } from './SimpleAI'
 import { OccupancyGrid, PlacementValidator } from './OccupancyGrid'
 import { PlacementController } from './PlacementController'
+import { FeedbackEffects } from './FeedbackEffects'
 import { PathingGrid } from './PathingGrid'
 import { findPath, pathToWorldWaypoints } from './PathFinder'
 import { TreeManager } from './TreeManager'
@@ -165,8 +167,7 @@ export class Game {
   private controlGroups = new ControlGroupManager()
   /** Quick access to selected units (delegates to SelectionModel) */
   private get selectedUnits(): readonly Unit[] { return this.selectionModel.units }
-  private selectionRings: THREE.Mesh[] = []
-  private selectionRingPhase = 0
+  private sel!: SelectionController
   private healthBars = new Map<Unit, { bg: THREE.Mesh; fill: THREE.Mesh }>()
 
   // 资源（通过 TeamResources 管理）
@@ -186,7 +187,6 @@ export class Game {
   // 框选
   private isDragging = false
   private dragStart = new THREE.Vector2()
-  private selBoxEl: HTMLDivElement
 
   // Shift 键状态
   private shiftHeld = false
@@ -195,6 +195,9 @@ export class Game {
   private lastClickTime = 0
   private lastClickUnit: Unit | null = null
   private static readonly DOUBLE_CLICK_MS = 350
+
+  // 反馈/视觉效果
+  private feedback!: FeedbackEffects
 
   // 建造放置模式
   private placement = new PlacementController()
@@ -206,6 +209,15 @@ export class Game {
   /** @deprecated Use placement.currentWorkers — kept for test backward compatibility */
   get placementWorkers(): readonly Unit[] { return this.placement.currentWorkers }
 
+  /** @deprecated Use sel — kept for test backward compatibility */
+  get selectionRings(): THREE.Mesh[] { return this.sel.selectionRings }
+  /** @deprecated Use sel — kept for test backward compatibility */
+  get selBoxEl(): HTMLDivElement { return this.sel.selBoxEl }
+  /** @deprecated Use sel.createSelectionRing — kept for test backward compatibility */
+  createSelectionRing(unit: Unit) { this.sel.createSelectionRing(unit) }
+  /** @deprecated Use sel.clearSelectionRings — kept for test backward compatibility */
+  clearSelectionRings() { this.sel.clearSelectionRings() }
+
   // 攻击移动目标模式
   private attackMoveMode = false
 
@@ -215,16 +227,6 @@ export class Game {
 
   // 模式提示文字
   private elModeHint = document.getElementById('mode-hint')!
-
-  // 移动指示器
-  private moveIndicators: { mesh: THREE.Mesh; life: number }[] = []
-
-  // 命中冲击环
-  private impactRings: { mesh: THREE.Mesh; life: number; maxLife: number }[] = []
-
-  // 队列移动指示器（持久，跟随选中单位的队列位置）
-  private queueIndicators: THREE.Mesh[] = []
-  private queueIndicatorGeo: THREE.PlaneGeometry | null = null
 
   // 时间
   private lastTime = 0
@@ -254,6 +256,11 @@ export class Game {
   private _lastCmdKey = ''  // 命令卡缓存，只在选择变化时重建
   private _lastSelKey = ''  // 选择HUD缓存
   private elTrainQueue = document.getElementById('train-queue')!
+
+  // 胜利/失败
+  private gameOverResult: 'victory' | 'defeat' | null = null
+  private elGameOverOverlay = document.getElementById('game-over-overlay')!
+  private elGameOverText = document.getElementById('game-over-text')!
 
   constructor() {
     this.scene = new THREE.Scene()
@@ -291,6 +298,11 @@ export class Game {
     const MAP_SIZE = 64
     this.terrain = new Terrain(MAP_SIZE, MAP_SIZE)
     this.mapRuntime = new MapRuntime(this.terrain)
+    this.feedback = new FeedbackEffects({
+      scene: this.scene,
+      camera: this.camera,
+      getWorldHeight: (wx, wz) => this.getWorldHeight(wx, wz),
+    })
     this.scene.add(this.terrain.mesh)
     this.scene.add(this.terrain.groundPlane)
     this.terrain.mesh.traverse((child) => {
@@ -332,7 +344,14 @@ export class Game {
     const hemi = new THREE.HemisphereLight(0x8899aa, 0x445533, 0.3)
     this.scene.add(hemi)
 
-    this.selBoxEl = document.getElementById('selection-box') as HTMLDivElement
+    const selBoxEl = document.getElementById('selection-box') as HTMLDivElement
+    this.sel = new SelectionController({
+      scene: this.scene,
+      camera: this.camera,
+      selectionModel: this.selectionModel,
+      feedback: this.feedback,
+      selBoxEl,
+    })
 
     // 初始化阵营资源
     this.resources.init(0, 500, 200)
@@ -382,11 +401,12 @@ export class Game {
     this.updateStaticDefense(dt)
     this.updateAutoAggro()
     this.updateHealthBars()
-    this.updateSelectionRings()
-    this.updateMoveIndicators(dt)
-    this.updateImpactRings(dt)
+    this.sel.updateSelectionRings()
+    this.feedback.updateMoveIndicators(dt)
+    this.feedback.updateImpactRings(dt)
     this.updateGhostPlacement()
     this.handleDeadUnits()
+    this.checkGameOver()
     this.updateHUD(dt)
     this.updateMinimap()
   }
@@ -403,7 +423,7 @@ export class Game {
       this.updateUnitState(unit, dt)
       this.updateBuildProgress(unit, dt)
       this.updateTrainingQueue(unit, dt)
-      this.updateCarryIndicator(unit)
+      this.feedback.updateCarryIndicator(unit)
     }
     // Post-move separation: push apart units that are too close
     this.applySeparation()
@@ -626,13 +646,18 @@ export class Game {
       }
 
       case UnitState.MovingToBuild: {
-        if (unit.moveTarget) return
         const target = unit.buildTarget
-        if (target && target.buildProgress < 1) {
-          unit.state = UnitState.Building
-        } else {
+        if (!target || target.buildProgress >= 1) {
           unit.state = UnitState.Idle
+          unit.buildTarget = null
+          unit.moveTarget = null
+          unit.waypoints = []
+          break
         }
+        if (unit.moveTarget && !this.hasReachedBuildInteraction(unit, target)) return
+        unit.moveTarget = null
+        unit.waypoints = []
+        unit.state = UnitState.Building
         break
       }
 
@@ -668,97 +693,12 @@ export class Game {
       if (mat) mat.opacity = 1
 
       // 完成反馈：短弹 + 亮度提亮回落
-      this.playBuildCompleteEffect(unit)
+      this.feedback.playBuildCompleteEffect(unit)
     }
 
     // 缩放动画：从0.3到1
     const scale = 0.3 + 0.7 * unit.buildProgress
     unit.mesh.scale.setScalar(scale)
-  }
-
-  /** 建筑完成视觉反馈：scale bounce + brightness flash */
-  private playBuildCompleteEffect(unit: Unit) {
-    // Scale bounce: 1.0 → 1.12 → 1.0 (快速)
-    unit.mesh.scale.setScalar(1.12)
-    setTimeout(() => { if (unit.mesh) unit.mesh.scale.setScalar(1.0) }, 120)
-
-    // 完工冲击环
-    this.spawnImpactRing(unit.mesh.position)
-
-    // Brightness flash on main mesh: emissive brief bump
-    const mesh0 = unit.mesh.children[0] as THREE.Mesh | undefined
-    if (mesh0) {
-      const mat = mesh0.material as THREE.MeshLambertMaterial
-      const origEmissive = mat.emissive.getHex()
-      mat.emissive.setHex(0x443300)
-      setTimeout(() => { if (mat) mat.emissive.setHex(origEmissive) }, 200)
-    }
-
-    // 完成光环：短暂向上扩散的圆环
-    const ringGeo = new THREE.RingGeometry(0.3, 1.5, 24)
-    ringGeo.rotateX(-Math.PI / 2)
-    const ringMat = new THREE.MeshBasicMaterial({
-      color: 0xd4a846, side: THREE.DoubleSide, transparent: true, opacity: 0.8,
-      depthTest: false,
-    })
-    const ring = new THREE.Mesh(ringGeo, ringMat)
-    const bSize = BUILDINGS[unit.type]?.size ?? 1
-    ring.position.copy(unit.mesh.position)
-    ring.position.y += bSize * 0.3
-    ring.renderOrder = 999
-    this.scene.add(ring)
-    // 光环动画：向上飘 + 淡出
-    const startTime = performance.now()
-    const animateRing = () => {
-      const elapsed = (performance.now() - startTime) / 1000
-      if (elapsed > 0.5) {
-        this.scene.remove(ring)
-        ringGeo.dispose()
-        ringMat.dispose()
-        return
-      }
-      ring.position.y += 0.03
-      ringMat.opacity = 0.8 * (1 - elapsed / 0.5)
-      ring.scale.setScalar(1 + elapsed * 1.5)
-      requestAnimationFrame(animateRing)
-    }
-    requestAnimationFrame(animateRing)
-  }
-
-  /** 更新 worker 资源携带视觉指示 */
-  private updateCarryIndicator(unit: Unit) {
-    if (unit.type !== 'worker') return
-
-    // 查找或创建 carry indicator（worker 背上的资源包）
-    let indicator = unit.mesh.getObjectByName('carryIndicator') as THREE.Mesh | undefined
-    const carrying = unit.carryAmount > 0 && unit.gatherType
-
-    if (!carrying) {
-      if (indicator) indicator.visible = false
-      return
-    }
-
-    if (!indicator) {
-      // 创建资源包 proxy（更大方块，远处可辨）
-      const geo = new THREE.BoxGeometry(0.25, 0.22, 0.25)
-      const mat = new THREE.MeshLambertMaterial({ color: 0xffdd00 })
-      indicator = new THREE.Mesh(geo, mat)
-      indicator.name = 'carryIndicator'
-      // 放在 worker 肩膀上方（更高更显眼）
-      indicator.position.set(0.15, 0.7, -0.1)
-      unit.mesh.add(indicator)
-    }
-
-    indicator.visible = true
-    // 根据 gatherType 切换颜色：gold = 金色, lumber = 木色
-    const mat = indicator.material as THREE.MeshLambertMaterial
-    if (unit.gatherType === 'gold') {
-      mat.color.setHex(0xffdd00)
-      mat.emissive.setHex(0x443300)
-    } else {
-      mat.color.setHex(0x8b6914)
-      mat.emissive.setHex(0x1a1000)
-    }
   }
 
   /** 训练队列 */
@@ -1103,13 +1043,13 @@ export class Game {
     setTimeout(() => { if (attacker.mesh) attacker.mesh.scale.copy(originalScale) }, 100)
 
     // 受击闪烁（增强版：闪红再闪白）
-    this.flashHit(target)
+    this.feedback.flashHit(target)
 
     // 命中冲击环
-    this.spawnImpactRing(target.mesh.position)
+    this.feedback.spawnImpactRing(target.mesh.position)
 
     // 浮动伤害数字
-    this.spawnDamageNumber(target, finalDamage)
+    this.feedback.spawnDamageNumber(target, finalDamage)
 
     // 血条闪烁反馈（短暂提亮血条边框）
     const bars = this.healthBars.get(target)
@@ -1124,93 +1064,6 @@ export class Game {
         }
       }
     }
-  }
-
-  /** 受击闪白效果（war3 风格：白色闪烁，短暂明显） */
-  private flashHit(unit: Unit) {
-    const flashMats: Array<{ color: THREE.Color; orig: number }> = []
-
-    unit.mesh.traverse((obj) => {
-      if (!(obj instanceof THREE.Mesh)) return
-      const materials = Array.isArray(obj.material) ? obj.material : [obj.material]
-      for (const mat of materials) {
-        if (!mat) continue
-        const colored = mat as THREE.Material & { color?: THREE.Color }
-        if (colored.color && typeof colored.color.getHex === 'function') {
-          flashMats.push({ color: colored.color, orig: colored.color.getHex() })
-        }
-      }
-    })
-
-    if (flashMats.length === 0) return
-    for (const entry of flashMats) {
-      entry.color.setHex(0xffffff)
-    }
-    setTimeout(() => {
-      for (const entry of flashMats) {
-        entry.color.setHex(entry.orig)
-      }
-    }, 80)
-  }
-
-  /** 浮动伤害数字（war3 风格：黄底黑边，上飘淡出） */
-  private damageNumberGeo: THREE.PlaneGeometry | null = null
-
-  private spawnDamageNumber(target: Unit, damage: number) {
-    // 复用 geometry
-    if (!this.damageNumberGeo) {
-      this.damageNumberGeo = new THREE.PlaneGeometry(0.45, 0.28)
-    }
-
-    const canvas = document.createElement('canvas')
-    canvas.width = 64
-    canvas.height = 32
-    const ctx = canvas.getContext('2d')!
-    ctx.font = 'bold 22px monospace'
-    ctx.textAlign = 'center'
-    ctx.textBaseline = 'middle'
-    // 黑色描边 + 黄色文字
-    ctx.strokeStyle = '#000000'
-    ctx.lineWidth = 3
-    ctx.strokeText(`${damage}`, 32, 16)
-    ctx.fillStyle = '#ffcc44'
-    ctx.fillText(`${damage}`, 32, 16)
-
-    const texture = new THREE.CanvasTexture(canvas)
-    texture.minFilter = THREE.LinearFilter
-    const mat = new THREE.MeshBasicMaterial({
-      map: texture, transparent: true, depthTest: false, side: THREE.DoubleSide,
-    })
-    const mesh = new THREE.Mesh(this.damageNumberGeo, mat)
-
-    // 定位在目标头顶
-    const yPos = target.isBuilding ? (BUILDINGS[target.type]?.size ?? 1) * 0.5 + 1.0 : 2.0
-    mesh.position.copy(target.mesh.position)
-    mesh.position.y += yPos
-    mesh.position.x += (Math.random() - 0.5) * 0.5
-    mesh.renderOrder = 1000
-    this.scene.add(mesh)
-
-    // 向上飘 + 淡出
-    const startTime = performance.now()
-    const duration = 800
-    const startY = mesh.position.y
-    const animateDmg = () => {
-      const elapsed = performance.now() - startTime
-      if (elapsed > duration) {
-        this.scene.remove(mesh)
-        mat.dispose()
-        texture.dispose()
-        return
-      }
-      const t = elapsed / duration
-      mesh.position.y = startY + t * 0.8
-      mat.opacity = 1 - t
-      // 朝向摄像机
-      mesh.quaternion.copy(this.camera.quaternion)
-      requestAnimationFrame(animateDmg)
-    }
-    requestAnimationFrame(animateDmg)
   }
 
   /** 自动反击：侦测附近的敌人 */
@@ -1354,10 +1207,7 @@ export class Game {
       const selIdx = this.selectionModel.contains(unit) ? this.selectedUnits.indexOf(unit) : -1
       if (selIdx >= 0) {
         this.selectionModel.remove(unit)
-        if (this.selectionRings[selIdx]) {
-          disposeObject3DDeep(this.selectionRings[selIdx])
-        }
-        this.selectionRings.splice(selIdx, 1)
+        this.sel.removeSelectionRingAt(selIdx)
       }
       // 取消其他单位对它的攻击引用
       for (const other of this.units) {
@@ -1410,7 +1260,40 @@ export class Game {
     this.units = this.units.filter(u => !deadSet.has(u))
   }
 
-  // ==================== 资源采集 ====================
+  // ==================== 胜利/失败检测 ====================
+
+  /** 检查胜利/失败条件：一方主基地全毁则判负 */
+  private checkGameOver() {
+    if (this.gameOverResult) return
+
+    // Player 0 (human) defeat: no living townhall
+    const playerTH = this.units.some(u => u.team === 0 && u.type === 'townhall' && u.isBuilding && u.hp > 0)
+    if (!playerTH) {
+      this.endGame('defeat')
+      return
+    }
+
+    // Player 1 (AI) defeat: no living townhall
+    const aiTH = this.units.some(u => u.team === 1 && u.type === 'townhall' && u.isBuilding && u.hp > 0)
+    if (!aiTH) {
+      this.endGame('victory')
+    }
+  }
+
+  private endGame(result: 'victory' | 'defeat') {
+    this.gameOverResult = result
+    this.phase.set(Phase.GameOver)
+
+    // Show end-state HUD overlay
+    this.elGameOverOverlay.style.display = 'flex'
+    this.elGameOverOverlay.classList.add(result)
+    this.elGameOverText.textContent = result === 'victory' ? '胜利' : '失败'
+  }
+
+  /** Public accessor for runtime tests */
+  getMatchResult(): 'victory' | 'defeat' | null {
+    return this.gameOverResult
+  }
 
   /** 树木耗尽：移除 mesh + 释放 blocker */
   private depleteTree(tree: TreeEntry) {
@@ -1454,6 +1337,13 @@ export class Game {
   private hasReachedDropoffHall(unit: Unit, hall: Unit | null): boolean {
     if (!hall) return false
     return unit.mesh.position.distanceTo(hall.mesh.position) <= this.getBuildingInteractionRadius(hall)
+  }
+
+  /** 建造同样按建筑边界交互，不要求工人走到占用中的中心点。 */
+  private hasReachedBuildInteraction(unit: Unit, target: Unit): boolean {
+    const size = BUILDINGS[target.type]?.size ?? 1
+    const radius = Math.max(BUILD_RANGE, size * 0.5)
+    return unit.mesh.position.distanceTo(target.mesh.position) <= radius
   }
 
   /** 金矿采集槽位：同一座金矿最多 5 个农民同时真正采集。 */
@@ -1830,7 +1720,7 @@ export class Game {
         this.handleClick()
       }
       this.isDragging = false
-      this.selBoxEl.style.display = 'none'
+      this.sel.hideSelectionBox()
     })
 
     canvas.addEventListener('mousemove', (e) => {
@@ -1917,15 +1807,15 @@ export class Game {
             for (const u of recalled) {
               if (!this.selectionModel.contains(u)) {
                 this.selectionModel.add(u)
-                this.createSelectionRing(u)
+                this.sel.createSelectionRing(u)
               }
             }
           } else {
             this.clearSelection()
-            this.clearSelectionRings()
+            this.sel.clearSelectionRings()
             this.selectionModel.setSelection(recalled)
             for (const u of recalled) {
-              this.createSelectionRing(u)
+              this.sel.createSelectionRing(u)
             }
           }
           // 重置 HUD 缓存
@@ -1950,9 +1840,9 @@ export class Game {
           this._lastCmdKey = ''
           this._lastSelKey = ''
           // 重建 selection rings 以匹配新的选择顺序
-          this.clearSelectionRings()
+          this.sel.clearSelectionRings()
           for (const u of this.selectedUnits) {
-            this.createSelectionRing(u)
+            this.sel.createSelectionRing(u)
           }
         }
         return
@@ -2071,56 +1961,13 @@ export class Game {
 
   // ==================== 单位命中查找 ====================
 
-  /** Walk hitObj.parent chain upward to find the unit whose mesh root matches. */
-  private findUnitByObject(hitObj: THREE.Object3D): Unit | undefined {
-    let obj: THREE.Object3D | null = hitObj
-    while (obj) {
-      const found = this.units.find((u) => u.mesh === obj)
-      if (found) return found
-      obj = obj.parent
-    }
-    return undefined
-  }
-
   /** Deduplicate all unit hits resolved from a raycast hit list. */
   private resolveHitUnits(hits: readonly THREE.Intersection<THREE.Object3D>[]): Unit[] {
-    const hitUnits: Unit[] = []
-    const seen = new Set<Unit>()
-    for (const hit of hits) {
-      const unit = this.findUnitByObject(hit.object)
-      if (unit && !seen.has(unit)) {
-        hitUnits.push(unit)
-        seen.add(unit)
-      }
-    }
-    return hitUnits
+    return this.sel.resolveHitUnits(hits, this.units)
   }
 
-  /**
-   * Left-click selection priority:
-   * if a goldmine is only blocked by workers already mining that same mine,
-   * prefer the mine so crowded mining does not make the resource node
-   * effectively unselectable.
-   */
   private resolveClickSelectionTarget(hitUnits: readonly Unit[]): Unit | undefined {
-    if (hitUnits.length === 0) return undefined
-    const first = hitUnits[0]
-    const goldmineIdx = hitUnits.findIndex((u) => u.type === 'goldmine')
-    if (goldmineIdx <= 0) return first
-
-    const mine = hitUnits[goldmineIdx]
-    const blockers = hitUnits.slice(0, goldmineIdx)
-    const blockersAreMiningWorkers = blockers.every((u) =>
-      u.type === 'worker' &&
-      u.gatherType === 'gold' &&
-      (u.state === UnitState.MovingToGather
-        || u.state === UnitState.Gathering
-        || u.state === UnitState.MovingToReturn) &&
-      u.resourceTarget?.type === 'goldmine' &&
-      u.resourceTarget.mine === mine,
-    )
-
-    return blockersAreMiningWorkers ? mine : first
+    return this.sel.resolveClickSelectionTarget(hitUnits)
   }
 
   // ==================== 左键选择 ====================
@@ -2139,14 +1986,11 @@ export class Game {
             // 移除：先记录 index 再从 model 移除
             const idx = this.selectedUnits.indexOf(unit)
             this.selectionModel.remove(unit)
-            if (idx >= 0 && idx < this.selectionRings.length) {
-              disposeObject3DDeep(this.selectionRings[idx])
-              this.selectionRings.splice(idx, 1)
-            }
+            this.sel.removeSelectionRingAt(idx)
           } else if (unit.team === 0) {
             // 添加友方单位
             this.selectionModel.add(unit)
-            this.createSelectionRing(unit)
+            this.sel.createSelectionRing(unit)
           }
           // 敌方单位：忽略
           // 'rejected' = 敌方单位，忽略
@@ -2158,13 +2002,13 @@ export class Game {
         if (this.lastClickUnit === unit && now - this.lastClickTime < Game.DOUBLE_CLICK_MS) {
           // 双击：选中屏幕上所有同类友方单位
           this.clearSelection()
-          this.clearSelectionRings()
+          this.sel.clearSelectionRings()
           this.selectionModel.setSelection([unit])
           // 尝试选中所有可见同类（保持 primary = 被点击的单位）
-          this.selectionModel.selectSameType(this.units, 0, (u) => this.isUnitOnScreen(u))
+          this.selectionModel.selectSameType(this.units, 0, (u) => this.sel.isUnitOnScreen(u))
           // 为所有选中的单位创建 selection rings
           for (const u of this.selectedUnits) {
-            this.createSelectionRing(u)
+            this.sel.createSelectionRing(u)
           }
           this.lastClickTime = 0
           this.lastClickUnit = null
@@ -2175,101 +2019,14 @@ export class Game {
         this.lastClickTime = now
         this.lastClickUnit = unit
         this.clearSelection()
-        this.clearSelectionRings()
+        this.sel.clearSelectionRings()
         this.selectUnit(unit)
         return
       }
     }
     // 点击空白处：清除选择（Shift 不影响）
     this.clearSelection()
-    this.clearSelectionRings()
-  }
-
-  /** 判断单位是否在当前屏幕可见范围内 */
-  private isUnitOnScreen(unit: Unit): boolean {
-    const screenPos = new THREE.Vector3()
-    screenPos.copy(unit.mesh.position).project(this.camera)
-    const sx = (screenPos.x + 1) / 2 * window.innerWidth
-    const sy = (-screenPos.y + 1) / 2 * window.innerHeight
-    // 在屏幕范围内（留一点边距）
-    return sx >= -50 && sx <= window.innerWidth + 50 && sy >= -50 && sy <= window.innerHeight + 50
-    && screenPos.z < 1  // 在摄像机前方
-  }
-
-  /** 同步 selection rings 使之与 SelectionModel 一致 */
-  private syncSelectionRings() {
-    // 清除多余的 rings
-    while (this.selectionRings.length > this.selectedUnits.length) {
-      const ring = this.selectionRings.pop()!
-      disposeObject3DDeep(ring)
-    }
-    // 补充缺失的 rings
-    for (let i = this.selectionRings.length; i < this.selectedUnits.length; i++) {
-      const unit = this.selectedUnits[i]
-      this.createSelectionRing(unit)
-    }
-  }
-
-  /** 为单位创建选中圈（war3 风格：团队色圆环 + 微弱脉冲） */
-  private createSelectionRing(unit: Unit) {
-    const radius = unit.isBuilding
-      ? (BUILDINGS[unit.type]?.size ?? 1) * 0.55
-      : unit.type === 'footman'
-        ? 0.68
-        : unit.type === 'worker'
-          ? 0.62
-          : 0.5
-    const thickness = unit.isBuilding ? 0.15 : 0.1
-    const ringGeo = new THREE.RingGeometry(radius - thickness, radius, 32)
-    ringGeo.rotateX(-Math.PI / 2)
-    // war3 风格：友方亮绿/青色，敌方红色
-    const ringColor = unit.team === 0 ? 0x00ee66 : 0xff3333
-    const ringMat = new THREE.MeshBasicMaterial({
-      color: ringColor,
-      side: THREE.DoubleSide,
-      depthTest: false,
-      transparent: true,
-      opacity: 0.88,
-    })
-    const ring = new THREE.Mesh(ringGeo, ringMat)
-    ring.position.copy(unit.mesh.position)
-    ring.position.y = 0.05
-    ring.renderOrder = 999
-    this.scene.add(ring)
-    this.selectionRings.push(ring)
-
-    // 选中闪光反馈
-    const flashMats: Array<{ color: THREE.Color; orig: number }> = []
-    unit.mesh.traverse((child) => {
-      if (flashMats.length > 0) return
-      if (!(child instanceof THREE.Mesh)) return
-      const materials = Array.isArray(child.material) ? child.material : [child.material]
-      for (const mat of materials) {
-        const maybeColored = mat as THREE.Material & { color?: THREE.Color }
-        if (maybeColored.color && typeof maybeColored.color.getHex === 'function') {
-          flashMats.push({ color: maybeColored.color, orig: maybeColored.color.getHex() })
-          break
-        }
-      }
-    })
-    for (const entry of flashMats) {
-      entry.color.setHex(0xffffff)
-    }
-    if (flashMats.length > 0) {
-      setTimeout(() => {
-        for (const entry of flashMats) {
-          entry.color.setHex(entry.orig)
-        }
-      }, 100)
-    }
-  }
-
-  /** 清除所有 selection rings */
-  private clearSelectionRings() {
-    for (const ring of this.selectionRings) {
-      disposeObject3DDeep(ring)
-    }
-    this.selectionRings = []
+    this.sel.clearSelectionRings()
   }
 
   // ==================== 右键命令 ====================
@@ -2288,7 +2045,7 @@ export class Game {
       const hitUnits: Unit[] = []
       const seen = new Set<Unit>()
       for (const hit of unitHits) {
-        const u = this.findUnitByObject(hit.object)
+        const u = this.sel.findUnitByObject(hit.object, this.units)
         if (u && !seen.has(u)) { hitUnits.push(u); seen.add(u) }
       }
       const target =
@@ -2315,7 +2072,7 @@ export class Game {
             this.planPathForUnits(nonWorkers, target.mesh.position)
             this.suppressAggroFor(nonWorkers)
           }
-          this.showMoveIndicator(target.mesh.position.x, target.mesh.position.z)
+          this.feedback.showMoveIndicator(target.mesh.position.x, target.mesh.position.z)
           return
         }
 
@@ -2334,7 +2091,7 @@ export class Game {
             if (this.assignBuilderToConstruction(worker, target)) assigned++
           }
           if (assigned > 0) {
-            this.showMoveIndicator(target.mesh.position.x, target.mesh.position.z)
+            this.feedback.showMoveIndicator(target.mesh.position.x, target.mesh.position.z)
             return
           }
         }
@@ -2343,7 +2100,7 @@ export class Game {
         dispatchGameCommand(controllable, { type: 'move', target: target.mesh.position })
         this.planPathForUnits(controllable, target.mesh.position)
         this.suppressAggroFor(controllable)
-        this.showMoveIndicator(target.mesh.position.x, target.mesh.position.z)
+        this.feedback.showMoveIndicator(target.mesh.position.x, target.mesh.position.z)
         return
       }
     }
@@ -2365,7 +2122,7 @@ export class Game {
           this.executeQueuedCommand(u, firstCmd)
         }
       }
-      this.showQueuedMoveIndicator(groundTarget.x, groundTarget.z)
+      this.feedback.showQueuedMoveIndicator(groundTarget.x, groundTarget.z)
       return
     }
 
@@ -2392,7 +2149,7 @@ export class Game {
       this.suppressAggroFor(controllable)
     }
 
-    this.showMoveIndicator(groundTarget.x, groundTarget.z)
+    this.feedback.showMoveIndicator(groundTarget.x, groundTarget.z)
   }
 
   /** 攻击移动：左键点击地面 */
@@ -2414,7 +2171,7 @@ export class Game {
           this.executeQueuedCommand(u, firstCmd)
         }
       }
-      this.showAttackMoveIndicator(target.x, target.z)
+      this.feedback.showAttackMoveIndicator(target.x, target.z)
       return
     }
 
@@ -2423,47 +2180,9 @@ export class Game {
       this.planAttackMovePath(u, target)
     }
     // 红色攻击移动指示器
-    this.showAttackMoveIndicator(target.x, target.z)
+    this.feedback.showAttackMoveIndicator(target.x, target.z)
   }
 
-  /** 攻击移动指示器（红色十字 + 圆环，war3 风格） */
-  private showAttackMoveIndicator(wx: number, wz: number) {
-    const h = this.getWorldHeight(wx - 0.5, wz - 0.5) + 0.1
-
-    // 外圈：红色
-    const geo1 = new THREE.RingGeometry(0.3, 0.45, 20)
-    geo1.rotateX(-Math.PI / 2)
-    const mat1 = new THREE.MeshBasicMaterial({
-      color: 0xcc2222, side: THREE.DoubleSide, transparent: true, opacity: 0.85,
-      depthTest: false,
-    })
-    const mesh1 = new THREE.Mesh(geo1, mat1)
-    mesh1.position.set(wx, h, wz)
-    mesh1.renderOrder = 999
-    this.scene.add(mesh1)
-    this.moveIndicators.push({ mesh: mesh1, life: 0.7 })
-
-    // 十字准心
-    const crossMat = new THREE.MeshBasicMaterial({
-      color: 0xcc2222, side: THREE.DoubleSide, transparent: true, opacity: 0.7,
-      depthTest: false,
-    })
-    const hGeo = new THREE.PlaneGeometry(0.5, 0.05)
-    hGeo.rotateX(-Math.PI / 2)
-    const hMesh = new THREE.Mesh(hGeo, crossMat)
-    hMesh.position.set(wx, h + 0.02, wz)
-    hMesh.renderOrder = 999
-    this.scene.add(hMesh)
-    this.moveIndicators.push({ mesh: hMesh, life: 0.7 })
-
-    const vGeo = new THREE.PlaneGeometry(0.05, 0.5)
-    vGeo.rotateX(-Math.PI / 2)
-    const vMesh = new THREE.Mesh(vGeo, crossMat.clone())
-    vMesh.position.set(wx, h + 0.02, wz)
-    vMesh.renderOrder = 999
-    this.scene.add(vMesh)
-    this.moveIndicators.push({ mesh: vMesh, life: 0.7 })
-  }
 
   /** 集结点：左键点击地面/金矿 */
   private handleRallyClick() {
@@ -2477,11 +2196,11 @@ export class Game {
 
     if (unitHits.length > 0) {
       const hitObj = unitHits[0].object
-      const target = this.findUnitByObject(hitObj)
+      const target = this.sel.findUnitByObject(hitObj, this.units)
       // 点击金矿 → 设为 goldmine rally
       if (target && target.type === 'goldmine') {
         dispatchGameCommand([], { type: 'setRally', building, target: target.mesh.position, rallyTarget: target })
-        this.showMoveIndicator(target.mesh.position.x, target.mesh.position.z)
+        this.feedback.showMoveIndicator(target.mesh.position.x, target.mesh.position.z)
         return
       }
     }
@@ -2491,7 +2210,7 @@ export class Game {
     if (groundHits.length === 0) return
     const target = groundHits[0].point
     dispatchGameCommand([], { type: 'setRally', building, target })
-    this.showMoveIndicator(target.x, target.z)
+    this.feedback.showMoveIndicator(target.x, target.z)
   }
 
   /** 进入集结点设置模式 */
@@ -2504,15 +2223,7 @@ export class Game {
   // ==================== 框选 ====================
 
   private drawSelectionBox(ex: number, ey: number) {
-    const x = Math.min(this.dragStart.x, ex)
-    const y = Math.min(this.dragStart.y, ey)
-    const w = Math.abs(ex - this.dragStart.x)
-    const h = Math.abs(ey - this.dragStart.y)
-    this.selBoxEl.style.display = 'block'
-    this.selBoxEl.style.left = `${x}px`
-    this.selBoxEl.style.top = `${y}px`
-    this.selBoxEl.style.width = `${w}px`
-    this.selBoxEl.style.height = `${h}px`
+    this.sel.drawSelectionBox(this.dragStart.x, this.dragStart.y, ex, ey)
   }
 
   private finishBoxSelect(ex: number, ey: number, appendSelection?: boolean) {
@@ -2532,7 +2243,7 @@ export class Game {
     // 如果没有 Shift，先清除现有选择
     if (!shouldAppend) {
       this.clearSelection()
-      this.clearSelectionRings()
+      this.sel.clearSelectionRings()
     }
 
     const screenPos = new THREE.Vector3()
@@ -2559,194 +2270,21 @@ export class Game {
 
   private selectUnit(unit: Unit) {
     this.selectionModel.add(unit)
-    this.createSelectionRing(unit)
+    this.sel.createSelectionRing(unit)
   }
 
   private clearSelection() {
     this.selectionModel.clear()
     this._lastCmdKey = ''
     this._lastSelKey = ''
-    this.clearSelectionRings()
-    this.clearQueueIndicators()
+    this.sel.clearSelectionRings()
+    this.feedback.clearQueueIndicators()
   }
 
   private updateSelectionRings() {
-    this.selectionRingPhase += 0.05  // ~3 rad/s → ~0.5Hz pulse
-    const pulse = 0.85 + 0.15 * Math.sin(this.selectionRingPhase)
-    const opacityPulse = 0.75 + 0.13 * Math.sin(this.selectionRingPhase)
-
-    for (let i = 0; i < this.selectedUnits.length; i++) {
-      const ring = this.selectionRings[i]
-      if (ring) {
-        ring.position.x = this.selectedUnits[i].mesh.position.x
-        ring.position.z = this.selectedUnits[i].mesh.position.z
-        ring.position.y = this.selectedUnits[i].mesh.position.y + 0.05
-        ring.scale.set(pulse, 1, pulse)
-        const mat = ring.material as THREE.MeshBasicMaterial
-        mat.opacity = opacityPulse
-      }
-    }
-    // 同时更新队列移动指示器
-    this.updateQueueIndicators()
+    this.sel.updateSelectionRings()
   }
 
-  /** 更新队列移动指示器（黄色小菱形，标记选中单位的队列目标） */
-  private updateQueueIndicators() {
-    // 收集所有选中单位的队列目标
-    const targets: { pos: THREE.Vector3; isAttackMove: boolean }[] = []
-    for (const u of this.selectedUnits) {
-      if (!u.isBuilding) {
-        for (const cmd of u.moveQueue) {
-          targets.push({ pos: cmd.target, isAttackMove: cmd.type === 'attackMove' })
-        }
-      }
-    }
-
-    // 确保有足够的指示器 mesh
-    if (!this.queueIndicatorGeo) {
-      this.queueIndicatorGeo = new THREE.PlaneGeometry(0.28, 0.28)
-    }
-
-    // 添加缺失的
-    while (this.queueIndicators.length < targets.length) {
-      const mat = new THREE.MeshBasicMaterial({
-        color: 0xddcc33, side: THREE.DoubleSide, transparent: true, opacity: 0.65,
-        depthTest: false,
-      })
-      const mesh = new THREE.Mesh(this.queueIndicatorGeo, mat)
-      mesh.rotation.x = -Math.PI / 2
-      mesh.rotation.z = Math.PI / 4  // 菱形
-      mesh.renderOrder = 998
-      mesh.visible = false
-      this.scene.add(mesh)
-      this.queueIndicators.push(mesh)
-    }
-
-    // 更新位置和可见性
-    for (let i = 0; i < this.queueIndicators.length; i++) {
-      if (i < targets.length) {
-        const t = targets[i]
-        this.queueIndicators[i].position.set(t.pos.x, this.getWorldHeight(t.pos.x - 0.5, t.pos.z - 0.5) + 0.15, t.pos.z)
-        this.queueIndicators[i].visible = true
-        // 区分颜色：红色=attackMove, 黄色=普通move
-        const mat = this.queueIndicators[i].material as THREE.MeshBasicMaterial
-        mat.color.setHex(t.isAttackMove ? 0xcc3333 : 0xddcc33)
-      } else {
-        this.queueIndicators[i].visible = false
-      }
-    }
-  }
-
-  /** 清除队列指示器 */
-  private clearQueueIndicators() {
-    for (const mesh of this.queueIndicators) {
-      this.scene.remove(mesh)
-      ;(mesh.material as THREE.Material).dispose()
-    }
-    this.queueIndicators = []
-  }
-
-  // ==================== 移动指示器 ====================
-
-  private showMoveIndicator(wx: number, wz: number) {
-    const h = this.getWorldHeight(wx - 0.5, wz - 0.5) + 0.1
-
-    // 外圈（绿色 = 移动）
-    const geo = new THREE.RingGeometry(0.3, 0.45, 20)
-    geo.rotateX(-Math.PI / 2)
-    const mat = new THREE.MeshBasicMaterial({
-      color: 0x00cc44, side: THREE.DoubleSide, transparent: true, opacity: 0.85,
-      depthTest: false,
-    })
-    const mesh = new THREE.Mesh(geo, mat)
-    mesh.position.set(wx, h, wz)
-    mesh.renderOrder = 999
-    this.scene.add(mesh)
-    this.moveIndicators.push({ mesh, life: 0.7 })
-
-    // 中心圆点
-    const dotGeo = new THREE.CircleGeometry(0.08, 8)
-    dotGeo.rotateX(-Math.PI / 2)
-    const dotMat = new THREE.MeshBasicMaterial({
-      color: 0x00cc44, side: THREE.DoubleSide, transparent: true, opacity: 0.85,
-      depthTest: false,
-    })
-    const dot = new THREE.Mesh(dotGeo, dotMat)
-    dot.position.set(wx, h + 0.01, wz)
-    dot.renderOrder = 999
-    this.scene.add(dot)
-    this.moveIndicators.push({ mesh: dot, life: 0.7 })
-  }
-
-  /** 追加移动指示器（黄色，区分普通移动的绿色） */
-  private showQueuedMoveIndicator(wx: number, wz: number) {
-    const h = this.getWorldHeight(wx - 0.5, wz - 0.5) + 0.1
-
-    // 外圈（黄色 = 追加）
-    const geo = new THREE.RingGeometry(0.25, 0.38, 16)
-    geo.rotateX(-Math.PI / 2)
-    const mat = new THREE.MeshBasicMaterial({
-      color: 0xeedd44, side: THREE.DoubleSide, transparent: true, opacity: 0.8,
-      depthTest: false,
-    })
-    const mesh = new THREE.Mesh(geo, mat)
-    mesh.position.set(wx, h, wz)
-    mesh.renderOrder = 999
-    this.scene.add(mesh)
-    this.moveIndicators.push({ mesh, life: 0.6 })
-  }
-
-  private updateMoveIndicators(dt: number) {
-    for (let i = this.moveIndicators.length - 1; i >= 0; i--) {
-      const ind = this.moveIndicators[i]
-      ind.life -= dt
-      const mat = ind.mesh.material as THREE.MeshBasicMaterial
-      mat.opacity = Math.max(0, ind.life / 0.6)
-      ind.mesh.scale.setScalar(1 + (1 - ind.life / 0.6) * 0.5)
-      if (ind.life <= 0) {
-        this.scene.remove(ind.mesh)
-        ind.mesh.geometry.dispose()
-        mat.dispose()
-        this.moveIndicators.splice(i, 1)
-      }
-    }
-  }
-
-  private spawnImpactRing(position: THREE.Vector3) {
-    const geo = new THREE.RingGeometry(0.0, 0.35, 16)
-    geo.rotateX(-Math.PI / 2)
-    const mat = new THREE.MeshBasicMaterial({
-      color: 0xffdd44,
-      transparent: true,
-      opacity: 0.85,
-      side: THREE.DoubleSide,
-      depthTest: false,
-    })
-    const ring = new THREE.Mesh(geo, mat)
-    ring.position.copy(position)
-    ring.position.y = 0.08
-    ring.renderOrder = 998
-    this.scene.add(ring)
-    this.impactRings.push({ mesh: ring, life: 0.28, maxLife: 0.28 })
-  }
-
-  private updateImpactRings(dt: number) {
-    for (let i = this.impactRings.length - 1; i >= 0; i--) {
-      const ir = this.impactRings[i]
-      ir.life -= dt
-      if (ir.life <= 0) {
-        this.scene.remove(ir.mesh)
-        disposeObject3DDeep(ir.mesh)
-        this.impactRings.splice(i, 1)
-        continue
-      }
-      const t = 1 - (ir.life / ir.maxLife)
-      const scale = 0.3 + t * 2.2
-      ir.mesh.scale.set(scale, 1, scale)
-      const mat = ir.mesh.material as THREE.MeshBasicMaterial
-      mat.opacity = 0.85 * (1 - t * t)
-    }
-  }
 
   // ==================== 单位创建 ====================
 
@@ -3417,7 +2955,7 @@ export class Game {
       let flashHitError: string | null = null
       let dealDamageError: string | null = null
       try {
-        this.flashHit(unit)
+        this.feedback.flashHit(unit)
       } catch (err) {
         flashHitError = err instanceof Error ? err.message : String(err)
       }
@@ -4673,12 +4211,7 @@ export class Game {
     this.units = []
     this.outlineObjects = []
     this.selectionModel.clear()
-    for (const ring of this.selectionRings) {
-      ring.geometry.dispose()
-      ;(ring.material as THREE.Material).dispose()
-      if (ring.parent) ring.parent.remove(ring)
-    }
-    this.selectionRings = []
+    this.sel.clearSelectionRings()
     this._lastCmdKey = ''
     this._lastSelKey = ''
   }
