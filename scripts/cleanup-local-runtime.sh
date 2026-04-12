@@ -4,6 +4,25 @@ set -euo pipefail
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd -- "$SCRIPT_DIR/.." && pwd)"
 LOCK_DIR="${WAR3_RUNTIME_LOCK_DIR:-${TMPDIR:-/tmp}/war3-re-runtime-tests.lockdir}"
+LOCK_INIT_GRACE_SEC="${WAR3_RUNTIME_LOCK_INIT_GRACE_SEC:-5}"
+
+lock_mtime() {
+  local path="$1"
+  if stat -f %m "$path" >/dev/null 2>&1; then
+    stat -f %m "$path"
+  else
+    stat -c %Y "$path"
+  fi
+}
+
+lock_age_seconds() {
+  local path="$1"
+  local now
+  now="$(date +%s)"
+  local modified
+  modified="$(lock_mtime "$path" 2>/dev/null || echo 0)"
+  echo $((now - modified))
+}
 
 # If a runtime test runner holds the lock, do not kill its browser/server from
 # another terminal/agent. The runner sets WAR3_RUNTIME_LOCK_HELD=1 for its own
@@ -14,6 +33,13 @@ if [[ "${WAR3_RUNTIME_LOCK_HELD:-0}" != "1" && "${FORCE_RUNTIME_CLEANUP:-0}" != 
     if [[ -n "$holder_pid" ]] && kill -0 "$holder_pid" 2>/dev/null; then
       echo "Runtime test lock active; cleanup skipped."
       exit 0
+    fi
+    if [[ -z "$holder_pid" ]]; then
+      lock_age="$(lock_age_seconds "$LOCK_DIR")"
+      if (( lock_age < LOCK_INIT_GRACE_SEC )); then
+        echo "Runtime test lock is still initializing (${lock_age}s old); cleanup skipped."
+        exit 0
+      fi
     fi
     echo "Removing stale runtime test lock."
     rm -rf "$LOCK_DIR"
