@@ -47,6 +47,7 @@ Current queue state:
 | Task 19 — Order Model Boundary Inventory | completed | GLM + Codex review | 2026-04-12 | Completed at commit `8e8d017`; added order-model boundary inventory and regression proof. |
 | Task 20 — Builder-Stealing Fix | completed | GLM + Codex review | 2026-04-12 | Completed at commit `7fa441e`; fixed active construction builder stealing and added 3 construction lifecycle tests. Codex verified build, app typecheck, and four M4 specs individually green. |
 | Task 21 — Runtime Harness Fast-Start | completed | GLM | 2026-04-12 | Partial infrastructure improvement. `?runtimeTest=1` skips W3X auto-load, per-test time ~8-9s -> ~5.8-6.5s. Individual M4 specs pass. Full `npm run test:runtime` still >10min, not a stable local gate. |
+| Task 22 — Runtime Sharded Gate | completed | GLM | 2026-04-12 | `npm run test:runtime` replaced with sharded script. 5/5 shards passed, 103 tests, 13m total. Replaces old single-command runtime. |
 | Task 08 — Game.ts Module Extraction Slice | ready | Codex dispatch | 2026-04-11 | Defer until death/cleanup and HUD cache gaps are covered. |
 
 ## Dispatch Rules
@@ -123,6 +124,61 @@ Bad development examples:
 - changing scale/camera/visual taste as a side effect of logic work
 
 ## Queue
+
+### Task 22 — Runtime Sharded Local Gate
+
+Status: `completed`.
+
+Owner: GLM.
+
+Started: 2026-04-12.
+
+Completed: 2026-04-12.
+
+Accepted commit: `test: shard runtime regression gate`.
+
+Final review status: accepted. Full sharded suite passes 5/5 shards, 103 tests, 779s total.
+
+Result:
+
+- Created `scripts/run-runtime-suite.sh` with 5 shards covering all 16 spec files.
+- Each shard prints name, spec list, per-shard timing. Fails fast on first failure.
+- Updated `package.json`: `test:runtime` now calls sharded script; old command preserved as `test:runtime:single`.
+- Fixed `test:runtime:single` to include `selection-input-regression.spec.ts` for coverage parity.
+- CI (`deploy-pages.yml`) uses `npm run test:runtime` which now goes through shards.
+
+Shard results:
+
+| Shard | Tests | Time |
+|-------|-------|------|
+| core-controls | 30 | 213s |
+| ui-economy | 16 | 107s |
+| presence-pathing | 18 | 159s |
+| ai-assets-buildings | 23 | 190s |
+| construction-defense | 16 | 110s |
+| **Total** | **103** | **779s (13m)** |
+
+Priority: immediate infrastructure fix following Task 21 fast-start.
+
+Why now:
+
+Task 21 reduced per-test time but `npm run test:runtime` was still a single opaque 15+ minute Playwright command that looked like a hang. Sharding makes progress observable and isolates failures.
+
+Goal:
+
+Replace the single long Playwright command with a sharded script where each shard prints clear progress, timing, and spec coverage.
+
+Allowed files:
+
+- `scripts/run-runtime-suite.sh`
+- `package.json`
+- `docs/GAMEPLAY_REGRESSION_CHECKLIST.md`
+- `docs/GLM_READY_TASK_QUEUE.md`
+
+Forbidden files:
+
+- `src/game/*`
+- `tests/*.spec.ts` (no assertion changes)
 
 ### Task 21 — Runtime Harness Fast-Start
 
