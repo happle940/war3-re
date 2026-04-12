@@ -1,6 +1,6 @@
 # War3 RE - Project Control Plan
 
-> Last updated: 2026-04-11
+> Last updated: 2026-04-12
 > Live demo: [https://happle940.github.io/war3-re/](https://happle940.github.io/war3-re/)
 > This is the top-level project control document. It is not a feature wishlist.
 
@@ -37,7 +37,7 @@ The target is not a literal asset clone. The target is a legally safe, Warcraft 
 
 Current stage:
 
-**M2 War3 Core Systems Alignment Ready For User Gate**
+**M2 live-reality closeout + M3 objective scale baseline complete**
 
 What this means:
 
@@ -45,10 +45,12 @@ What this means:
 - Core RTS systems exist: selection, commands, resources, build, train, combat, AI, map loading, GitHub Pages.
 - Several earlier fake-green validations have been replaced with real runtime assertions.
 - Worker and key-building readability have stronger proxy implementations, but still require human approval on the live build.
-- The project passed the first user playability gate, but it is still not a convincing Warcraft III-like slice because visual and scale debt remain.
+- The project passed the first user playability gate as `pass with visual debt`, but it is still not a convincing Warcraft III-like slice.
 - M2 objective packs completed so far: construction lifecycle, static defense combat, command-card disabled reasons, unit presence baseline, and combat-control contract.
 - M2 has a consolidated regression entrypoint: `npm run test:m2`.
-- M2 is ready for user gate review, not yet user-approved.
+- M3 objective scale ratios are now guarded by `tests/m3-scale-measurement.spec.ts`; this is numeric proof, not human visual approval.
+- Latest user live feedback shows several M2 rules must be revalidated through live-like input/DOM paths, not just internal setup tests.
+- Active GLM task: M4 Player-Reported UX Reality Pack, covering construction resume/cancel, tower attack reality, supply-block feedback, and unit body presence.
 
 ## 3. Solved vs Not Solved
 
@@ -70,15 +72,17 @@ What this means:
 - `glm` can be watched safely with `./scripts/glm-watch.sh readonly`.
 - Worker readability has an enlarged RTS proxy implementation.
 - Goldmine, barracks, and tower have stronger procedural readability proxies.
+- M3 scale contract has runtime proof: completed farm/TH area ratio, footman/worker silhouette ratio, tower/TH ratio, tree/TH height ratio, ring sanity, and healthbar placement are measured.
 
 ### 3.2 Not solved, even if some code exists
 
 - Visual identity is not final; M1 passed with visual debt, not visual approval.
-- Combat-control semantics still need a dedicated contract: fighting units must obey player move/stop/hold commands and cannot be immediately stolen back by auto-aggro.
+- Combat-control has automated baseline coverage, but live-feel validation is still not a substitute for human play.
 - Unit collision/presence is only a baseline. It is not yet full Warcraft-like collision, body blocking, or pathfinder-integrated local avoidance.
-- Command-card disabled reasons cover resource/supply blocks, but prerequisites and richer ability-state modeling are not final.
+- Command-card disabled reasons cover resource/supply blocks, but the live player path still needs DOM/input proof when supply is capped.
 - Terrain/base grammar is still weak compared with Warcraft III.
 - Human visual feel remains a later gate after core systems align better with Warcraft-like rules.
+- Tower attack, construction resume/cancel, supply recovery, and collision must be rechecked against the exact live paths the user reported, even if internal tests already exist.
 
 ## 4. Top-Level Cause Of Recent Problems
 
