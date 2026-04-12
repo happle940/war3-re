@@ -14,7 +14,7 @@ PASSED_SHARDS=0
 FAILED_SHARD=""
 
 # Shard definitions: name followed by spec files.
-# Covers the same 16 specs as test:runtime:single.
+# Covers the same 17 specs as test:runtime:single.
 shards=(
   core-controls
     tests/closeout.spec.ts
@@ -41,6 +41,7 @@ shards=(
   construction-defense
     tests/construction-lifecycle-regression.spec.ts
     tests/static-defense-regression.spec.ts
+    tests/m4-player-reported-issues.spec.ts
 )
 
 run_shard() {

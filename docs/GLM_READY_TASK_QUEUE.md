@@ -49,7 +49,8 @@ Current queue state:
 | Task 21 — Runtime Harness Fast-Start | completed | GLM | 2026-04-12 | Partial infrastructure improvement. `?runtimeTest=1` skips W3X auto-load, per-test time ~8-9s -> ~5.8-6.5s. Individual M4 specs pass. Full `npm run test:runtime` still >10min, not a stable local gate. |
 | Task 22 — Runtime Sharded Gate | completed | GLM + Codex closeout | 2026-04-12 | Completed at commit `2e7421d`; `npm run test:runtime` replaced with sharded script. 5/5 shards passed, 103 tests, 13m total. Replaces old single-command runtime. |
 | Task 23 — M3 Scale Contract Implementation | completed | GLM + Codex correction | 2026-04-12 | Completed locally; Codex corrected the farm measurement flaw so M3 measures completed buildings only. Verification green: build, app typecheck, M3 spec, visibility/pathing/selection affected pack. |
-| Task 24 — M4 Player-Reported UX Reality Pack | in_progress | GLM | 2026-04-12 | Convert latest human complaints into deterministic runtime/DOM proofs and minimal fixes: construction resume/cancel discoverability, tower attack reality, supply-block command feedback, and unit collision baseline. |
+| Task 24 — M4 Player-Reported UX Reality Pack | completed | GLM + Codex correction | 2026-04-12 | M4 spec added and corrected. Verification green: build, app typecheck, M4 pack 6/6, affected construction/static-defense/resource/unit-presence pack 29/29. |
+| Task 25 — M4 War3 Command Surface Matrix | in_progress | GLM | 2026-04-12 | Next GLM task: prove the player-facing command matrix through live-like input/DOM paths so user-reported gaps stop reappearing as isolated patches. |
 | Task 08 — Game.ts Module Extraction Slice | ready | Codex dispatch | 2026-04-11 | Defer until death/cleanup and HUD cache gaps are covered. |
 
 ## Dispatch Rules
@@ -127,13 +128,95 @@ Bad development examples:
 
 ## Queue
 
-### Task 24 — M4 Player-Reported UX Reality Pack
+### Task 25 — M4 War3 Command Surface Matrix
 
 Status: `in_progress`.
 
 Owner: GLM.
 
 Started: 2026-04-12.
+
+Priority: follows Task24 because the user correctly identified the player issues as symptoms of incomplete War3-like order/ability alignment, not isolated bugs.
+
+Goal:
+
+Create a command-surface regression pack that tests the player's visible command semantics as a matrix. This is not a broad order-system rewrite. It is a contract layer that says which selected unit + clicked target + command-card state must produce which War3-like behavior.
+
+Required contracts:
+
+- Right-click target matrix:
+  - Worker + unfinished own building -> selected worker resumes construction through `handleRightClick()` and real `g.update()` loop.
+  - Worker + goldmine -> gather command, `resourceTarget` points to that mine.
+  - Non-worker + goldmine -> move near mine, not gather.
+  - Combat unit + enemy -> attack command.
+  - Unit + ground -> move command and clear stale gather/build/attack state.
+  - Unit + own completed building -> move near building, not accidental build/attack.
+- Command-card state matrix:
+  - Worker card exposes buildable Farm/Barracks/Tower commands with explicit disabled reasons when resources are insufficient.
+  - Unfinished selected building exposes Cancel and executing it releases footprint + clears builder.
+  - Completed Barracks at supply cap disables Footman with a supply reason.
+  - Tower selected HUD exposes enough attack information that a player can tell it is a weapon building.
+- No fake proof:
+  - Setup may spawn entities directly.
+  - Behavior under test must use public/live-like paths: `handleRightClick()`, command-card button click, keyboard event, or `g.update()`.
+  - Do not call `updateBuildProgress()` or `assignBuilderToConstruction()` as the asserted behavior path.
+
+Allowed files:
+
+- `tests/command-surface-regression.spec.ts` (new)
+- `src/game/Game.ts` only for minimal product fixes proven by the new spec
+- `docs/GAMEPLAY_REGRESSION_CHECKLIST.md`
+- `docs/GLM_READY_TASK_QUEUE.md`
+
+Forbidden files:
+
+- `src/game/SimpleAI.ts`
+- `src/game/TeamResources.ts`
+- camera, terrain, asset catalog, visual factories
+- runtime harness scripts
+- broad Game.ts refactor
+
+Required verification:
+
+```bash
+npm run build
+npx tsc --noEmit -p tsconfig.app.json
+./scripts/run-runtime-tests.sh tests/command-surface-regression.spec.ts --reporter=list
+./scripts/run-runtime-tests.sh tests/m4-player-reported-issues.spec.ts tests/selection-input-regression.spec.ts tests/command-card-state-regression.spec.ts --reporter=list
+FORCE_RUNTIME_CLEANUP=1 ./scripts/cleanup-local-runtime.sh
+ps aux | egrep 'node .*vite|playwright|chrome-headless-shell|\.openclaw/browser' | grep -v egrep || true
+```
+
+Closeout rules:
+
+- Report matrix rows as `proven`, `fixed`, or `still open`.
+- If a row requires product code, keep the patch minimal and name the exact failing assertion that drove it.
+- Do not commit if any required verification fails.
+
+Commit message:
+
+```text
+gameplay: add command surface regression matrix
+```
+
+### Task 24 — M4 Player-Reported UX Reality Pack
+
+Status: `completed`.
+
+Owner: GLM + Codex correction.
+
+Started: 2026-04-12.
+
+Completed: 2026-04-12.
+
+Final review status: accepted locally after Codex correction. GLM created the initial M4 pack and nested-mesh hit resolution helper, but Codex paused GLM before accepting an invalid terrain-height clamp, corrected the live-like right-click proof, and added the `planPath()` no-path-to-building transition needed for adjacent construction resume.
+
+Verification:
+
+- `npm run build`
+- `npx tsc --noEmit -p tsconfig.app.json`
+- `./scripts/run-runtime-tests.sh tests/m4-player-reported-issues.spec.ts --reporter=list` -> 6/6 passed
+- `./scripts/run-runtime-tests.sh tests/construction-lifecycle-regression.spec.ts tests/static-defense-regression.spec.ts tests/resource-supply-regression.spec.ts tests/unit-presence-regression.spec.ts --reporter=list` -> 29/29 passed
 
 Priority: next after Task23 because the user reported concrete live-play blockers after the M3 scale pass.
 

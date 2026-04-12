@@ -49,8 +49,8 @@ What this means:
 - M2 objective packs completed so far: construction lifecycle, static defense combat, command-card disabled reasons, unit presence baseline, and combat-control contract.
 - M2 has a consolidated regression entrypoint: `npm run test:m2`.
 - M3 objective scale ratios are now guarded by `tests/m3-scale-measurement.spec.ts`; this is numeric proof, not human visual approval.
-- Latest user live feedback shows several M2 rules must be revalidated through live-like input/DOM paths, not just internal setup tests.
-- Active GLM task: M4 Player-Reported UX Reality Pack, covering construction resume/cancel, tower attack reality, supply-block feedback, and unit body presence.
+- Latest user live feedback has been converted into M4 live-like runtime contracts: construction resume/cancel, tower attack reality, supply-block feedback, and unit body presence are covered by `tests/m4-player-reported-issues.spec.ts`.
+- Active GLM task: M4 War3 Command Surface Matrix, broadening those fixes into selected-unit + target + command-card contracts so future War3-alignment gaps are caught as system failures rather than isolated bugs.
 
 ## 3. Solved vs Not Solved
 

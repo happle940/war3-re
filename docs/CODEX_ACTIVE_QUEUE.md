@@ -73,7 +73,8 @@ GLM owns:
 | C18 — War3 Rule System Roadmap | done | 2026-04-11 | Converted the user's bug list into a durable S1-S7 system roadmap so future work is contract-first, not patch-first. |
 | C19 — Runtime Harness Sharding Review | done | 2026-04-12 | Accepted Task22 at commit `2e7421d`; sharded runtime gate passed 5/5 shards, 103 tests, 779s, with 16-spec coverage parity. |
 | C20 — M3/M4 Next Work Packet Prep | done | 2026-04-12 | Task23 completed with corrected M3 objective scale contract; Codex rejected invalid construction-scale farm evidence and replaced it with completed-building measurement. |
-| C21 — Dispatch M4 Player Issue Reality Pack | active | 2026-04-12 | Keep GLM on concrete product blockers from user live play: construction resume/cancel, tower attack reality, supply feedback, and unit body presence. |
+| C21 — Dispatch M4 Player Issue Reality Pack | done | 2026-04-12 | GLM started the M4 pack; Codex corrected the live-like construction-resume proof and accepted the pack after build, app typecheck, M4 6/6, and affected 29/29 regression tests. |
+| C22 — Dispatch M4 Command Surface Matrix | active | 2026-04-12 | Keep GLM on a broader War3-like command matrix so future live-play issues are tested as system contracts instead of one-off patches. |
 
 ## Task Cards
 
@@ -644,11 +645,11 @@ Closeout:
 - Task23 completed with corrected M3 measurement contract.
 - Codex rejected GLM's invalid farm evidence because it measured a construction-scaled farm.
 - Corrected final M3 values: `farmOverTH=0.291`, `footmanOverWorker=1.547`, `maxTreeHeightOverTH=1.175`.
-- Next GLM task is Task24: M4 Player-Reported UX Reality Pack.
+- Next GLM task after M4 closeout is Task25: M4 War3 Command Surface Matrix.
 
 ### C21 — Dispatch M4 Player Issue Reality Pack
 
-Status: `active`.
+Status: `done`.
 
 Goal: convert the user's latest live-play blockers into deterministic runtime proof and narrow fixes before M4.
 
@@ -667,6 +668,35 @@ Codex responsibilities:
 - Review GLM output for real input/DOM assertions, not internal smoke.
 - Reject claims that existing internal tests are enough if the user's live path is not covered.
 - Keep browser/runtime cleanup enforced after Playwright runs.
+
+Verification:
+
+```bash
+git diff --check
+```
+
+Closeout:
+
+- M4 player-reported pack accepted after Codex correction.
+- Verified locally: build, app typecheck, `m4-player-reported-issues.spec.ts` 6/6, affected construction/static-defense/resource/unit-presence pack 29/29.
+- GLM's invalid `Math.max(0, getWorldHeight())` spawn-height change was rejected because it would decouple entities from terrain height instead of proving visibility.
+
+### C22 — Dispatch M4 Command Surface Matrix
+
+Status: `active`.
+
+Goal: turn the user's higher-level complaint into a command-surface matrix so War3-like behavior is defined by selected unit + target + command card state, not by ad hoc fixes.
+
+Inputs:
+
+- User asked that the above problems be treated as a higher-level War3-alignment direction.
+- Task24 proved several isolated fixes, but the command surface still needs a matrix contract.
+
+Codex responsibilities:
+
+- Dispatch Task25 to GLM with non-overlapping, test-first ownership.
+- Review for real live-like input/DOM paths.
+- Continue non-conflicting architecture/roadmap work while GLM runs.
 
 Verification:
 

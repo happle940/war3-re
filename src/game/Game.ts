@@ -1614,7 +1614,12 @@ export class Game {
 
     building.builder = worker
     dispatchGameCommand([worker], { type: 'build', target: building })
-    this.planPath(worker, building.mesh.position)
+    const hasPath = this.planPath(worker, building.mesh.position)
+    if (!hasPath) {
+      worker.waypoints = []
+      worker.moveTarget = null
+      worker.state = UnitState.Building
+    }
     return true
   }
 
@@ -2001,6 +2006,19 @@ export class Game {
     }
   }
 
+  // ==================== 单位命中查找 ====================
+
+  /** Walk hitObj.parent chain upward to find the unit whose mesh root matches. */
+  private findUnitByObject(hitObj: THREE.Object3D): Unit | undefined {
+    let obj: THREE.Object3D | null = hitObj
+    while (obj) {
+      const found = this.units.find((u) => u.mesh === obj)
+      if (found) return found
+      obj = obj.parent
+    }
+    return undefined
+  }
+
   // ==================== 左键选择 ====================
 
   private handleClick() {
@@ -2010,9 +2028,7 @@ export class Game {
 
     if (hits.length > 0) {
       const hitObj = hits[0].object
-      const unit = this.units.find(
-        (u) => u.mesh === hitObj || u.mesh.children.includes(hitObj),
-      )
+      const unit = this.findUnitByObject(hitObj)
       if (unit) {
         // Shift+click: add/remove toggle
         if (this.shiftHeld) {
@@ -2164,9 +2180,7 @@ export class Game {
 
     if (unitHits.length > 0) {
       const hitObj = unitHits[0].object
-      const target = this.units.find(
-        (u) => u.mesh === hitObj || u.mesh.children.includes(hitObj),
-      )
+      const target = this.findUnitByObject(hitObj)
 
       if (target) {
         // 只有己方可控单位才能接受玩家命令
@@ -2349,9 +2363,7 @@ export class Game {
 
     if (unitHits.length > 0) {
       const hitObj = unitHits[0].object
-      const target = this.units.find(
-        (u) => u.mesh === hitObj || u.mesh.children.includes(hitObj),
-      )
+      const target = this.findUnitByObject(hitObj)
       // 点击金矿 → 设为 goldmine rally
       if (target && target.type === 'goldmine') {
         dispatchGameCommand([], { type: 'setRally', building, target: target.mesh.position, rallyTarget: target })
