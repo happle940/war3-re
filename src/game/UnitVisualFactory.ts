@@ -319,5 +319,8 @@ function createProxyFootman(group: THREE.Group, color: number) {
   shield.position.set(-0.43, 0.55, 0)
   group.add(shield)
 
-  group.scale.setScalar(1.5)
+  // M3 scale contract: footman must read meaningfully heavier than worker.
+  // scale 1.7 => silhouette ratio ~1.5x worker (target > 1.3).
+  // Collision/pathing unchanged; this is only the visual adapter.
+  group.scale.setScalar(1.7)
 }

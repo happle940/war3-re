@@ -48,7 +48,8 @@ Current queue state:
 | Task 20 — Builder-Stealing Fix | completed | GLM + Codex review | 2026-04-12 | Completed at commit `7fa441e`; fixed active construction builder stealing and added 3 construction lifecycle tests. Codex verified build, app typecheck, and four M4 specs individually green. |
 | Task 21 — Runtime Harness Fast-Start | completed | GLM | 2026-04-12 | Partial infrastructure improvement. `?runtimeTest=1` skips W3X auto-load, per-test time ~8-9s -> ~5.8-6.5s. Individual M4 specs pass. Full `npm run test:runtime` still >10min, not a stable local gate. |
 | Task 22 — Runtime Sharded Gate | completed | GLM + Codex closeout | 2026-04-12 | Completed at commit `2e7421d`; `npm run test:runtime` replaced with sharded script. 5/5 shards passed, 103 tests, 13m total. Replaces old single-command runtime. |
-| Task 23 — M3 Scale Contract Implementation | in_progress | GLM | 2026-04-12 | Tighten objective War3-like scale/readability ratios and make minimal proxy-only adjustments. No camera, terrain, AI, command, or subjective screenshot work. |
+| Task 23 — M3 Scale Contract Implementation | completed | GLM + Codex correction | 2026-04-12 | Completed locally; Codex corrected the farm measurement flaw so M3 measures completed buildings only. Verification green: build, app typecheck, M3 spec, visibility/pathing/selection affected pack. |
+| Task 24 — M4 Player-Reported UX Reality Pack | ready | GLM dispatch | 2026-04-12 | Convert latest human complaints into deterministic runtime/DOM proofs and minimal fixes: construction resume/cancel discoverability, tower attack reality, supply-block command feedback, and unit collision baseline. |
 | Task 08 — Game.ts Module Extraction Slice | ready | Codex dispatch | 2026-04-11 | Defer until death/cleanup and HUD cache gaps are covered. |
 
 ## Dispatch Rules
@@ -126,13 +127,111 @@ Bad development examples:
 
 ## Queue
 
+### Task 24 — M4 Player-Reported UX Reality Pack
+
+Status: `ready`.
+
+Owner: GLM dispatch.
+
+Priority: next after Task23 because the user reported concrete live-play blockers after the M3 scale pass.
+
+User-reported issues to convert into contracts:
+
+1. Barracks construction can stop halfway and feels impossible to resume.
+2. Arrow tower appears to have no attack in live play.
+3. Units do not have meaningful collision/body presence.
+4. Supply block makes unit production feel dead instead of explaining the block and guiding farm construction.
+5. Construction cancel is not discoverable or not usable enough.
+6. These are all symptoms of incomplete War3-like order/ability/system alignment, not isolated UI polish.
+
+Goal:
+
+Create one runtime spec that uses real input/DOM where possible and direct runtime setup only where needed. If a contract fails, make the smallest product-code fix inside the allowed files. Do not claim "fixed" from internal smoke only.
+
+Required contracts:
+
+- Construction resume:
+  - Start a farm or barracks through the player build flow.
+  - Interrupt the worker.
+  - Select a worker and right-click the unfinished building.
+  - Assert `buildProgress` continues increasing and the selected worker becomes/retains the builder.
+- Construction cancel discoverability:
+  - Select an unfinished player building.
+  - Assert the command card exposes a cancel command with enabled/disabled state and reason.
+  - Execute cancel and assert footprint release + deterministic partial refund + builder cleanup.
+- Tower live attack:
+  - Spawn or build a completed player tower and an enemy unit in range.
+  - Advance simulation and assert enemy hp drops, tower `attackTarget` clears/reacquires correctly, and under-construction tower does not attack.
+  - If existing tower combat passes internally but live play still feels like no attack, add a visible feedback assertion or HUD/stat assertion rather than changing combat numbers blindly.
+- Supply-block feedback:
+  - Fill supply to cap.
+  - Select barracks.
+  - Assert footman command is disabled with an explicit supply reason.
+  - Assert worker/farm build route remains available when resources allow, so the player has an obvious recovery path.
+- Unit collision/body presence:
+  - Use existing unit presence/collision baseline as reference.
+  - Add one focused regression that two units ordered to the same point do not end in exact overlap and remain selectable.
+  - Do not attempt full local avoidance/pathfinder rewrite in this task.
+
+Allowed files:
+
+- `tests/m4-player-reported-issues.spec.ts` (new)
+- `src/game/Game.ts` only for proven minimal fixes in construction resume/cancel, command-card state, tower feedback/stat surfacing, or local body separation
+- `src/game/GameCommand.ts` only if command semantics are proven wrong by the new spec
+- `src/game/GameData.ts` only if tower/supply numbers are provably missing or inconsistent
+- `docs/GAMEPLAY_REGRESSION_CHECKLIST.md`
+- `docs/GLM_READY_TASK_QUEUE.md`
+
+Forbidden files:
+
+- `src/game/SimpleAI.ts`
+- `src/game/TeamResources.ts` unless the new spec proves an actual supply accounting bug
+- camera, terrain, asset catalog, visual factories
+- runtime harness scripts
+- screenshot-only validation
+- broad Game.ts refactor
+
+Required verification:
+
+```bash
+npm run build
+npx tsc --noEmit -p tsconfig.app.json
+./scripts/run-runtime-tests.sh tests/m4-player-reported-issues.spec.ts --reporter=list
+./scripts/run-runtime-tests.sh tests/construction-lifecycle-regression.spec.ts tests/static-defense-regression.spec.ts tests/resource-supply-regression.spec.ts tests/unit-presence-regression.spec.ts --reporter=list
+FORCE_RUNTIME_CLEANUP=1 ./scripts/cleanup-local-runtime.sh
+ps aux | egrep 'node .*vite|playwright|chrome-headless-shell|\.openclaw/browser' | grep -v egrep || true
+```
+
+Closeout rules:
+
+- Report which user issue is proven fixed, already covered, or still open.
+- If an issue is "already covered by existing tests" but user still reports it live, explain the gap and add a better live-like test.
+- Do not commit if any required verification fails.
+
+Commit message:
+
+```text
+gameplay: add M4 player issue reality pack
+```
+
 ### Task 23 — M3 Scale Contract Implementation
 
-Status: `in_progress`.
+Status: `completed`.
 
-Owner: GLM.
+Owner: GLM + Codex correction.
 
 Started: 2026-04-12.
+
+Completed: 2026-04-12.
+
+Final status:
+
+- Strengthened M3 objective ratio tests.
+- Enlarged footman proxy scale from 1.5 to 1.7.
+- Reduced tree random scale from 0.8-1.6x to 0.6-1.1x.
+- Corrected farm measurement to use completed buildings only; farm proxy geometry remains compact and unchanged.
+- Verified `farmOverTH=0.291`, `footmanOverWorker=1.547`, `maxTreeHeightOverTH=1.175`.
+- Codex reran build, app typecheck, M3 spec, and affected visibility/pathing/selection pack successfully.
 
 Priority: first M3 implementation slice after M2 runtime harness stabilization.
 

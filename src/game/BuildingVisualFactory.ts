@@ -265,6 +265,7 @@ function createProxyBarracks(group: THREE.Group, color: number) {
 }
 
 function createProxyFarm(group: THREE.Group) {
+  // Farm is a compact size=2 wall/supply piece; M3 measures completed visuals only.
   const base = new THREE.Mesh(
     new THREE.BoxGeometry(1.5, 0.4, 1.3),
     new THREE.MeshLambertMaterial({ color: 0x907050 }),

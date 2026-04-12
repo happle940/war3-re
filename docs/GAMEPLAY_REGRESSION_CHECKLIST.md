@@ -279,7 +279,15 @@
 
 - [x] Worker/Footman 视觉包围盒非零，两者均为可见实体
 - [x] 建筑占地层级：Farm < Barracks <= GoldMine <= TownHall（footprint area）
-- [x] Tower 具有竖向防御轮廓：高度 > 宽度
+- [x] 建筑比例测量只使用完工建筑（`buildProgress >= 1`），避免建造中缩放污染 M3 数据
+- [x] Tower 具有竖向防御轮廓：高度 > 宽度，且底座宽度 > 0.8
+- [x] Farm 视觉面积 / TH 面积在 [0.08, 0.40] 范围内（compact wall piece）
+- [x] Footman 剪影面积 / Worker 剪影面积 > 1.3（军事单位更重）
+- [x] Tower 高度 / TH 高度 < 1.7（防御标志不压倒主基地）
+- [x] Tower 视觉面积 / TH 面积 > 0.05（有可见体量）
+- [x] 树木最大高度 / TH 高度 < 1.5（填空物不主导基地）
+- [x] TH 选择圈 / 视觉半径在 [0.3, 1.5] 范围内
+- [x] Worker healthBarY > 0.8 × 视觉高度（血条在身体上方）
 - [x] 开局农民不在任何建筑/金矿 blocker footprint 内
 - [x] 默认镜头视口包含玩家基地锚点组：TownHall + GoldMine + 至少一个 Worker
 - [x] 选择圈半径在实体 footprint 的合理因子范围内，不会坍缩为极小值

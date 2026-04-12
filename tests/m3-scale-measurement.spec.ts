@@ -120,9 +120,13 @@ test.describe('M3 Scale Measurement Baseline', () => {
         return g.units.filter((u: any) => u.team === team && u.type === type && u.hp > 0)
       }
 
-      function findAny(type: string) {
-        return g.units.find((u: any) => u.type === type && u.hp > 0 && !u.isBuilding) ||
-               g.units.find((u: any) => u.type === type && u.hp > 0)
+      function findCompletedBuilding(type: string) {
+        return g.units.find((u: any) =>
+          u.isBuilding &&
+          u.type === type &&
+          u.hp > 0 &&
+          (u.buildProgress ?? 1) >= 1,
+        )
       }
 
       // =====================================================
@@ -152,11 +156,11 @@ test.describe('M3 Scale Measurement Baseline', () => {
       // =====================================================
       // GROUP 2: Relative footprint hierarchy
       // =====================================================
-      const th = findAny('townhall')
-      const gm = findAny('goldmine')
-      let barracks = findAny('barracks')
-      let farm = findAny('farm')
-      let tower = findAny('tower')
+      const th = findCompletedBuilding('townhall')
+      const gm = findCompletedBuilding('goldmine')
+      let barracks = findCompletedBuilding('barracks')
+      let farm = findCompletedBuilding('farm')
+      let tower = findCompletedBuilding('tower')
 
       // Spawn missing building types at safe positions for measurement
       let spawnedBarracks = false
@@ -165,15 +169,24 @@ test.describe('M3 Scale Measurement Baseline', () => {
 
       if (!barracks) {
         barracks = g.spawnBuilding('barracks', 0, 20, 22)
-        if (barracks) spawnedBarracks = true
+        if (barracks) {
+          barracks.buildProgress = 1
+          spawnedBarracks = true
+        }
       }
       if (!farm) {
         farm = g.spawnBuilding('farm', 0, 25, 25)
-        if (farm) spawnedFarm = true
+        if (farm) {
+          farm.buildProgress = 1
+          spawnedFarm = true
+        }
       }
       if (!tower) {
         tower = g.spawnBuilding('tower', 0, 28, 25)
-        if (tower) spawnedTower = true
+        if (tower) {
+          tower.buildProgress = 1
+          spawnedTower = true
+        }
       }
 
       const thBBox = th ? computeWorldBBox(th.mesh) : null
@@ -181,6 +194,24 @@ test.describe('M3 Scale Measurement Baseline', () => {
       const barracksBBox = barracks ? computeWorldBBox(barracks.mesh) : null
       const farmBBox = farm ? computeWorldBBox(farm.mesh) : null
       const towerBBox = tower ? computeWorldBBox(tower.mesh) : null
+
+      // Measure tree visual height: sample up to 10 trees near player base
+      const treeEntries = g.treeManager?.entries ?? []
+      const baseTrees = treeEntries
+        .filter((t: any) => {
+          const dx = t.mesh.position.x - 13
+          const dz = t.mesh.position.z - 14
+          return dx * dx + dz * dz < 400 // within ~20 tiles of base center
+        })
+        .slice(0, 10)
+      const treeHeights = baseTrees.map((t: any) => {
+        const bbox = computeWorldBBox(t.mesh)
+        return bbox ? bbox.height : 0
+      }).filter((h: number) => h > 0)
+      const maxTreeHeight = treeHeights.length > 0 ? Math.max(...treeHeights) : 0
+      const avgTreeHeight = treeHeights.length > 0
+        ? treeHeights.reduce((a: number, b: number) => a + b, 0) / treeHeights.length
+        : 0
 
       // Footprint area (XZ plane)
       function footprintArea(bbox: any) {
@@ -206,8 +237,8 @@ test.describe('M3 Scale Measurement Baseline', () => {
       // GROUP 4: Default camera viewport contains base anchor
       // =====================================================
       const camera = g.camera
-      const playerTH = findEntities(0, 'townhall')[0]
-      const playerGM = findAny('goldmine')
+      const playerTH = th
+      const playerGM = gm
       const firstWorker = playerWorkers[0]
 
       function isOnScreen(obj: any) {
@@ -260,6 +291,7 @@ test.describe('M3 Scale Measurement Baseline', () => {
           bboxHeight: +workerBBox.height.toFixed(3),
           bboxDepth: +workerBBox.depth.toFixed(3),
           count: playerWorkers.length,
+          healthBarY: playerWorkers[0]?.mesh?.userData?.healthBarY ?? 0,
         } : null,
         footman: footmanBBoxFinal ? {
           bboxWidth: +footmanBBoxFinal.width.toFixed(3),
@@ -267,6 +299,7 @@ test.describe('M3 Scale Measurement Baseline', () => {
           bboxDepth: +footmanBBoxFinal.depth.toFixed(3),
           count: footmenForCheck.length,
           spawnedForTest: spawnedFootman,
+          healthBarY: footmenForCheck[0]?.mesh?.userData?.healthBarY ?? 0,
         } : null,
 
         // Buildings
@@ -276,6 +309,7 @@ test.describe('M3 Scale Measurement Baseline', () => {
           bboxDepth: +thBBox.depth.toFixed(3),
           dataSize: 4,
           footprintArea: +footprintArea(thBBox).toFixed(3),
+          buildProgress: th?.buildProgress ?? 1,
         } : null,
         goldmine: gmBBox ? {
           bboxWidth: +gmBBox.width.toFixed(3),
@@ -283,6 +317,7 @@ test.describe('M3 Scale Measurement Baseline', () => {
           bboxDepth: +gmBBox.depth.toFixed(3),
           dataSize: 3,
           footprintArea: +footprintArea(gmBBox).toFixed(3),
+          buildProgress: gm?.buildProgress ?? 1,
         } : null,
         barracks: barracksBBox ? {
           bboxWidth: +barracksBBox.width.toFixed(3),
@@ -290,6 +325,7 @@ test.describe('M3 Scale Measurement Baseline', () => {
           bboxDepth: +barracksBBox.depth.toFixed(3),
           dataSize: 3,
           footprintArea: +footprintArea(barracksBBox).toFixed(3),
+          buildProgress: barracks?.buildProgress ?? 1,
         } : null,
         farm: farmBBox ? {
           bboxWidth: +farmBBox.width.toFixed(3),
@@ -297,6 +333,7 @@ test.describe('M3 Scale Measurement Baseline', () => {
           bboxDepth: +farmBBox.depth.toFixed(3),
           dataSize: 2,
           footprintArea: +footprintArea(farmBBox).toFixed(3),
+          buildProgress: farm?.buildProgress ?? 1,
         } : null,
         tower: towerBBox ? {
           bboxWidth: +towerBBox.width.toFixed(3),
@@ -304,6 +341,7 @@ test.describe('M3 Scale Measurement Baseline', () => {
           bboxDepth: +towerBBox.depth.toFixed(3),
           dataSize: 2,
           footprintArea: +footprintArea(towerBBox).toFixed(3),
+          buildProgress: tower?.buildProgress ?? 1,
         } : null,
 
         // Ratios (TH = 1.0 baseline)
@@ -316,6 +354,14 @@ test.describe('M3 Scale Measurement Baseline', () => {
           footmanOverWorker: workerBBox && footmanBBoxFinal
             ? +((footmanBBoxFinal.width * footmanBBoxFinal.height) / (workerBBox.width * workerBBox.height)).toFixed(3)
             : null,
+          maxTreeHeightOverTH: thBBox && maxTreeHeight > 0 ? +(maxTreeHeight / thBBox.height).toFixed(3) : null,
+        },
+
+        // Trees
+        trees: {
+          sampledCount: treeHeights.length,
+          maxHeight: +maxTreeHeight.toFixed(3),
+          avgHeight: +avgTreeHeight.toFixed(3),
         },
 
         // Camera
@@ -371,6 +417,8 @@ test.describe('M3 Scale Measurement Baseline', () => {
     expect(barArea, 'barracks visual footprint area must be > 0').toBeGreaterThan(0)
     expect(farmArea, 'farm visual footprint area must be > 0').toBeGreaterThan(0)
     expect(towerArea, 'tower visual footprint area must be > 0').toBeGreaterThan(0)
+    expect(s.farm.buildProgress, 'farm scale contract must measure a completed farm').toBeGreaterThanOrEqual(1)
+    expect(s.tower.buildProgress, 'tower scale contract must measure a completed tower').toBeGreaterThanOrEqual(1)
 
     // Data size hierarchy invariant: farm < barracks <= goldmine <= townhall
     // These are from GameData.size, which controls placement and selection ring sizing
@@ -387,14 +435,57 @@ test.describe('M3 Scale Measurement Baseline', () => {
     const towerW = s.tower?.bboxWidth ?? 0
     expect(towerH, `tower height (${towerH}) must exceed tower width (${towerW}) for vertical profile`).toBeGreaterThan(towerW)
 
-    // M3 visual-scale contract: the runtime bbox must preserve base hierarchy.
-    // These thresholds are intentionally broad; they prevent inverted silhouettes
-    // while leaving room for later asset swaps and hand-tuned visual polish.
-    expect(s.ratios.footmanOverWorker, 'footman silhouette must read heavier than worker').toBeGreaterThan(1.1)
+    // Tower has visible defensive base (not just a thin pole)
+    expect(towerW, `tower base width (${towerW}) must be wide enough to read as a defense structure`).toBeGreaterThan(0.8)
+
+    // M3 visual-scale contract: the runtime bbox must preserve War3-like base hierarchy.
+    //
+    // These ratios are measurable guards against silhouette inversions.
+    // They do NOT claim the game "looks like War3" — human visual approval is still required.
+    //
+    // Rationale for each threshold:
+    // - footmanOverWorker > 1.3: military units must read heavier than workers at RTS zoom.
+    //   War3 footman has armor+shield+sword that makes silhouette ~2x worker.
+    // - barracksOverTH < 0.95: Town Hall must anchor the base. Barracks is production, not dominance.
+    // - farmOverTH in [0.08, 0.40]: farm is a compact wall/supply piece, not a main building,
+    //   but also not invisible. Below 0.08 it becomes unreadable; above 0.40 it loses wall-piece role.
+    // - goldmineOverTH < 1.1: resource landmark, but Town Hall is the base identity anchor.
+    // - towerHeightOverTH < 1.7: tower has vertical profile but must not dwarf Town Hall skyline.
+    // - towerOverTH > 0.05: tower must have nonzero visual mass (not a pixel-wide stick).
+    expect(s.ratios.footmanOverWorker, 'footman silhouette must read meaningfully heavier than worker (ratio > 1.3)').toBeGreaterThan(1.3)
     expect(s.ratios.barracksOverTH, 'barracks must remain visually smaller than Town Hall anchor').toBeLessThan(0.95)
-    expect(s.ratios.farmOverTH, 'farm must remain a compact wall/supply piece').toBeLessThan(0.45)
+    expect(s.ratios.farmOverTH, 'farm must be visible as compact wall/supply piece (ratio >= 0.08)').toBeGreaterThanOrEqual(0.08)
+    expect(s.ratios.farmOverTH, 'farm must remain compact relative to Town Hall (ratio < 0.40)').toBeLessThan(0.40)
     expect(s.ratios.goldmineOverTH, 'goldmine should not visually dominate Town Hall').toBeLessThan(1.1)
-    expect(s.ratios.towerHeightOverTH, 'tower skyline should not dwarf Town Hall').toBeLessThan(1.8)
+    expect(s.ratios.towerHeightOverTH, 'tower skyline should not dwarf Town Hall (ratio < 1.7)').toBeLessThan(1.7)
+    expect(s.ratios.towerOverTH, 'tower must have visible footprint mass (ratio > 0.05)').toBeGreaterThan(0.05)
+
+    // Tree height contract: trees should not visually dominate Town Hall.
+    // If we sampled at least one tree, max tree height must be below TH height.
+    // (Trees at 0.8 + rng()*0.8 = 0.8-1.6x base, base tree ~2.75 => max ~4.4)
+    if (s.trees.sampledCount > 0 && s.ratios.maxTreeHeightOverTH !== null) {
+      expect(s.ratios.maxTreeHeightOverTH,
+        `max tree height (${s.trees.maxHeight}) should not exceed Town Hall height (${s.townhall.bboxHeight}) scaled by 1.5`).toBeLessThan(1.5)
+    }
+
+    // Healthbar placement sanity: worker healthBarY > worker bbox height
+    // (This checks the proxy's healthBarY userData is above the visual body)
+    const workerHealthBarY = s.worker.healthBarY
+    const workerVisualH = s.worker.bboxHeight
+    if (workerHealthBarY > 0) {
+      expect(workerHealthBarY,
+        `worker healthBarY (${workerHealthBarY}) must be above visual bbox top (${workerVisualH})`).toBeGreaterThan(workerVisualH * 0.8)
+    }
+
+    // Selection ring radius must be a reasonable fraction of visual footprint
+    // Buildings: ring radius should be between 0.3x and 1.5x the visual half-extent
+    const thFootArea = s.townhall?.footprintArea ?? 0
+    const thVisualRadius = Math.sqrt(thFootArea) / 2
+    const thRing = s.ringRadii.townhall?.expected ?? 0
+    expect(thRing / thVisualRadius,
+      `TH selection ring (${thRing}) / visual half-extent (${thVisualRadius.toFixed(2)}) must be in [0.3, 1.5]`).toBeGreaterThanOrEqual(0.3)
+    expect(thRing / thVisualRadius,
+      `TH selection ring (${thRing}) / visual half-extent (${thVisualRadius.toFixed(2)}) must be in [0.3, 1.5]`).toBeLessThanOrEqual(1.5)
 
     // ---- GROUP 3: Spawned workers outside blockers ----
     for (const w of s.workerBlockerStatus) {

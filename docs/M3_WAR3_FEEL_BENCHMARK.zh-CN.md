@@ -489,6 +489,62 @@ Remaining visual debt:
 2. Worker visibility on the live page still requires human review because the proxy can be occluded by dark terrain, tree shadows, and HUD opacity.
 3. Final M3 approval still depends on browser playtest: default view, base readability, drag-select, worker construction, and first combat.
 
+### 6.5 M3 Scale Contract Enforcement 快照 (2026-04-12)
+
+来源：`tests/m3-scale-measurement.spec.ts` 的本轮验证输出。
+
+本轮关键修正：
+
+- `tests/m3-scale-measurement.spec.ts` 只测 `buildProgress >= 1` 的完工建筑；如果当前局面没有完工 farm/tower，则生成一个完工测量对象。避免把建造中 0.3 scale 的建筑误当成最终比例。
+- Farm proxy 几何体保持 compact wall/supply piece，不靠放大 farm 来掩盖错误测量。
+- Footman proxy 放大到 `1.7`，用于保证军事单位剪影明显重于 worker。
+- Tree 随机缩放范围收窄，避免树木在默认基地视角中压倒 Town Hall。
+
+Proxy 视觉数值调整（不改碰撞/寻路/GameData.size）：
+
+| 修改项 | 文件 | before | after | 原因 |
+|---|---|---|---|---|
+| Farm 测量对象 | `m3-scale-measurement.spec.ts` | 可能测到建造中 0.3 scale farm | 只测 `buildProgress >= 1` 完工 farm | 防止 construction-scale 产生假失败/假通过 |
+| Footman scale | `UnitVisualFactory.ts` | `group.scale.setScalar(1.5)` | `group.scale.setScalar(1.7)` | footman/worker silhouette 1.204→1.547，满足 >1.3 contract |
+| Tree random scale | `Game.ts` | `0.8 + rng() * 0.8` (0.8-1.6x) | `0.6 + rng() * 0.5` (0.6-1.1x) | max tree/TH height ~1.175，满足 <1.5 contract |
+
+```
+Worker:    1.240w × 1.865h × 0.963d (unchanged)
+Footman:   1.547w × 2.312h × 1.088d (scale 1.5→1.7)
+Town Hall: 3.508w × 2.232h × 3.229d (unchanged)
+Gold Mine: 2.840w × 3.160h × 2.840d (unchanged)
+Barracks:  2.546w × 2.550h × 2.546d (unchanged)
+Farm:      1.500w × 1.000h × 2.200d (completed building, buildProgress=1)
+Tower:     1.320w × 3.500h × 1.320d (unchanged)
+
+Trees (sample of 10 near player base):
+  maxHeight: 2.623  avgHeight: 2.017
+
+Measured ratios:
+  Farm / TH area       = 0.291   (contract: 0.08–0.40) ✓
+  Barracks / TH area   = 0.572   (contract: <0.95)     ✓
+  GoldMine / TH area   = 0.712   (contract: <1.1)      ✓
+  Tower / TH area      = 0.154   (contract: >0.05)     ✓
+  Tower height / TH    = 1.568   (contract: <1.7)      ✓
+  Footman / Worker     = 1.547   (contract: >1.3)      ✓
+  Max tree / TH height = 1.175   (contract: <1.5)      ✓
+```
+
+新增 objective ratio contracts:
+
+| Contract | 阈值 | 含义 |
+|---|---|---|
+| farmOverTH >= 0.08 | farm 不能不可读 | wall/supply piece 必须可见 |
+| farmOverTH < 0.40 | farm 不能比 TH 大 | compact wall piece 角色 |
+| footmanOverWorker > 1.3 | 军事单位比工人重 | 盔甲+盾牌剪影分离 |
+| towerHeightOverTH < 1.7 | 塔不压倒 TH | 防御标志不压主基地 |
+| tower base width > 0.8 | 塔有可见底座 | 不是细棍 |
+| maxTreeHeightOverTH < 1.5 | 树不压倒 TH | 填空物不主导基地 |
+| TH ring/visual half-extent in [0.3, 1.5] | 选择圈合理 | ring 与视觉 footprint 匹配 |
+| worker healthBarY > 0.8 * bbox height | 血条在身体上方 | 可读性 |
+
+**human visual approval still required.** These are measurable numeric guards against silhouette inversions, not visual feel confirmation.
+
 ---
 
 ## 7. 参考文档

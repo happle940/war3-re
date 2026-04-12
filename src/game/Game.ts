@@ -3574,7 +3574,7 @@ export class Game {
       if (tile === TileType.Water || tile === TileType.Dirt || tile === TileType.LightDirt
         || tile === TileType.Stone || tile === TileType.DarkStone) continue
       const h = this.getWorldHeight(x, z)
-      const scale = 0.8 + rng() * 0.8
+      const scale = 0.6 + rng() * 0.5
       const tree = this.createSingleTree()
       tree.position.set(x + 0.5, h, z + 0.5)
       tree.scale.setScalar(scale)
@@ -3602,7 +3602,7 @@ export class Game {
       if (tile === TileType.Water || tile === TileType.Dirt || tile === TileType.LightDirt
         || tile === TileType.Stone || tile === TileType.DarkStone) continue
       const h = this.getWorldHeight(x, z)
-      const scale = 0.8 + rng() * 0.8
+      const scale = 0.6 + rng() * 0.5
       const tree = this.createSingleTree()
       tree.position.set(x + 0.5, h, z + 0.5)
       tree.scale.setScalar(scale)
@@ -3623,7 +3623,7 @@ export class Game {
       if (d1 < 16 || d2 < 16) continue
 
       const h = this.getWorldHeight(x, z)
-      const scale = 0.8 + rng() * 0.8
+      const scale = 0.6 + rng() * 0.5
       const tree = this.createSingleTree()
       tree.position.set(x + 0.5, h, z + 0.5)
       tree.scale.setScalar(scale)
@@ -4649,7 +4649,7 @@ export class Game {
       // 高度
       const groundH = terrain.groundHeight[dataIdx] * 3.0  // 匹配 renderer 的 heightScale
 
-      const scale = 0.8 + rng() * 0.8
+      const scale = 0.6 + rng() * 0.5
       const tree = this.createSingleTree()
       tree.position.set(x + 0.5, groundH, z + 0.5)
       tree.scale.setScalar(scale)

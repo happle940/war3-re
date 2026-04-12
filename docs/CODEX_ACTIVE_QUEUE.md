@@ -72,7 +72,8 @@ GLM owns:
 | C17 — Dispatch M2 Gate Packet | done | 2026-04-11 | GLM added `npm run test:m2` and `docs/M2_GATE_PACKET.zh-CN.md`; Codex reran `npm run test:m2` locally, 32/32 passed. |
 | C18 — War3 Rule System Roadmap | done | 2026-04-11 | Converted the user's bug list into a durable S1-S7 system roadmap so future work is contract-first, not patch-first. |
 | C19 — Runtime Harness Sharding Review | done | 2026-04-12 | Accepted Task22 at commit `2e7421d`; sharded runtime gate passed 5/5 shards, 103 tests, 779s, with 16-spec coverage parity. |
-| C20 — M3/M4 Next Work Packet Prep | active | 2026-04-12 | Next dispatch is M3 Scale Contract Implementation because M2 objective runtime gate is green and user already passed M1 with visual debt. |
+| C20 — M3/M4 Next Work Packet Prep | done | 2026-04-12 | Task23 completed with corrected M3 objective scale contract; Codex rejected invalid construction-scale farm evidence and replaced it with completed-building measurement. |
+| C21 — Dispatch M4 Player Issue Reality Pack | active | 2026-04-12 | Keep GLM on concrete product blockers from user live play: construction resume/cancel, tower attack reality, supply feedback, and unit body presence. |
 
 ## Task Cards
 
@@ -614,7 +615,7 @@ Closeout:
 
 ### C20 — M3/M4 Next Work Packet Prep
 
-Status: `active`.
+Status: `done`.
 
 Goal: keep the next product-level work ready so GLM does not idle after Task22.
 
@@ -631,6 +632,41 @@ Likely next GLM task shapes:
 - M3 Base Grammar Measurement: add deterministic checks for townhall, mine, barracks, tree line, and exit spacing without claiming visual approval.
 - M4 Win/Loss Baseline: add victory/defeat state, AI/player base destruction detection, and end-state HUD.
 - M4 AI Recovery Pack: prove AI can recover after worker/building loss without bypassing normal rules.
+
+Verification:
+
+```bash
+git diff --check
+```
+
+Closeout:
+
+- Task23 completed with corrected M3 measurement contract.
+- Codex rejected GLM's invalid farm evidence because it measured a construction-scaled farm.
+- Corrected final M3 values: `farmOverTH=0.291`, `footmanOverWorker=1.547`, `maxTreeHeightOverTH=1.175`.
+- Next GLM task is Task24: M4 Player-Reported UX Reality Pack.
+
+### C21 — Dispatch M4 Player Issue Reality Pack
+
+Status: `active`.
+
+Goal: convert the user's latest live-play blockers into deterministic runtime proof and narrow fixes before M4.
+
+Inputs:
+
+- Barracks construction can stop halfway and feel impossible to resume.
+- Tower appears to have no attack in live play.
+- Units lack meaningful body/collision presence.
+- Supply block makes production feel dead.
+- Construction cancel is not discoverable enough.
+- These must be handled as War3-like order/ability/system alignment gaps, not isolated visual polish.
+
+Codex responsibilities:
+
+- Dispatch Task24 with tight file ownership.
+- Review GLM output for real input/DOM assertions, not internal smoke.
+- Reject claims that existing internal tests are enough if the user's live path is not covered.
+- Keep browser/runtime cleanup enforced after Playwright runs.
 
 Verification:
 
