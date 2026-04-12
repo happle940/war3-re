@@ -47,7 +47,8 @@ Current queue state:
 | Task 19 — Order Model Boundary Inventory | completed | GLM + Codex review | 2026-04-12 | Completed at commit `8e8d017`; added order-model boundary inventory and regression proof. |
 | Task 20 — Builder-Stealing Fix | completed | GLM + Codex review | 2026-04-12 | Completed at commit `7fa441e`; fixed active construction builder stealing and added 3 construction lifecycle tests. Codex verified build, app typecheck, and four M4 specs individually green. |
 | Task 21 — Runtime Harness Fast-Start | completed | GLM | 2026-04-12 | Partial infrastructure improvement. `?runtimeTest=1` skips W3X auto-load, per-test time ~8-9s -> ~5.8-6.5s. Individual M4 specs pass. Full `npm run test:runtime` still >10min, not a stable local gate. |
-| Task 22 — Runtime Sharded Gate | completed | GLM | 2026-04-12 | `npm run test:runtime` replaced with sharded script. 5/5 shards passed, 103 tests, 13m total. Replaces old single-command runtime. |
+| Task 22 — Runtime Sharded Gate | completed | GLM + Codex closeout | 2026-04-12 | Completed at commit `2e7421d`; `npm run test:runtime` replaced with sharded script. 5/5 shards passed, 103 tests, 13m total. Replaces old single-command runtime. |
+| Task 23 — M3 Scale Contract Implementation | in_progress | GLM | 2026-04-12 | Tighten objective War3-like scale/readability ratios and make minimal proxy-only adjustments. No camera, terrain, AI, command, or subjective screenshot work. |
 | Task 08 — Game.ts Module Extraction Slice | ready | Codex dispatch | 2026-04-11 | Defer until death/cleanup and HUD cache gaps are covered. |
 
 ## Dispatch Rules
@@ -124,6 +125,76 @@ Bad development examples:
 - changing scale/camera/visual taste as a side effect of logic work
 
 ## Queue
+
+### Task 23 — M3 Scale Contract Implementation
+
+Status: `in_progress`.
+
+Owner: GLM.
+
+Started: 2026-04-12.
+
+Priority: first M3 implementation slice after M2 runtime harness stabilization.
+
+Why now:
+
+The user's remaining visual complaint is not just "art quality"; it is inconsistent RTS scale grammar. M3 must start by making scale relationships objective and testable before any subjective visual pass.
+
+Goal:
+
+Tighten the M3 objective scale/readability contract and make minimal proxy-only adjustments so the current procedural visuals obey stable War3-like ratios:
+
+- farm remains a compact wall/supply piece
+- barracks reads as mid-size production, below Town Hall
+- tower has a visible defensive base and vertical profile without dwarfing Town Hall
+- footman silhouette reads meaningfully heavier than worker
+- tree height does not visually dominate the player base
+- selection ring and healthbar placement remain sane after ratio changes
+
+Allowed files:
+
+- `tests/m3-scale-measurement.spec.ts`
+- `src/game/UnitVisualFactory.ts`
+- `src/game/BuildingVisualFactory.ts`
+- `src/game/Game.ts` only for tree scale/height constants and measurement hooks; do not touch command, AI, combat, construction, or resource logic
+- `docs/M3_WAR3_FEEL_BENCHMARK.zh-CN.md`
+- `docs/GAMEPLAY_REGRESSION_CHECKLIST.md`
+- `docs/GLM_READY_TASK_QUEUE.md`
+
+Forbidden files:
+
+- `src/game/GameCommand.ts`
+- `src/game/SimpleAI.ts`
+- `src/game/TeamResources.ts`
+- runtime harness scripts
+- camera controller
+- terrain generator
+- asset sourcing or external model files
+- screenshots or browser-visible manual validation
+
+Required workflow:
+
+1. First run the existing M3 measurement test and read the emitted `[M3-SCALE-MEASUREMENT]` JSON.
+2. Strengthen `tests/m3-scale-measurement.spec.ts` with objective ratios only. Do not assert subjective "looks like War3".
+3. Make minimal proxy numeric changes in the allowed visual files until the strengthened contract passes.
+4. Update docs with exact before/after ratios and clearly label human visual approval as still required.
+
+Required verification:
+
+```bash
+npm run build
+npx tsc --noEmit -p tsconfig.app.json
+./scripts/run-runtime-tests.sh tests/m3-scale-measurement.spec.ts --reporter=list
+./scripts/run-runtime-tests.sh tests/unit-visibility-regression.spec.ts tests/pathing-footprint-regression.spec.ts tests/selection-input-regression.spec.ts --reporter=list
+./scripts/cleanup-local-runtime.sh
+ps aux | egrep 'node .*vite|playwright|chrome-headless-shell|\.openclaw/browser' | grep -v egrep || true
+```
+
+Commit message:
+
+```text
+visual: enforce M3 scale contract
+```
 
 ### Task 22 — Runtime Sharded Local Gate
 

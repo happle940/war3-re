@@ -71,8 +71,8 @@ GLM owns:
 | C16 — Review GLM Combat Control Contract | done | 2026-04-11 | GLM drafted the test file but it initially failed 8/8; Codex took over, exposed the real command dispatcher for runtime tests, fixed HoldPosition state restoration, and verified 20/20 affected tests. |
 | C17 — Dispatch M2 Gate Packet | done | 2026-04-11 | GLM added `npm run test:m2` and `docs/M2_GATE_PACKET.zh-CN.md`; Codex reran `npm run test:m2` locally, 32/32 passed. |
 | C18 — War3 Rule System Roadmap | done | 2026-04-11 | Converted the user's bug list into a durable S1-S7 system roadmap so future work is contract-first, not patch-first. |
-| C19 — Runtime Harness Sharding Review | active | 2026-04-12 | GLM is implementing Task22. Codex must prevent false completion, verify spec coverage, runtime cleanup, and CI compatibility before accepting it. |
-| C20 — M3/M4 Next Work Packet Prep | ready | 2026-04-12 | Prepare the next product-level task packet after harness stabilization: either War3 scale/readability integration or Human-vs-AI alpha loop, depending on M2 gate result. |
+| C19 — Runtime Harness Sharding Review | done | 2026-04-12 | Accepted Task22 at commit `2e7421d`; sharded runtime gate passed 5/5 shards, 103 tests, 779s, with 16-spec coverage parity. |
+| C20 — M3/M4 Next Work Packet Prep | active | 2026-04-12 | Next dispatch is M3 Scale Contract Implementation because M2 objective runtime gate is green and user already passed M1 with visual debt. |
 
 ## Task Cards
 
@@ -563,7 +563,7 @@ Closeout:
 
 ### C19 — Runtime Harness Sharding Review
 
-Status: `active`.
+Status: `done`.
 
 Trigger: GLM Task22 is in progress.
 
@@ -604,9 +604,17 @@ Closeout requirement:
 
 - If GLM pushes Task22, Codex must inspect the diff and rerun at least build, app typecheck, and the sharded runtime suite before marking C19 done.
 
+Closeout:
+
+- Accepted commit `2e7421d` (`test: shard runtime regression gate`).
+- `npm run test:runtime` now routes through `scripts/run-runtime-suite.sh`.
+- `test:runtime:single` is retained with equivalent 16-spec coverage.
+- Full sharded runtime gate passed: 5/5 shards, 103 tests, 779s.
+- Codex reran build, app typecheck, diff check, and static coverage parity check before commit/push.
+
 ### C20 — M3/M4 Next Work Packet Prep
 
-Status: `ready`.
+Status: `active`.
 
 Goal: keep the next product-level work ready so GLM does not idle after Task22.
 
