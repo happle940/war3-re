@@ -316,6 +316,22 @@
 - [x] 分离后单位不会被推入建筑/树木 blocker tile
 - [x] 单位存在感测试过程无严重 console error
 
+### M4 命令表面矩阵自动化覆盖
+
+以下项目由 `tests/command-surface-regression.spec.ts` 自动验证（Playwright）：
+
+- [x] Worker 右键未完成己方建筑 → handleRightClick + g.update() 恢复建造
+- [x] Worker 右键金矿 → gather 命令 + resourceTarget 指向该 mine
+- [x] 非Worker 右键金矿 → move near mine，不进入 gather 状态
+- [x] 战斗单位右键敌方 → attack 命令 + attackTarget 指向敌人
+- [x] 单位右键地面 → move 命令并清理 stale gather/build/attack state
+- [x] 单位右键己方完成建筑 → move near，不触发 build/attack
+- [x] Worker 命令卡显示 Farm/Barracks/Tower 建造按钮；资源不足时有明确 disabled reason
+- [x] 选中未完成建筑暴露 Cancel；点击后释放 footprint + 清 builder
+- [x] Completed Barracks 在 supply cap 时 Footman disabled，原因包含人口
+- [x] Tower HUD/命令面板暴露 attackDamage/range/cooldown 可读文本
+- [x] 拥挤金矿右键（多农民遮挡）→ resolve 到金矿 gather 而非 move 到 worker
+
 ## 仍未被自动化覆盖（需人工验证）
 
 - [ ] 玩家手动操作的采集/建造/训练完整流程

@@ -2179,8 +2179,19 @@ export class Game {
     const unitHits = this.raycaster.intersectObjects(unitMeshes, true)
 
     if (unitHits.length > 0) {
-      const hitObj = unitHits[0].object
-      const target = this.findUnitByObject(hitObj)
+      // Resolve all hit units from the hit list. When workers crowd a goldmine
+      // the first hit may be a worker, but the player intent is to gather.
+      // Prefer goldmine or unfinished building over own units.
+      const hitUnits: Unit[] = []
+      const seen = new Set<Unit>()
+      for (const hit of unitHits) {
+        const u = this.findUnitByObject(hit.object)
+        if (u && !seen.has(u)) { hitUnits.push(u); seen.add(u) }
+      }
+      const target =
+        hitUnits.find(u => u.type === 'goldmine') ??
+        hitUnits.find(u => u.team === 0 && u.isBuilding && u.buildProgress < 1) ??
+        hitUnits[0]
 
       if (target) {
         // 只有己方可控单位才能接受玩家命令
@@ -4161,6 +4172,12 @@ export class Game {
         if (u.trainingQueue.length > 1) {
           statsHtml += `<span class="stat">队列 ${u.trainingQueue.length}</span>`
         }
+      }
+      // Weapon stats for combat buildings (e.g., tower)
+      if (bDef?.attackDamage) {
+        statsHtml += `<span class="stat">⚔ ${bDef.attackDamage}</span>`
+        if (bDef.attackRange) statsHtml += `<span class="stat">射程 ${bDef.attackRange}</span>`
+        if (bDef.attackCooldown) statsHtml += `<span class="stat">冷却 ${bDef.attackCooldown}s</span>`
       }
       this.elUnitStats.innerHTML = statsHtml
     } else if (u.type === 'goldmine') {

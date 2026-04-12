@@ -50,7 +50,7 @@ Current queue state:
 | Task 22 — Runtime Sharded Gate | completed | GLM + Codex closeout | 2026-04-12 | Completed at commit `2e7421d`; `npm run test:runtime` replaced with sharded script. 5/5 shards passed, 103 tests, 13m total. Replaces old single-command runtime. |
 | Task 23 — M3 Scale Contract Implementation | completed | GLM + Codex correction | 2026-04-12 | Completed locally; Codex corrected the farm measurement flaw so M3 measures completed buildings only. Verification green: build, app typecheck, M3 spec, visibility/pathing/selection affected pack. |
 | Task 24 — M4 Player-Reported UX Reality Pack | completed | GLM + Codex correction | 2026-04-12 | M4 spec added and corrected. Verification green: build, app typecheck, M4 pack 6/6, affected construction/static-defense/resource/unit-presence pack 29/29. |
-| Task 25 — M4 War3 Command Surface Matrix | in_progress | GLM | 2026-04-12 | Next GLM task: prove the player-facing command matrix through live-like input/DOM paths so user-reported gaps stop reappearing as isolated patches. |
+| Task 25 — M4 War3 Command Surface Matrix | completed | GLM | 2026-04-12 | 11/11 command surface tests green. Game.ts fixes: tower weapon stats in HUD, crowded goldmine right-click target priority, findUnitByObject parent-chain helper. |
 | Task 08 — Game.ts Module Extraction Slice | ready | Codex dispatch | 2026-04-11 | Defer until death/cleanup and HUD cache gaps are covered. |
 
 ## Dispatch Rules
