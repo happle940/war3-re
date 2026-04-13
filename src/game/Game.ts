@@ -1454,7 +1454,7 @@ export class Game {
     this.clearSelection()
 
     // 创建幽灵建筑
-    const ghostMesh = this.createBuildingMesh(buildingKey, 0x00ff00, 0.5)
+    const ghostMesh = this.placement.createGhostMesh(buildingKey)
     ghostMesh.visible = false
     this.scene.add(ghostMesh)
     this.placement.begin(buildingKey, savedWorkers, ghostMesh)
@@ -1467,28 +1467,12 @@ export class Game {
 
     this.raycaster.setFromCamera(this.mouseNDC, this.camera)
     const hits = this.raycaster.intersectObject(this.terrain.groundPlane)
-    if (hits.length > 0) {
-      const p = hits[0].point
-      const tx = Math.round(p.x)
-      const tz = Math.round(p.z)
-      this.placement.currentGhost.position.set(
-        tx + 0.5,
-        this.getWorldHeight(tx, tz) + 0.01,
-        tz + 0.5,
-      )
-      this.placement.currentGhost.visible = true
-
-      // 合法性颜色反馈：绿色=可放置，红色=不可放置（更鲜明的对比）
-      const def = BUILDINGS[this.placement.mode!]
-      const valid = def && this.placementValidator.canPlace(tx, tz, def.size).ok
-      const color = valid ? 0x44ff44 : 0xff3333
-      this.placement.currentGhost.traverse((child) => {
-        if (child instanceof THREE.Mesh) {
-          const mat = child.material as THREE.MeshLambertMaterial | THREE.LineBasicMaterial
-          if ('color' in mat) mat.color.setHex(color)
-        }
-      })
-    }
+    const hitPoint = hits.length > 0 ? hits[0].point : null
+    this.placement.updatePreview(
+      hitPoint,
+      (wx, wz) => this.getWorldHeight(wx, wz),
+      this.placementValidator,
+    )
   }
 
   /** 放置建筑 */
@@ -2637,29 +2621,6 @@ export class Game {
         child.receiveShadow = true
       }
     })
-    return group
-  }
-
-  private createBuildingMesh(type: string, color: number, opacity: number): THREE.Group {
-    const group = new THREE.Group()
-    const def = BUILDINGS[type]
-    const s = def?.size ?? 1
-
-    // 主体
-    const base = new THREE.Mesh(
-      new THREE.BoxGeometry(s, s * 0.4, s),
-      new THREE.MeshLambertMaterial({ color, transparent: true, opacity }),
-    )
-    base.position.y = s * 0.2
-    group.add(base)
-
-    // 地面指示框（绿色/红色，显示占地范围）
-    const outlineGeo = new THREE.EdgesGeometry(new THREE.BoxGeometry(s + 0.1, 0.01, s + 0.1))
-    const outlineMat = new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.8 })
-    const outline = new THREE.LineSegments(outlineGeo, outlineMat)
-    outline.position.y = 0.02
-    group.add(outline)
-
     return group
   }
 
