@@ -460,13 +460,28 @@ test.describe('M4 Player-Reported UX Reality', () => {
       const goldBefore = beforeRes.gold
       const lumberBefore = beforeRes.lumber
 
-      // Spawn unfinished farm with a builder
-      const builder = g.spawnUnit('worker', 0, 44, 44)
-      const farm = g.spawnBuilding('farm', 0, 46, 44)
+      const farmSize = 2
+      let farmTile: { x: number; z: number } | null = null
+      for (let z = 20; z < 58 && !farmTile; z++) {
+        for (let x = 20; x < 58; x++) {
+          if (g.placementValidator.canPlace(x, z, farmSize).ok) {
+            farmTile = { x, z }
+            break
+          }
+        }
+      }
+      if (!farmTile) return { ok: false, reason: 'no clear farm tile' }
+
+      // Spawn unfinished farm with a builder on a tile that was actually
+      // placeable before the test building occupied it.
+      const builder = g.spawnUnit('worker', 0, farmTile.x - 2, farmTile.z)
+      const farm = g.spawnBuilding('farm', 0, farmTile.x, farmTile.z)
       farm.buildProgress = 0.4
       farm.builder = builder
       builder.buildTarget = farm
       builder.state = 6 // Building
+
+      const canPlaceBefore = g.placementValidator.canPlace(farmTile.x, farmTile.z, farmSize).ok
 
       // Select unfinished building
       g.selectionModel.clear()
@@ -503,7 +518,9 @@ test.describe('M4 Player-Reported UX Reality', () => {
         builderBuildTarget: builder.buildTarget ? g.units.indexOf(builder.buildTarget) : -1,
         selectedCount: g.selectionModel.count,
         ringCount: g.selectionRings.length,
-        canPlaceAfter: g.placementValidator.canPlace(46, 44, 2).ok,
+        farmTile,
+        canPlaceBefore,
+        canPlaceAfter: g.placementValidator.canPlace(farmTile.x, farmTile.z, farmSize).ok,
         unitName: document.getElementById('unit-name')?.textContent ?? '',
         Idle,
       }
@@ -511,6 +528,7 @@ test.describe('M4 Player-Reported UX Reality', () => {
 
     expect(result.ok, 'game must load').toBe(true)
     expect(result.hadCancelButton, 'cancel button must appear when unfinished building is selected').toBe(true)
+    expect(result.canPlaceBefore, `test farm tile should be occupied before cancel: ${JSON.stringify(result.farmTile)}`).toBe(false)
 
     // Post-cancel assertions
     expect(result.farmStillExists, 'farm must be removed after cancel').toBe(false)
