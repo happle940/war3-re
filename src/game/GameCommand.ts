@@ -15,6 +15,7 @@ export type GameCommand =
   | { type: 'attackMove'; target: THREE.Vector3 }
   | { type: 'setRally'; building: Unit; target: THREE.Vector3; rallyTarget?: Unit }
   | { type: 'clearRally'; building: Unit }
+  | { type: 'upgradeBuilding'; building: Unit; targetKey: string; upgradeTime: number }
 
 // ===== 命令分发器 =====
 
@@ -196,6 +197,10 @@ export function issueCommand(units: Unit[], cmd: GameCommand) {
     case 'clearRally':
       cmd.building.rallyPoint = null
       cmd.building.rallyTarget = null
+      break
+
+    case 'upgradeBuilding':
+      cmd.building.upgradeQueue = { targetType: cmd.targetKey, remaining: cmd.upgradeTime }
       break
   }
 }

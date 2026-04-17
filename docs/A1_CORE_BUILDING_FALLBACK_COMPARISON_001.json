@@ -1,0 +1,63 @@
+{
+  "review_id": "a1-core-building-fallback-comparison-001",
+  "branch": "codex/asset-public-share",
+  "prepared_at": "2026-04-16",
+  "runtime_asset_changes": false,
+  "approved_for_import": [],
+  "source_artifacts": {
+    "comparison_html": "artifacts/asset-intake/preview/quaternius-vs-s0-core-buildings-preview.html",
+    "comparison_png": "artifacts/asset-intake/preview/quaternius-vs-s0-core-buildings-rts-preview.png",
+    "comparison_metrics": "artifacts/asset-intake/preview/quaternius-vs-s0-core-buildings-preview.metrics.json",
+    "source_sweep": "docs/A1_CORE_BUILDING_ASSET_PREVIEW_SWEEP_002.zh-CN.md",
+    "file_plan": "docs/A1_CORE_BUILDING_FILE_PLAN_002.zh-CN.md"
+  },
+  "browser_validation": {
+    "preview_failures": [],
+    "metrics_count": 6,
+    "canvas_nonblank": true,
+    "non_background_samples": 116,
+    "opaque_samples": 160
+  },
+  "product_verdict": {
+    "overall": "promising-but-not-import-ready",
+    "summary": "Quaternius candidates improve world/readability for core buildings, but current S0 fallback still has clearer team-color and functional cues. The next stage should combine Quaternius silhouettes with explicit team-color/interaction markers before any runtime import."
+  },
+  "category_findings": [
+    {
+      "key": "townhall",
+      "verdict": "promote-to-import-packet-candidate-after-team-color-pass",
+      "finding": "Quaternius Town Center gives a stronger base-anchor/world read than the boxy S0 proxy, but it lacks obvious player ownership and needs a command-center cue."
+    },
+    {
+      "key": "barracks",
+      "verdict": "promote-to-import-packet-candidate-after-military-cue-pass",
+      "finding": "Quaternius Barracks reads as a real military building, while S0 is more explicit through shield/swords/team color. Add banner/crest or team-color slot before import."
+    },
+    {
+      "key": "farm",
+      "verdict": "strongest-visual-upgrade-candidate",
+      "finding": "Quaternius Farm is a clear civilian/supply building and materially improves over the simple S0 farm wedge. Main risk is footprint/scale, not identity."
+    },
+    {
+      "key": "goldmine",
+      "verdict": "combine-mine-body-with-gold-accent-before-import",
+      "finding": "Quaternius Mine has a better cave/rock body, but S0 still has a stronger gold cue. The likely solution is Quaternius Mine plus Resource Gold accent."
+    },
+    {
+      "key": "tree_line",
+      "verdict": "promote-to-tree-line-placement-test",
+      "finding": "Quaternius Trees look more like a natural resource boundary than the single S0 fallback tree. Needs repeated placement and worker occlusion proof."
+    },
+    {
+      "key": "tower",
+      "verdict": "promote-to-attack-cue-and-team-color-test",
+      "finding": "Quaternius Watch Tower has strong silhouette, but S0 communicates team ownership better through a color band. Add attack cue and team marker before import."
+    }
+  ],
+  "next_gate": [
+    "Create team-color/material marker concepts for Town Center, Barracks, Tower, and optionally Farm.",
+    "Compose Mine + Resource Gold into a single goldmine preview before runtime import.",
+    "Run footprint/selection-ring/worker pathing proof for Town Hall, Barracks, Farm, Goldmine, Tree Line, and Tower.",
+    "Keep S0 fallback paths intact and prove GLB load failure returns to fallback."
+  ]
+}

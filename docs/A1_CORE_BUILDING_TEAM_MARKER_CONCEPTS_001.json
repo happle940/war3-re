@@ -1,0 +1,62 @@
+{
+  "review_id": "a1-core-building-team-marker-concepts-001",
+  "branch": "codex/asset-public-share",
+  "prepared_at": "2026-04-16",
+  "runtime_asset_changes": false,
+  "approved_for_import": [],
+  "purpose": "Test concept-only team-color and function markers on Quaternius intake GLBs before any runtime import decision.",
+  "artifacts": {
+    "preview_html": "artifacts/asset-intake/preview/quaternius-team-marker-concepts.html",
+    "preview_png": "artifacts/asset-intake/preview/quaternius-team-marker-concepts.png",
+    "preview_metrics": "artifacts/asset-intake/preview/quaternius-team-marker-concepts.metrics.json",
+    "fallback_comparison": "docs/A1_CORE_BUILDING_FALLBACK_COMPARISON_001.zh-CN.md"
+  },
+  "browser_validation": {
+    "preview_failures": [],
+    "metrics_count": 5,
+    "canvas_nonblank": true,
+    "non_background_samples": 109,
+    "opaque_samples": 160
+  },
+  "concept_verdict": {
+    "overall": "marker-concepts-viable-for-next-proof",
+    "summary": "Small external marker geometry appears sufficient to restore player ownership and role cues on Quaternius models without editing source GLBs. This is still a concept preview only; final runtime path requires footprint, selection ring, and fallback regression proof."
+  },
+  "marker_concepts": [
+    {
+      "key": "townhall",
+      "concept": "blue pole flag plus front banner",
+      "purpose": "Restore player ownership and main-base command cue at RTS camera distance.",
+      "next_requirement": "Place marker in a stable anchor or merged child mesh that does not shift selection ring or healthbar."
+    },
+    {
+      "key": "barracks",
+      "concept": "blue crest plus crossed weapon cue",
+      "purpose": "Recover S0 military/production readability while keeping Quaternius building form.",
+      "next_requirement": "Verify crest is visible from camera and does not imply unavailable upgrades."
+    },
+    {
+      "key": "farm",
+      "concept": "small blue flag only",
+      "purpose": "Give ownership without over-militarizing a civilian supply building.",
+      "next_requirement": "Keep marker small and confirm Farm remains visually subordinate to Town Hall/Barracks."
+    },
+    {
+      "key": "goldmine",
+      "concept": "Mine body plus Resource Gold accent and gold light",
+      "purpose": "Combine cave/rock body with explicit gold resource cue.",
+      "next_requirement": "Turn into one selected/harvestable runtime object with worker approach lanes."
+    },
+    {
+      "key": "tower",
+      "concept": "blue top flag plus attack-point cone",
+      "purpose": "Recover team ownership and defense role cue.",
+      "next_requirement": "Verify projectile spawn point and attack range visualization can align with marker."
+    }
+  ],
+  "next_gate": [
+    "Build footprint/selection-ring/pathing proof using these marker placements.",
+    "Test GLB failure fallback while keeping marker paths deterministic.",
+    "Decide whether marker geometry should be separate runtime child objects or baked into a prepared GLB copy after approval."
+  ]
+}

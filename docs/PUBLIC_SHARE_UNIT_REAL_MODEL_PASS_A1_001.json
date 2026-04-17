@@ -1,0 +1,47 @@
+{
+  "id": "public-share-unit-real-model-pass-a1-001",
+  "date": "2026-04-16",
+  "status": "import-trial-active-not-final-art",
+  "scope": "all current Human unit runtime types",
+  "runtimeRoute": "real-gltf-unit-model",
+  "unitTypes": [
+    "worker",
+    "footman",
+    "rifleman",
+    "mortar_team",
+    "priest",
+    "militia",
+    "sorceress",
+    "knight",
+    "paladin"
+  ],
+  "assetDirectory": "public/assets/models/vendor/poly-pizza/units",
+  "proof": {
+    "screenshot": "artifacts/asset-intake/preview/real-unit-model-lineup-a1-001.png",
+    "metrics": "artifacts/asset-intake/preview/real-unit-model-lineup-a1-001.json",
+    "test": "tests/real-unit-model-intake-proof.spec.ts"
+  },
+  "verification": [
+    {
+      "command": "npm run build",
+      "result": "pass"
+    },
+    {
+      "command": "./scripts/run-runtime-tests.sh tests/real-unit-model-intake-proof.spec.ts tests/worker-peasant-readability-proof.spec.ts tests/unit-visibility-regression.spec.ts tests/asset-pipeline-regression.spec.ts --reporter=list",
+      "result": "pass",
+      "tests": 9
+    },
+    {
+      "command": "./scripts/run-runtime-tests.sh tests/real-unit-model-intake-proof.spec.ts --reporter=list",
+      "result": "pass",
+      "tests": 1,
+      "note": "rerun after clearing the proof screenshot stage from tree occlusion"
+    }
+  ],
+  "notes": [
+    "This replaces the default visible path for every current Human unit with a local GLB when assets are loaded.",
+    "Procedural proxy models remain as fallback only when an asset is missing or fails to load.",
+    "Small circular team/role cues are runtime adapters for RTS readability; they are not pixel-block placeholders.",
+    "Final public art approval is still separate from this import trial."
+  ]
+}

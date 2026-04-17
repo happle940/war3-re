@@ -626,9 +626,9 @@ test.describe('Command Surface Regression Matrix', () => {
   })
 
   // ============================================================
-  // C1: Worker card shows build buttons; disabled when broke
+  // C1: Worker card shows build buttons; disabled when broke or missing tech
   // ============================================================
-  test('command card: worker shows Farm/Barracks/Tower build buttons with resource gating', async ({ page }) => {
+  test('command card: worker shows Farm/Barracks/Tower build buttons with resource and tech gating', async ({ page }) => {
     await waitForGame(page)
 
     const result = await page.evaluate(() => {
@@ -638,7 +638,7 @@ test.describe('Command Surface Regression Matrix', () => {
       const worker = g.units.find((u: any) => u.team === 0 && u.type === 'worker' && u.hp > 0)
       if (!worker) return { ok: false, reason: 'no worker' }
 
-      // --- Step 1: With resources, buttons should be enabled ---
+      // --- Step 1: With resources, basic buttons should be enabled and tower should explain its tech gate ---
       g.resources.earn(0, 500, 500)
       g.selectionModel.clear()
       g.clearSelectionRings()
@@ -656,6 +656,19 @@ test.describe('Command Surface Regression Matrix', () => {
       const farmBtn = richData.find(b => b.label === '农场')
       const barracksBtn = richData.find(b => b.label === '兵营')
       const towerBtn = richData.find(b => b.label === '箭塔')
+
+      // --- Step 1b: With a completed lumber mill, tower should become enabled ---
+      const lumberMill = g.spawnBuilding('lumber_mill', 0, 28, 28)
+      g._lastCmdKey = ''
+      g.updateHUD(0.016)
+
+      const techReadyButtons = Array.from(document.querySelectorAll('#command-card button'))
+      const techReadyData = techReadyButtons.map((btn: any) => ({
+        label: btn.querySelector('.btn-label')?.textContent?.trim() ?? '',
+        disabled: btn.disabled,
+        disabledReason: btn.dataset.disabledReason ?? '',
+      }))
+      const techReadyTowerBtn = techReadyData.find(b => b.label === '箭塔')
 
       // --- Step 2: With no resources, buttons should be disabled with reason ---
       g.resources.spend(0, { gold: g.resources.get(0).gold, lumber: g.resources.get(0).lumber })
@@ -675,7 +688,9 @@ test.describe('Command Surface Regression Matrix', () => {
         farmBtn: farmBtn ?? null,
         barracksBtn: barracksBtn ?? null,
         towerBtn: towerBtn ?? null,
+        techReadyTowerBtn: techReadyTowerBtn ?? null,
         poorFarmBtn: poorFarmBtn ?? null,
+        lumberMillStillExists: g.units.some((u: any) => u === lumberMill && u.hp > 0),
       }
     })
 
@@ -686,7 +701,11 @@ test.describe('Command Surface Regression Matrix', () => {
     expect(result.towerBtn, 'tower button must exist').not.toBeNull()
     expect(result.farmBtn.disabled, 'farm should be enabled with resources').toBe(false)
     expect(result.barracksBtn.disabled, 'barracks should be enabled with resources').toBe(false)
-    expect(result.towerBtn.disabled, 'tower should be enabled with resources').toBe(false)
+    expect(result.towerBtn.disabled, 'tower should be disabled until lumber mill exists').toBe(true)
+    expect(result.towerBtn.disabledReason, 'tower should explain its lumber mill prerequisite').toContain('伐木场')
+    expect(result.techReadyTowerBtn, 'tower button must exist after lumber mill').not.toBeNull()
+    expect(result.techReadyTowerBtn.disabled, 'tower should be enabled once lumber mill exists').toBe(false)
+    expect(result.lumberMillStillExists, 'lumber mill prerequisite fixture should exist').toBe(true)
 
     // Poor state: build button disabled with reason
     expect(result.poorFarmBtn, 'farm button must exist when poor').not.toBeNull()

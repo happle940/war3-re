@@ -1,0 +1,68 @@
+{
+  "proof_id": "a1-core-building-gameplay-smoke-baseline-001",
+  "branch": "codex/asset-public-share",
+  "prepared_at": "2026-04-16",
+  "runtime_asset_changes": false,
+  "approved_for_import": [],
+  "command": "./scripts/run-runtime-tests.sh tests/mining-saturation-regression.spec.ts tests/static-defense-regression.spec.ts tests/construction-lifecycle-regression.spec.ts tests/building-agency-regression.spec.ts --reporter=list",
+  "result": {
+    "status": "passed",
+    "total_tests": 24,
+    "failed_tests": 0,
+    "duration": "3.6m"
+  },
+  "test_groups": [
+    {
+      "file": "tests/building-agency-regression.spec.ts",
+      "passed": 5,
+      "product_surface": "worker selection and building placement agency"
+    },
+    {
+      "file": "tests/construction-lifecycle-regression.spec.ts",
+      "passed": 10,
+      "product_surface": "construction, cancellation, refund, builder ownership, selection, HUD"
+    },
+    {
+      "file": "tests/mining-saturation-regression.spec.ts",
+      "passed": 2,
+      "product_surface": "goldmine gatherer saturation and economy scale"
+    },
+    {
+      "file": "tests/static-defense-regression.spec.ts",
+      "passed": 7,
+      "product_surface": "tower attack, target filtering, static-defense behavior, console stability"
+    }
+  ],
+  "coverage_summary": [
+    "goldmine gatherer cap remains stable at five active workers",
+    "default economy scale approaches five-worker mining saturation",
+    "completed tower damages enemy units inside range",
+    "under-construction tower does not attack",
+    "tower does not damage allied units",
+    "tower does not move or chase while attacking",
+    "tower clears dead targets and can acquire a new enemy",
+    "tower ignores goldmine and non-combat resource targets",
+    "construction can stop, resume, cancel, refund, and clear builder ownership deterministically",
+    "worker can enter Building state from building edge without reaching blocked center",
+    "selected under-construction building cancel path leaves selection, rings, HUD, and command surface valid",
+    "building placement agency selects workers deterministically and clears placement state on cancel"
+  ],
+  "test_contract_adjustments": [
+    {
+      "file": "tests/construction-lifecycle-regression.spec.ts",
+      "summary": "Updated stale command card slot assertion to match the current 4x4 / 16-slot command surface.",
+      "product_behavior_changed": false
+    }
+  ],
+  "product_verdict": {
+    "overall": "pre-import-gameplay-baseline-passed",
+    "summary": "The current A1 building gameplay contracts are stable enough to use as a baseline for a later Quaternius import packet. This does not approve any third-party runtime import."
+  },
+  "remaining_blockers_for_import": [
+    "Quaternius GLBs have not been copied into runtime asset paths.",
+    "AssetCatalog has not been pointed at Quaternius files.",
+    "Candidate team-color markers, attack points, and healthbar anchors have not been implemented in runtime.",
+    "The first import packet must rerun load-failure fallback proof and this gameplay smoke package after the minimal asset copy/catalog change.",
+    "No approved-for-import packet has been accepted."
+  ]
+}

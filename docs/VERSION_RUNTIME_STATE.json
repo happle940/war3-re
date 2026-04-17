@@ -1,0 +1,65 @@
+{
+  "version": 1,
+  "currentVersion": "V9",
+  "currentMilestone": "V9 maintenance and expansion runway",
+  "activatedByTransitionId": "V8_TO_V9",
+  "activatedAt": "2026-04-15T05:56:01.351Z",
+  "activationHistory": [
+    {
+      "transitionId": "V2_TO_V3",
+      "fromVersion": "V2",
+      "toVersion": "V3",
+      "fromMilestone": "V2 credible page-product vertical slice",
+      "toMilestone": "V3.1 battlefield + product-shell clarity",
+      "activatedAt": "2026-04-13T17:24:47.148Z"
+    },
+    {
+      "transitionId": "V3_TO_V4",
+      "fromVersion": "V3",
+      "toVersion": "V4",
+      "fromMilestone": "V3.1 battlefield + product-shell clarity",
+      "toMilestone": "V4 short-match alpha",
+      "activatedAt": "2026-04-14T05:21:14.046Z"
+    },
+    {
+      "transitionId": "V4_TO_V5",
+      "fromVersion": "V4",
+      "toVersion": "V5",
+      "fromMilestone": "V4 short-match alpha",
+      "toMilestone": "V5 strategy backbone alpha",
+      "activatedAt": "2026-04-14T06:31:49.022Z"
+    },
+    {
+      "transitionId": "V5_TO_V6",
+      "fromVersion": "V5",
+      "toVersion": "V6",
+      "fromMilestone": "V5 strategy backbone alpha",
+      "toMilestone": "V6 War3 identity alpha",
+      "activatedAt": "2026-04-14T09:23:05.848Z"
+    },
+    {
+      "transitionId": "V6_TO_V7",
+      "fromVersion": "V6",
+      "toVersion": "V7",
+      "fromMilestone": "V6 War3 identity alpha",
+      "toMilestone": "V7 content and beta candidate",
+      "activatedAt": "2026-04-15T02:29:00.705Z"
+    },
+    {
+      "transitionId": "V7_TO_V8",
+      "fromVersion": "V7",
+      "toVersion": "V8",
+      "fromMilestone": "V7 content and beta candidate",
+      "toMilestone": "V8 external demo and release candidate",
+      "activatedAt": "2026-04-15T05:19:45.363Z"
+    },
+    {
+      "transitionId": "V8_TO_V9",
+      "fromVersion": "V8",
+      "toVersion": "V9",
+      "fromMilestone": "V8 external demo and release candidate",
+      "toMilestone": "V9 maintenance and expansion runway",
+      "activatedAt": "2026-04-15T05:56:01.351Z"
+    }
+  ]
+}

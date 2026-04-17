@@ -11,6 +11,7 @@
 
 import * as THREE from 'three'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
+import { clone as cloneSkeleton } from 'three/examples/jsm/utils/SkeletonUtils.js'
 import { getAllAssetEntries, type AssetEntry } from './AssetCatalog'
 
 export type AssetStatus = 'pending' | 'loading' | 'loaded' | 'failed'
@@ -19,6 +20,7 @@ export interface LoadedAsset {
   entry: AssetEntry
   scene: THREE.Group
   status: AssetStatus
+  animations: THREE.AnimationClip[]
 }
 
 const cache = new Map<string, LoadedAsset>()
@@ -27,13 +29,18 @@ const gltfLoader = new GLTFLoader()
 async function loadOne(entry: AssetEntry): Promise<void> {
   if (cache.has(entry.key)) return
 
-  cache.set(entry.key, { entry, scene: new THREE.Group(), status: 'loading' })
+  cache.set(entry.key, { entry, scene: new THREE.Group(), status: 'loading', animations: [] })
 
   try {
     const gltf = await gltfLoader.loadAsync(entry.path)
     const scene = gltf.scene
     scene.scale.setScalar(entry.scale)
     scene.position.y = entry.offsetY
+    scene.userData.assetKey = entry.key
+    scene.userData.assetPath = entry.path
+    scene.userData.assetScale = entry.scale
+
+    applyStaticIdlePose(entry.key, scene, gltf.animations)
 
     scene.traverse((child) => {
       if (child instanceof THREE.Mesh) {
@@ -42,10 +49,35 @@ async function loadOne(entry: AssetEntry): Promise<void> {
       }
     })
 
-    cache.set(entry.key, { entry, scene, status: 'loaded' })
+    cache.set(entry.key, { entry, scene, status: 'loaded', animations: gltf.animations })
   } catch {
-    cache.set(entry.key, { entry, scene: new THREE.Group(), status: 'failed' })
+    cache.set(entry.key, { entry, scene: new THREE.Group(), status: 'failed', animations: [] })
   }
+}
+
+const IDLE_ANIMATION_HINTS: Record<string, string[]> = {
+  worker: ['Idle_Neutral', 'Idle'],
+  militia: ['Idle_Sword', 'Idle_Neutral', 'Idle'],
+  rifleman: ['Idle_Gun', 'Idle_Gun_Pointing', 'Idle'],
+  paladin: ['Idle_Sword', 'Idle_Neutral', 'Idle'],
+}
+
+function applyStaticIdlePose(key: string, scene: THREE.Group, clips: THREE.AnimationClip[]) {
+  if (clips.length === 0) return
+
+  const hints = IDLE_ANIMATION_HINTS[key] ?? ['Idle_Neutral', 'Idle_Sword', 'Idle_Gun', 'Idle']
+  const clip =
+    hints
+      .map(hint => clips.find(candidate => candidate.name.includes(hint)))
+      .find((candidate): candidate is THREE.AnimationClip => !!candidate) ??
+    clips.find(candidate => candidate.name.toLowerCase().includes('idle')) ??
+    clips[0]
+
+  const mixer = new THREE.AnimationMixer(scene)
+  const action = mixer.clipAction(clip)
+  action.play()
+  mixer.setTime(Math.min(clip.duration * 0.35, 0.6))
+  scene.updateMatrixWorld(true)
 }
 
 export async function loadAllAssets(): Promise<Map<string, AssetStatus>> {
@@ -81,7 +113,7 @@ function deepCloneMaterials(group: THREE.Group): void {
 export function getLoadedModel(key: string): THREE.Group | null {
   const asset = cache.get(key)
   if (!asset || asset.status !== 'loaded') return null
-  const clone = asset.scene.clone()
+  const clone = cloneSkeleton(asset.scene) as THREE.Group
   deepCloneMaterials(clone)
   return clone
 }
@@ -116,8 +148,11 @@ export function __testInjectFakeAsset(
   const previous = cache.get(key)
   scene.scale.setScalar(scale)
   scene.position.y = offsetY
+  scene.userData.assetKey = key
+  scene.userData.assetPath = '__test__'
+  scene.userData.assetScale = scale
   const entry: AssetEntry = { key, kind, path: '__test__', scale, offsetY }
-  cache.set(key, { entry, scene, status: 'loaded' })
+  cache.set(key, { entry, scene, status: 'loaded', animations: [] })
   return () => {
     if (previous) cache.set(key, previous)
     else cache.delete(key)

@@ -1,0 +1,427 @@
+{
+  "ledger_id": "public-share-asset-candidate-ledger-2026-04-16",
+  "branch": "codex/asset-public-share",
+  "prepared_at": "2026-04-16",
+  "approval_state": {
+    "approved_for_import": [],
+    "approved_for_import_trial": [
+      "a1-quaternius-town-center-001",
+      "a1-quaternius-barracks-001",
+      "a1-quaternius-farm-001",
+      "a1-quaternius-mine-001",
+      "a1-quaternius-resource-gold-accent-001",
+      "a1-quaternius-watch-tower-001"
+    ],
+    "approved_for_intake": [
+      "a1-kenney-castle-tower-square-001",
+      "a1-kenney-castle-tree-line-001",
+      "a1-kenney-td-tree-tile-001",
+      "a1-kenney-castle-rocks-001",
+      "a1-kenney-castle-wall-gate-001",
+      "human-kaykit-knight-footman-body-001",
+      "human-kaykit-mage-caster-body-001",
+      "human-kaykit-rig-medium-animation-core-001",
+      "a1-quaternius-town-center-001",
+      "a1-quaternius-barracks-001",
+      "a1-quaternius-farm-001",
+      "a1-quaternius-mine-001",
+      "a1-quaternius-resource-gold-accent-001",
+      "a1-quaternius-tree-line-001",
+      "a1-quaternius-watch-tower-001"
+    ],
+    "summary": "No third-party or AI-generated asset is approved for import. Kenney A1 tower/tree/terrain-aid, KayKit Human Footman/caster/animation-core, and Quaternius A1 core building/resource/tree/tower sub-candidates have partial approved-for-intake status only. Goldmine has an import-trial readability boost. Current S0 procedural Tree line has lumber/pathing and worker-readability proof but no final tree art approval."
+  },
+  "review_artifacts": [
+    "docs/A1_ASSET_PREVIEW_SWEEP_001.zh-CN.md",
+    "docs/A1_ASSET_PREVIEW_SWEEP_001.json",
+    "artifacts/asset-intake/preview/kenney-a1-shortlist-rts-preview.png",
+    "docs/HUMAN_UNIT_ASSET_PREVIEW_SWEEP_001.zh-CN.md",
+    "docs/HUMAN_UNIT_ASSET_PREVIEW_SWEEP_001.json",
+    "docs/HUMAN_UNIT_ASSET_FILE_PLAN_001.zh-CN.md",
+    "artifacts/asset-intake/preview/kaykit-human-units-rts-preview.png",
+    "docs/HUMAN_UNIT_ANIMATION_RETARGET_SPIKE_001.zh-CN.md",
+    "docs/HUMAN_UNIT_ANIMATION_RETARGET_SPIKE_001.json",
+    "artifacts/asset-intake/preview/kaykit-animation-retarget-spike.png",
+    "docs/A1_CORE_BUILDING_ASSET_PREVIEW_SWEEP_002.zh-CN.md",
+    "docs/A1_CORE_BUILDING_ASSET_PREVIEW_SWEEP_002.json",
+    "artifacts/asset-intake/manifests/quaternius_ultimate_fantasy_rts_poly_pizza_index.json",
+    "artifacts/asset-intake/preview/quaternius-core-buildings-rts-preview.png",
+    "artifacts/asset-intake/preview/quaternius-core-buildings-preview.metrics.json",
+    "docs/A1_CORE_BUILDING_FILE_PLAN_002.zh-CN.md",
+    "docs/A1_CORE_BUILDING_FALLBACK_COMPARISON_001.zh-CN.md",
+    "docs/A1_CORE_BUILDING_FALLBACK_COMPARISON_001.json",
+    "artifacts/asset-intake/preview/quaternius-vs-s0-core-buildings-rts-preview.png",
+    "artifacts/asset-intake/preview/quaternius-vs-s0-core-buildings-preview.metrics.json",
+    "docs/A1_CORE_BUILDING_TEAM_MARKER_CONCEPTS_001.zh-CN.md",
+    "docs/A1_CORE_BUILDING_TEAM_MARKER_CONCEPTS_001.json",
+    "artifacts/asset-intake/preview/quaternius-team-marker-concepts.png",
+    "artifacts/asset-intake/preview/quaternius-team-marker-concepts.metrics.json",
+    "docs/A1_CORE_BUILDING_RULE_FIT_PROOF_001.zh-CN.md",
+    "docs/A1_CORE_BUILDING_RULE_FIT_PROOF_001.json",
+    "artifacts/asset-intake/preview/quaternius-rule-fit-proof.png",
+    "artifacts/asset-intake/preview/quaternius-rule-fit-proof.metrics.json",
+    "docs/A1_CORE_BUILDING_LOAD_FAILURE_FALLBACK_PROOF_001.zh-CN.md",
+    "docs/A1_CORE_BUILDING_LOAD_FAILURE_FALLBACK_PROOF_001.json",
+    "docs/A1_CORE_BUILDING_GAMEPLAY_SMOKE_BASELINE_001.zh-CN.md",
+    "docs/A1_CORE_BUILDING_GAMEPLAY_SMOKE_BASELINE_001.json",
+    "docs/PUBLIC_SHARE_ASSET_IMPORT_REVIEW_PACKET_A1_001.zh-CN.md",
+    "docs/PUBLIC_SHARE_ASSET_IMPORT_REVIEW_PACKET_A1_001.json",
+    "docs/PUBLIC_SHARE_ASSET_ATTRIBUTION_PLAN.zh-CN.md",
+    "docs/PUBLIC_SHARE_ASSET_ATTRIBUTION_PLAN.json",
+    "public/assets/THIRD_PARTY_NOTICES.md",
+    "docs/PUBLIC_SHARE_ASSET_IMPORT_CHECKLIST.zh-CN.md",
+    "docs/PUBLIC_SHARE_ASSET_IMPORT_CHECKLIST.json",
+    "docs/PUBLIC_SHARE_ASSET_IMPORT_TRIAL_A1_001.zh-CN.md",
+    "docs/PUBLIC_SHARE_ASSET_IMPORT_TRIAL_A1_001.json",
+    "docs/PUBLIC_SHARE_ASSET_OPTIMIZATION_PROOF_A1_001.zh-CN.md",
+    "docs/PUBLIC_SHARE_ASSET_OPTIMIZATION_PROOF_A1_001.json",
+    "docs/PUBLIC_SHARE_ASSET_OPTIMIZATION_PASS_A1_001.zh-CN.md",
+    "docs/PUBLIC_SHARE_ASSET_OPTIMIZATION_PASS_A1_001.json",
+    "artifacts/asset-intake/optimized/quaternius-a1-pass-001/final/barracks.glb",
+    "artifacts/asset-intake/optimized/quaternius-a1-pass-001/final/farm.glb",
+    "docs/PUBLIC_SHARE_ASSET_GOLDMINE_COMPOSITION_PASS_A1_001.zh-CN.md",
+    "docs/PUBLIC_SHARE_ASSET_GOLDMINE_COMPOSITION_PASS_A1_001.json",
+    "docs/PUBLIC_SHARE_ASSET_GOLDMINE_READABILITY_PASS_A1_002.zh-CN.md",
+    "docs/PUBLIC_SHARE_ASSET_GOLDMINE_READABILITY_PASS_A1_002.json",
+    "artifacts/asset-intake/preview/goldmine-gold-readability-a1-002.png",
+    "artifacts/asset-intake/preview/goldmine-gold-readability-a1-002.json",
+    "docs/PUBLIC_SHARE_ASSET_TREE_LINE_IMPORT_GATE_A1_001.zh-CN.md",
+    "docs/PUBLIC_SHARE_ASSET_TREE_LINE_IMPORT_GATE_A1_001.json",
+    "docs/PUBLIC_SHARE_ASSET_TREE_LINE_LUMBER_GATE_A1_001.zh-CN.md",
+    "docs/PUBLIC_SHARE_ASSET_TREE_LINE_LUMBER_GATE_A1_001.json",
+    "docs/PUBLIC_SHARE_ASSET_TREE_LINE_WORKER_READABILITY_A1_001.zh-CN.md",
+    "docs/PUBLIC_SHARE_ASSET_TREE_LINE_WORKER_READABILITY_A1_001.json",
+    "artifacts/asset-intake/preview/tree-line-worker-readability-a1-001.png",
+    "artifacts/asset-intake/preview/tree-line-worker-readability-a1-001.json",
+    "artifacts/asset-intake/optimized/quaternius-gold-accent-pass-001/final/resource-gold.glb",
+    "docs/CODEX_ASSET_IMPORT_HANDOFF_2026-04-16.zh-CN.md"
+  ],
+  "candidates": [
+    {
+      "candidate_id": "pub-a1-kaykit-medieval-hexagon-001",
+      "source_name": "KayKit Medieval Hexagon Pack",
+      "source_url": "https://kaylousberg.itch.io/kaykit-medieval-hexagon",
+      "source_class": "S1",
+      "license_summary": "CC0 candidate; page states personal and commercial use with no attribution required.",
+      "target_surfaces": [
+        "A1 battlefield",
+        "A-Human buildings"
+      ],
+      "target_runtime_keys": [
+        "townhall",
+        "barracks",
+        "farm",
+        "goldmine",
+        "pine_tree",
+        "blacksmith",
+        "lumber_mill"
+      ],
+      "status": "candidate-source-verified-download-pending",
+      "approved_for_import": false,
+      "owner_decision": "High-priority preview candidate. Source page and itch free download page were reached; page shows Free / 33 MB / Apr 26, 2024, but local zip download timed out/canceled. Requires successful zip acquisition, per-file selection, RTS camera readability check, file plan, fallback, and source snapshot before intake approval.",
+      "review_notes": {
+        "attempted_at": "2026-04-16",
+        "purchase_page_snapshot": "artifacts/asset-intake/preview/kaykit-browser/kaykit-medieval-hexagon-purchase.png",
+        "download_page_snapshot": "artifacts/asset-intake/preview/kaykit-browser/kaykit-medieval-hexagon-download-page.png",
+        "download_page_controls": "artifacts/asset-intake/preview/kaykit-browser/kaykit-medieval-hexagon-download-page.controls.json",
+        "local_zip_state": "not-acquired-download-timeout"
+      }
+    },
+    {
+      "candidate_id": "pub-ah-kaykit-adventurers-001",
+      "source_name": "KayKit Adventurers",
+      "source_url": "https://kaylousberg.itch.io/kaykit-adventurers",
+      "source_class": "S1",
+      "license_summary": "CC0 candidate; page states personal and commercial use with no attribution required.",
+      "target_surfaces": [
+        "A-Human units"
+      ],
+      "target_runtime_keys": [
+        "footman",
+        "rifleman",
+        "sorceress",
+        "priest",
+        "hero_proxy"
+      ],
+      "status": "partial-approved-for-intake",
+      "approved_for_import": false,
+      "owner_decision": "Sweep 001 completed. Knight body can enter intake for Footman, Mage body can enter intake for caster direction. Ranger remains only a ranged proxy/reference; Rifleman, mounted Knight, and Worker are still unsolved."
+    },
+    {
+      "candidate_id": "pub-ah-kaykit-character-animations-001",
+      "source_name": "KayKit Character Animations",
+      "source_url": "https://kaylousberg.itch.io/kaykit-character-animations",
+      "source_class": "S1",
+      "license_summary": "CC0 candidate; page states personal and commercial use with no attribution required.",
+      "target_surfaces": [
+        "A-Human unit animation"
+      ],
+      "target_runtime_keys": [
+        "worker",
+        "footman",
+        "rifleman",
+        "sorceress",
+        "knight"
+      ],
+      "status": "partial-approved-for-intake",
+      "approved_for_import": false,
+      "owner_decision": "Sweep 001 and retarget spike 001 completed. Rig_Medium movement/general/melee/ranged/tools animation packs can enter intake; sampled Knight/Ranger/Mage binding passed with no missing track targets. Still not approved for runtime mixer import until lifecycle, foot sliding, hit-frame, weapon attachment, team-color, and fallback behavior are proven."
+    },
+    {
+      "candidate_id": "pub-a1-quaternius-ultimate-fantasy-rts-001",
+      "source_name": "Quaternius Ultimate Fantasy RTS",
+      "source_url": "https://quaternius.com/packs/ultimatefantasyrts.html",
+      "source_class": "S1",
+      "license_summary": "CC0 candidate; page lists glTF format and personal/commercial use.",
+      "target_surfaces": [
+        "A1 battlefield"
+      ],
+      "target_runtime_keys": [
+        "townhall",
+        "barracks",
+        "farm",
+        "tower",
+        "goldmine",
+        "pine_tree",
+        "terrain_readability_aids"
+      ],
+      "status": "partial-approved-for-intake",
+      "approved_for_import": false,
+      "owner_decision": "Sweep 002, S0 comparison 001, marker concepts 001, rule-fit proof 001, load-failure fallback proof 001, pre-import gameplay smoke baseline 001, minimal import review packet 001, attribution/notice plan, THIRD_PARTY_NOTICES template, first-slice import checklist, first-slice runtime import trial, optimization proof, optimization pass 001, Goldmine composition pass 001, Goldmine readability pass 002, Tree line import gate 001, Tree line lumber gate 001, and Tree line worker readability proof 001 completed. Five Quaternius building candidates are active as import trial and passed fallback proof plus split gameplay smoke. Barracks and Farm have been replaced with low-risk optimized GLBs. Resource Gold has been composed as a visual-only goldmine accent, passed mining saturation, and was boosted for stronger gold readability after user feedback. Current S0 procedural Tree line has lumber/pathing and worker-readability proof, but Tree line art import remains deferred. This is not final public-art approval.",
+      "review_notes": {
+        "sweep": "docs/A1_CORE_BUILDING_ASSET_PREVIEW_SWEEP_002.zh-CN.md",
+        "machine_record": "docs/A1_CORE_BUILDING_ASSET_PREVIEW_SWEEP_002.json",
+        "poly_pizza_index": "artifacts/asset-intake/manifests/quaternius_ultimate_fantasy_rts_poly_pizza_index.json",
+        "preview": "artifacts/asset-intake/preview/quaternius-core-buildings-rts-preview.png",
+        "approved_for_intake_sub_candidates": [
+          "a1-quaternius-town-center-001",
+          "a1-quaternius-barracks-001",
+          "a1-quaternius-farm-001",
+          "a1-quaternius-mine-001",
+          "a1-quaternius-resource-gold-accent-001",
+          "a1-quaternius-tree-line-001",
+          "a1-quaternius-watch-tower-001"
+        ],
+        "file_plan": "docs/A1_CORE_BUILDING_FILE_PLAN_002.zh-CN.md",
+        "fallback_comparison": "docs/A1_CORE_BUILDING_FALLBACK_COMPARISON_001.zh-CN.md",
+        "team_marker_concepts": "docs/A1_CORE_BUILDING_TEAM_MARKER_CONCEPTS_001.zh-CN.md",
+        "rule_fit_proof": "docs/A1_CORE_BUILDING_RULE_FIT_PROOF_001.zh-CN.md",
+        "load_failure_fallback_proof": "docs/A1_CORE_BUILDING_LOAD_FAILURE_FALLBACK_PROOF_001.zh-CN.md",
+        "gameplay_smoke_baseline": "docs/A1_CORE_BUILDING_GAMEPLAY_SMOKE_BASELINE_001.zh-CN.md",
+        "import_review_packet": "docs/PUBLIC_SHARE_ASSET_IMPORT_REVIEW_PACKET_A1_001.zh-CN.md",
+        "attribution_plan": "docs/PUBLIC_SHARE_ASSET_ATTRIBUTION_PLAN.zh-CN.md",
+        "third_party_notices": "public/assets/THIRD_PARTY_NOTICES.md",
+        "import_checklist": "docs/PUBLIC_SHARE_ASSET_IMPORT_CHECKLIST.zh-CN.md",
+        "import_trial_record": "docs/PUBLIC_SHARE_ASSET_IMPORT_TRIAL_A1_001.zh-CN.md",
+        "optimization_proof": "docs/PUBLIC_SHARE_ASSET_OPTIMIZATION_PROOF_A1_001.zh-CN.md",
+        "optimization_pass": "docs/PUBLIC_SHARE_ASSET_OPTIMIZATION_PASS_A1_001.zh-CN.md",
+        "optimization_summary": {
+          "optimized_runtime_keys": [
+            "barracks",
+            "farm"
+          ],
+          "before_total_bytes": 1072168,
+          "after_total_bytes": 907348,
+          "saved_bytes": 164820,
+          "saved_percent": 15.37,
+          "post_pass_asset_regression": "11/11 passed",
+          "post_pass_construction_smoke": "1/1 passed",
+          "decoder_changes_required": false
+        },
+        "goldmine_composition_pass": "docs/PUBLIC_SHARE_ASSET_GOLDMINE_COMPOSITION_PASS_A1_001.zh-CN.md",
+        "goldmine_composition_summary": {
+          "visual_only_key": "goldmine_accent",
+          "runtime_file": "public/assets/models/vendor/quaternius/ultimate-fantasy-rts/resource-gold.glb",
+          "sha256": "a580525d732887e89ab7d538cefd6ce59c2d1657e5fea9f6b3839a484194faa7",
+          "composition_regression": "1/1 passed",
+          "asset_regression": "11/11 passed",
+          "mining_saturation": "2/2 passed",
+          "gameplay_object_changed": false
+        },
+        "goldmine_readability_pass": "docs/PUBLIC_SHARE_ASSET_GOLDMINE_READABILITY_PASS_A1_002.zh-CN.md",
+        "goldmine_readability_summary": {
+          "trigger": "User feedback: goldmine does not look gold enough.",
+          "screenshot": "artifacts/asset-intake/preview/goldmine-gold-readability-a1-002.png",
+          "metrics": "artifacts/asset-intake/preview/goldmine-gold-readability-a1-002.json",
+          "accent_root_count": 4,
+          "readability_cue_mesh_count": 3,
+          "remaining_gold": 2000,
+          "build": "passed",
+          "runtime_proof": "2/2 passed",
+          "mining_saturation": "2/2 passed",
+          "gameplay_changed": false
+        },
+        "tree_line_import_gate": "docs/PUBLIC_SHARE_ASSET_TREE_LINE_IMPORT_GATE_A1_001.zh-CN.md",
+        "tree_line_decision": "blocked-direct-import-of-jUzojhHoYR-trees-glb-to-pine_tree",
+        "tree_line_lumber_gate": "docs/PUBLIC_SHARE_ASSET_TREE_LINE_LUMBER_GATE_A1_001.zh-CN.md",
+        "tree_line_lumber_summary": {
+          "test": "tests/tree-line-lumber-gate-regression.spec.ts",
+          "result": "2/2 passed",
+          "pathing_blocker_gate": "passed",
+          "depletion_release_gate": "passed",
+          "final_tree_art_approved": false
+        },
+        "tree_line_worker_readability_proof": "docs/PUBLIC_SHARE_ASSET_TREE_LINE_WORKER_READABILITY_A1_001.zh-CN.md",
+        "tree_line_worker_readability_summary": {
+          "test": "tests/tree-line-worker-readability-proof.spec.ts",
+          "result": "1/1 passed",
+          "source": "existing-tree-line",
+          "screenshot": "artifacts/asset-intake/preview/tree-line-worker-readability-a1-001.png",
+          "metrics": "artifacts/asset-intake/preview/tree-line-worker-readability-a1-001.json",
+          "worker_readability_gate": "passed",
+          "selection_ring_gate": "passed",
+          "final_tree_art_approved": false
+        },
+        "parallel_session_handoff": "docs/CODEX_ASSET_IMPORT_HANDOFF_2026-04-16.zh-CN.md"
+      }
+    },
+    {
+      "candidate_id": "pub-ah-quaternius-fantasy-props-001",
+      "source_name": "Quaternius Fantasy Props MegaKit",
+      "source_url": "https://quaternius.com/packs/fantasypropsmegakit.html",
+      "source_class": "S1",
+      "license_summary": "CC0 candidate; page lists glTF format and personal/commercial use.",
+      "target_surfaces": [
+        "A-Human building detail",
+        "A2 shell props"
+      ],
+      "target_runtime_keys": [
+        "blacksmith",
+        "workshop",
+        "arcane_sanctum",
+        "ui_decor"
+      ],
+      "status": "candidate",
+      "approved_for_import": false,
+      "owner_decision": "Use for readable building props and thematic detail, not as a substitute for complete runtime buildings without composition work."
+    },
+    {
+      "candidate_id": "pub-a1-kenney-tower-defense-001",
+      "source_name": "Kenney Tower Defense Kit",
+      "source_url": "https://kenney.nl/assets/tower-defense-kit",
+      "source_class": "S1",
+      "license_summary": "Kenney support states game assets on asset pages are CC0/public domain; per-pack page still needs snapshot.",
+      "target_surfaces": [
+        "A1 battlefield"
+      ],
+      "target_runtime_keys": [
+        "tower",
+        "farm",
+        "terrain_readability_aids"
+      ],
+      "status": "partial-approved-for-intake",
+      "approved_for_import": false,
+      "owner_decision": "Sweep 001 completed. Tree tile can enter intake for tree-line/terrain-aid review. Tower candidates remain candidate until color and Human military semantics are retuned."
+    },
+    {
+      "candidate_id": "pub-a1-kenney-castle-kit-001",
+      "source_name": "Kenney Castle Kit",
+      "source_url": "https://kenney.nl/assets/castle-kit",
+      "source_class": "S1",
+      "license_summary": "Kenney support states game assets on asset pages are CC0/public domain; per-pack page still needs snapshot.",
+      "target_surfaces": [
+        "A1 battlefield",
+        "A-Human Castle"
+      ],
+      "target_runtime_keys": [
+        "townhall",
+        "castle",
+        "tower",
+        "wall_proxy"
+      ],
+      "status": "partial-approved-for-intake",
+      "approved_for_import": false,
+      "owner_decision": "Sweep 001 completed. Tower, tree, rocks, wall/gate sub-candidates can enter intake for A1 tower/tree/terrain-aid only. Not approved as Town Hall, Barracks, Farm, Goldmine, or final Human identity."
+    },
+    {
+      "candidate_id": "pub-ui-game-icons-001",
+      "source_name": "Game-icons.net",
+      "source_url": "https://game-icons.net/faq.html",
+      "source_class": "S2",
+      "license_summary": "FAQ says icons are CC-BY or Public Domain, with credit required for CC-BY icons.",
+      "target_surfaces": [
+        "A2 shell",
+        "A-Human command card"
+      ],
+      "target_runtime_keys": [
+        "command_card_icons",
+        "research_icons",
+        "settings_help_icons"
+      ],
+      "status": "candidate-with-attribution",
+      "approved_for_import": false,
+      "owner_decision": "Usable only after attribution surface exists. Short-term S0 self-made icons remain cleaner."
+    },
+    {
+      "candidate_id": "pub-s6-meshy-paid-clean-001",
+      "source_name": "Meshy paid clean generation route",
+      "source_url": "https://help.meshy.ai/en/articles/9992001-can-i-use-my-generated-assets-for-commercial-projects",
+      "source_class": "S6",
+      "license_summary": "Paid customer route can be usable if inputs do not violate others' copyrights; free plan route requires CC-BY attribution.",
+      "target_surfaces": [
+        "A1 battlefield",
+        "A-Human units",
+        "A-Human buildings"
+      ],
+      "target_runtime_keys": [
+        "blacksmith",
+        "rifleman",
+        "sorceress",
+        "knight",
+        "workshop"
+      ],
+      "status": "candidate",
+      "approved_for_import": false,
+      "owner_decision": "Allowed for original drafts only. Requires paid account, clean prompt, no protected IP input, manual modification, and full prompt/tool log."
+    },
+    {
+      "candidate_id": "pub-s6-tripo-paid-clean-001",
+      "source_name": "Tripo paid clean generation route",
+      "source_url": "https://www.tripo3d.ai/terms",
+      "source_class": "S6",
+      "license_summary": "Terms distinguish free users and paid users; paid users generally have broader rights to inputs/outputs, subject to compliance.",
+      "target_surfaces": [
+        "A1 battlefield",
+        "A-Human units",
+        "A-Human buildings"
+      ],
+      "target_runtime_keys": [
+        "blacksmith",
+        "rifleman",
+        "sorceress",
+        "knight",
+        "workshop"
+      ],
+      "status": "candidate",
+      "approved_for_import": false,
+      "owner_decision": "Allowed for original drafts only. Free user outputs are not approved for public runtime assets."
+    },
+    {
+      "candidate_id": "pub-s6-hunyuan3d-lab-only-001",
+      "source_name": "Tencent Hunyuan3D-2",
+      "source_url": "https://github.com/Tencent-Hunyuan/Hunyuan3D-2/blob/main/LICENSE",
+      "source_class": "S6",
+      "license_summary": "Community license has territory, distribution, notice, MAU, output, and model-use restrictions.",
+      "target_surfaces": [
+        "research only"
+      ],
+      "target_runtime_keys": [],
+      "status": "lab-only",
+      "approved_for_import": false,
+      "owner_decision": "Do not use for public runtime assets without counsel review and a dedicated approval packet."
+    }
+  ],
+  "next_actions": [
+    "Owner review the Quaternius A1 minimal import packet and decide whether the first five-building trial slice may start.",
+    "Run Quaternius first-slice GLB optimization pass for barracks.glb and farm.glb, then rerun fallback, mining, and tower smoke.",
+    "After packet and notice acceptance, run the first minimal asset copy/catalog-change import attempt behind deterministic S0 fallback.",
+    "After any runtime import attempt, rerun rule-fit proof, load-failure fallback proof, and gameplay smoke baseline.",
+    "Run worker pathing and selection-ring proof around the Mine candidate; static preview is not enough for Goldmine.",
+    "Retry KayKit Medieval Hexagon zip acquisition; keep it source-verified/download-pending until local files exist.",
+    "Run closer-to-runtime Human animation mixer spike for Footman idle/walk/melee and caster idle/hit/death/cast-like proxy.",
+    "Find or generate a clean Rifleman firearm silhouette; Ranger is not enough for public Human Rifleman.",
+    "Find or generate a mounted Knight cavalry solution; KayKit Adventurers free package does not solve it.",
+    "Decide whether Game-icons.net attribution cost is worth it before any icon import.",
+    "Use docs/AI_ASSET_PROMPT_PACK.zh-CN.md for clean S6 draft generation, with every output starting as reference-only."
+  ]
+}

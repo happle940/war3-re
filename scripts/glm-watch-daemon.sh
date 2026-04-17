@@ -4,52 +4,44 @@ set -euo pipefail
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd -- "$SCRIPT_DIR/.." && pwd)"
 LOG_DIR="$ROOT_DIR/logs"
-PID_FILE="$LOG_DIR/glm-watch-monitor.pid"
 DAEMON_LOG="$LOG_DIR/glm-watch-monitor-daemon.log"
 INTERVAL="${GLM_MONITOR_INTERVAL_SECONDS:-300}"
-mkdir -p "$LOG_DIR"
+SOCKET_DIR="${GLM_MONITOR_TMUX_SOCKET_DIR:-${TMPDIR:-/tmp}/war3-re-tmux}"
+SOCKET="$SOCKET_DIR/glm-watch-monitor.sock"
+SESSION="${GLM_MONITOR_SESSION_NAME:-glm-watch-monitor}"
+mkdir -p "$LOG_DIR" "$SOCKET_DIR"
 
-is_running() {
-  [[ -f "$PID_FILE" ]] || return 1
-  local pid
-  pid="$(cat "$PID_FILE" 2>/dev/null || true)"
-  [[ -n "$pid" ]] || return 1
-  kill -0 "$pid" 2>/dev/null
+session_exists() {
+  tmux -S "$SOCKET" has-session -t "$SESSION" 2>/dev/null
 }
 
 start_daemon() {
-  if is_running; then
-    echo "glm-watch monitor daemon already running (pid $(cat "$PID_FILE"))."
-    exit 0
+  if session_exists; then
+    echo "glm-watch monitor daemon already running."
+    return 0
   fi
 
-  nohup /bin/zsh -lc '
-    while true; do
-      "'$ROOT_DIR'/scripts/glm-watch-monitor.sh" check >> "'$DAEMON_LOG'" 2>&1 || true
-      sleep "'$INTERVAL'"
-    done
-  ' >/dev/null 2>&1 &
+  local daemon_cmd
+  daemon_cmd=$(printf 'while true; do %q check >> %q 2>&1 || true; sleep %q; done' \
+    "$ROOT_DIR/scripts/glm-watch-monitor.sh" "$DAEMON_LOG" "$INTERVAL")
 
-  echo $! > "$PID_FILE"
-  echo "Started glm-watch monitor daemon (pid $(cat "$PID_FILE"), interval ${INTERVAL}s)."
+  tmux -S "$SOCKET" new-session -d -s "$SESSION" -n monitor -c "$ROOT_DIR" /bin/zsh -lc "$daemon_cmd"
+  tmux -S "$SOCKET" set-option -t "$SESSION" history-limit 10000 >/dev/null
+  echo "Started glm-watch monitor daemon (session $SESSION, interval ${INTERVAL}s)."
 }
 
 stop_daemon() {
-  if ! is_running; then
-    rm -f "$PID_FILE"
+  if ! session_exists; then
     echo "glm-watch monitor daemon is not running."
-    exit 0
+    return 0
   fi
-  local pid
-  pid="$(cat "$PID_FILE")"
-  kill "$pid" 2>/dev/null || true
-  rm -f "$PID_FILE"
-  echo "Stopped glm-watch monitor daemon (pid $pid)."
+  tmux -S "$SOCKET" kill-session -t "$SESSION"
+  echo "Stopped glm-watch monitor daemon."
 }
 
 status_daemon() {
-  if is_running; then
-    echo "running (pid $(cat "$PID_FILE"))"
+  if session_exists; then
+    echo "running (session $SESSION)"
   else
     echo "stopped"
   fi

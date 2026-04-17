@@ -1,0 +1,67 @@
+{
+  "id": "public-share-unit-real-model-style-pass-a1-002",
+  "date": "2026-04-16",
+  "status": "style-pass-active-not-final-art",
+  "changes": [
+    {
+      "unit": "rifleman",
+      "before": "SWAT by Quaternius",
+      "after": "Adventurer by Quaternius",
+      "reason": "The SWAT model looked too modern for the Human fantasy faction."
+    },
+    {
+      "unit": "mortar_team",
+      "before": "Cannon only",
+      "after": "Cannon plus a small militia crew model",
+      "reason": "The unit now reads as a team instead of a standalone prop."
+    },
+    {
+      "scope": "footman_and_knight",
+      "change": "Added sword, shield, and footman helmet crest runtime cues.",
+      "reason": "The Warrior source models need stronger RTS role readability."
+    },
+    {
+      "scope": "all_units",
+      "change": "Applied material lightness polish and brighter scene lighting.",
+      "reason": "Default RTS camera was swallowing model detail in shadow."
+    }
+  ],
+  "rejectedCandidates": [
+    {
+      "unit": "priest",
+      "candidate": "Monk by Quaternius",
+      "reason": "Top-down silhouette did not read as well as Eye Cleric."
+    },
+    {
+      "unit": "sorceress",
+      "candidate": "Wizard by Quaternius",
+      "reason": "Default camera produced an oversized purple blob that dominated the lineup."
+    }
+  ],
+  "proof": {
+    "screenshot": "artifacts/asset-intake/preview/real-unit-model-style-pass-a1-002.png",
+    "metrics": "artifacts/asset-intake/preview/real-unit-model-style-pass-a1-002.json",
+    "glbInspection": "artifacts/asset-intake/metadata/poly-pizza-unit-glb-inspection-a1-002-2026-04-16.json"
+  },
+  "verification": [
+    {
+      "command": "npm run build",
+      "result": "pass"
+    },
+    {
+      "command": "./scripts/run-runtime-tests.sh tests/real-unit-model-intake-proof.spec.ts --reporter=list",
+      "result": "pass",
+      "tests": 1
+    },
+    {
+      "command": "./scripts/run-runtime-tests.sh tests/real-unit-model-intake-proof.spec.ts tests/unit-visibility-regression.spec.ts --reporter=list",
+      "result": "pass",
+      "tests": 3
+    },
+    {
+      "command": "./scripts/run-runtime-tests.sh tests/asset-pipeline-regression.spec.ts tests/worker-peasant-readability-proof.spec.ts --reporter=list",
+      "result": "pass",
+      "tests": 6
+    }
+  ]
+}

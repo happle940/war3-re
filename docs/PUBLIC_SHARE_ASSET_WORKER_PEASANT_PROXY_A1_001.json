@@ -1,0 +1,92 @@
+{
+  "id": "public-share-asset-worker-peasant-proxy-a1-001",
+  "date": "2026-04-16",
+  "branch": "codex/asset-public-share",
+  "status": {
+    "workerGltfFinalAsset": "unresolved",
+    "runtimeFallback": "upgraded-with-painted-billboard",
+    "gameplayRulesChanged": false,
+    "thirdPartyWorkerAssetImported": false
+  },
+  "runtime": {
+    "unit": "worker",
+    "visualRoute": "painted-peasant-billboard-proxy",
+    "sourceFile": "src/game/UnitVisualFactory.ts",
+    "paintedSprite": {
+      "count": 1,
+      "name": "worker-painted-peasant-sprite",
+      "texture": "runtime-generated CanvasTexture",
+      "textureWidth": 192,
+      "textureHeight": 256,
+      "source": "project-original canvas drawing",
+      "role": "first-read peasant art layer"
+    },
+    "meshCueCounts": {
+      "visibleMeshes": 34,
+      "teamCues": 8,
+      "toolCues": 8,
+      "faceCues": 2,
+      "hatCues": 3
+    },
+    "peasantCues": {
+      "hat": true,
+      "face": true,
+      "backpack": true,
+      "pickaxe": true,
+      "hammer": true,
+      "teamTabard": true
+    }
+  },
+  "proof": {
+    "screenshot": "artifacts/asset-intake/preview/worker-peasant-readability-a1-001.png",
+    "metrics": "artifacts/asset-intake/preview/worker-peasant-readability-a1-001.json",
+    "source": "isolated-showcase-worker",
+    "cameraDistance": 10,
+    "visualRoute": "painted-peasant-billboard-proxy",
+    "paintedSprite": {
+      "count": 1,
+      "textureWidth": 192,
+      "textureHeight": 256
+    },
+    "focusedScreenPixels": {
+      "width": 133.84069091826086,
+      "height": 152.92518483326484
+    },
+    "worldBounds": {
+      "width": 1.458388057473007,
+      "height": 1.8650000017881392,
+      "depth": 1.102707713842392
+    },
+    "commands": [
+      {
+        "command": "npm run build",
+        "result": "pass"
+      },
+      {
+        "command": "./scripts/run-runtime-tests.sh tests/worker-peasant-readability-proof.spec.ts tests/unit-visibility-regression.spec.ts --reporter=list",
+        "result": "pass",
+        "testsPassed": 3,
+        "latestRuntimeSeconds": 36.6
+      }
+    ]
+  },
+  "aestheticPass": {
+    "portrait": "Upgraded from simple geometric icon to bust-style peasant portrait with straw hat, beard, pickaxe, team hat band, and leather straps.",
+    "mapModel": "Reduced large team-color blocks and exposed more tunic/leather/straw/tool surfaces.",
+    "paintedBillboard": "Added a project-original camera-facing peasant art layer so the in-map worker reads as a character instead of only procedural blocks.",
+    "healthBar": "Worker health bar narrowed from generic unit width to reduce visual occlusion."
+  },
+  "publicShareCopyBoundary": {
+    "allowed": "Worker 当前使用项目原创手绘 peasant billboard + 3D proxy，已经能支撑公开分享截图里的农民观感。",
+    "forbidden": [
+      "Worker 最终模型已经完成。",
+      "Worker 已经有正式第三方 GLB。",
+      "Worker 美术已经批准导入。"
+    ]
+  },
+  "nextSteps": [
+    "Find or create a clean worker/engineer/peasant GLB candidate with public-share-safe license.",
+    "Use the current procedural silhouette as the approval baseline for future GLB replacement.",
+    "Do not import sample-only or unclear-license worker art as a runtime asset."
+  ]
+}

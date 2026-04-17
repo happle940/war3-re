@@ -1,0 +1,90 @@
+{
+  "generatedAt": "2026-04-14T07:41:55.803Z",
+  "transitionId": "V5_TO_V6",
+  "currentMilestone": "V5 strategy backbone alpha",
+  "nextMilestone": "V6 War3 identity alpha",
+  "state": "preheat-due",
+  "generator": {
+    "lane": "codex",
+    "mode": "version-preheat"
+  },
+  "preheatInput": {
+    "blockerCount": 1,
+    "threshold": 1
+  },
+  "handoffContract": {
+    "northStar": "让 War3 玩家前 5 分钟愿意认真对待它",
+    "fromVersionOutcome": "V5 strategy backbone alpha",
+    "toVersionFocus": "V6 War3 identity alpha",
+    "mustStayInFromVersion": [
+      "任何仍 open 的 V5 blocker"
+    ],
+    "allowedCarryover": [
+      "V5 balance tuning debt",
+      "V5 presentation polish debt"
+    ],
+    "residualRouting": [
+      "V5 roster clarity debt -> V6 identity readability",
+      "V5 production-decision debt -> V6 hero/faction expression"
+    ],
+    "netNewBlockers": [
+      "英雄/法术/物品等身份系统",
+      "阵营或单位身份差异",
+      "能让玩家认出这像 War3-like 的核心表达"
+    ]
+  },
+  "preheatSnapshot": {
+    "currentBlockers": [
+      {
+        "gate": "V5-COUNTER1",
+        "status": "blocked-by-pending-proof",
+        "conclusion": "V5 blocker / blocked-by-pending-proof",
+        "routing": "留在 V5；不能带进 V6 启动。"
+      }
+    ],
+    "currentConditional": [],
+    "currentUserOpen": [
+      {
+        "gate": "V5-UA1",
+        "status": "user gate / user-open",
+        "routing": "可作为 V6 人眼判断背景；不能由自动化代判。"
+      }
+    ],
+    "preparedArtifacts": [
+      "docs/V6_IDENTITY_SYSTEMS_REMAINING_GATES.zh-CN.md",
+      "docs/V6_IDENTITY_SYSTEMS_EVIDENCE_LEDGER.zh-CN.md",
+      "docs/V6_TRANSITION_BOOTSTRAP_PACKET.zh-CN.md"
+    ],
+    "missingArtifacts": [
+      "docs/runways/V6_CODEX_TRANSITION_RUNWAY.zh-CN.md",
+      "docs/runways/V6_GLM_TRANSITION_RUNWAY.zh-CN.md"
+    ]
+  },
+  "codex": [
+    {
+      "id": "PREHEAT-V5_TO_V6-03",
+      "title": "V6 双车道 Runway 草案",
+      "status": "ready",
+      "transitionId": "V5_TO_V6",
+      "milestone": "V6 War3 identity alpha",
+      "summary": "补齐 Codex 和 GLM 的 V6 首批跑道，让正式切换后只派身份系统相关任务。",
+      "goal": "生成 V6 Codex / GLM transition runway，定义 gate sync、证据收口、bounded proof pack、残留路由、user verdict 路由和禁止范围。",
+      "whyNow": "V6 gate、evidence ledger 和 bootstrap packet 已准备；当前 preheat pack 只缺两条 runway。V5 仍有 COUNTER1 blocker 时，必须先写清 runway 是预热草案，避免把 V5 blocker 或 V6 gameplay implementation 提前派发。",
+      "stopCondition": "两份 runway 都存在；Codex 只承担 gate sync、review、routing 和治理，GLM 只承担 bounded proof packs；任务仍是 seed draft，不进入 live queue，也不声明 V6 active。",
+      "artifactTargets": [
+        "codexRunway",
+        "glmRunway"
+      ],
+      "files": [
+        "docs/runways/V6_CODEX_TRANSITION_RUNWAY.zh-CN.md",
+        "docs/runways/V6_GLM_TRANSITION_RUNWAY.zh-CN.md"
+      ],
+      "requirements": [
+        "首批任务必须围绕英雄/法术/物品等身份系统、阵营或单位身份差异、War3-like 核心表达。",
+        "不得生成 gameplay implementation、UI polish、真实素材导入、当前 V5 closeout、完整内容扩张或 V7 任务。",
+        "必须写清这些 runway 是预热草案，只有 cutover-ready 后才能播种 live queue。",
+        "任何仍 open 的 V5 blocker，尤其 V5-COUNTER1，必须留在 V5，不能带进 V6 启动。"
+      ]
+    }
+  ]
+}

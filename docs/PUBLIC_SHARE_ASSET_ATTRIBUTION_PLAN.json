@@ -1,0 +1,89 @@
+{
+  "plan_id": "public-share-asset-attribution-plan-2026-04-16",
+  "branch": "codex/asset-public-share",
+  "prepared_at": "2026-04-16",
+  "approved_for_import": [],
+  "required_before_third_party_import": [
+    "public/assets/THIRD_PARTY_NOTICES.md exists and contains Quaternius import-trial-active entries",
+    "source-specific review packet",
+    "per-file source URL, license, download/import date, and local checksum"
+  ],
+  "approved_for_import_trial": [
+    "a1-quaternius-town-center-001",
+    "a1-quaternius-barracks-001",
+    "a1-quaternius-farm-001",
+    "a1-quaternius-mine-001",
+    "a1-quaternius-watch-tower-001"
+  ],
+  "required_before_cc_by_icon_import": [
+    "public/assets/THIRD_PARTY_NOTICES.md",
+    "in-game Help/Credits access path",
+    "per-icon author, source URL, and license"
+  ],
+  "required_before_ai_runtime_or_marketing_use": [
+    "tool/model/plan record",
+    "clean prompt summary",
+    "input source record",
+    "human modification record",
+    "public labeling decision",
+    "fallback route"
+  ],
+  "source_policies": [
+    {
+      "source_name": "Quaternius Ultimate Fantasy RTS",
+      "current_use": "A1 building, nature, resource, and tower candidates",
+      "license_position": "CC0 candidate based on source page",
+      "notice_required": "recommended",
+      "source_url": "https://quaternius.com/packs/ultimatefantasyrts.html"
+    },
+    {
+      "source_name": "KayKit Adventurers / Character Animations / Medieval Hexagon",
+      "current_use": "Human unit, animation, and building candidates",
+      "license_position": "CC0 candidate based on itch pages",
+      "notice_required": "recommended",
+      "source_urls": [
+        "https://kaylousberg.itch.io/kaykit-adventurers",
+        "https://kaylousberg.itch.io/kaykit-character-animations",
+        "https://kaylousberg.itch.io/kaykit-medieval-hexagon"
+      ]
+    },
+    {
+      "source_name": "Kenney assets",
+      "current_use": "tower, tree, and terrain-aid candidates",
+      "license_position": "CC0/public domain candidate based on Kenney support page",
+      "notice_required": "recommended",
+      "source_url": "https://kenney.nl/support",
+      "restriction_note": "Do not use the Kenney logo."
+    },
+    {
+      "source_name": "Game-icons.net",
+      "current_use": "command card, research, and ability icon candidates",
+      "license_position": "CC-BY or Public Domain depending on icon",
+      "notice_required": "mandatory if used",
+      "source_url": "https://game-icons.net/faq.html"
+    },
+    {
+      "source_name": "Meshy / Tripo paid-clean route",
+      "current_use": "AI draft candidates",
+      "license_position": "case-by-case paid-clean route only",
+      "notice_required": "ai-production-record-required"
+    },
+    {
+      "source_name": "Hunyuan3D-2",
+      "current_use": "technical research only",
+      "license_position": "lab-only / blocked for public runtime until counsel review",
+      "notice_required": "not applicable until dedicated approval packet"
+    }
+  ],
+  "mainland_china_boundary": {
+    "runtime_ai_generation": "not allowed for current public-share plan",
+    "offline_ai_asset_generation": "allowed only as reference/candidate with records",
+    "game_public_operation": "asset notices do not replace game publication/approval materials, copyright materials, screenshots, Chinese script, or minor-protection obligations"
+  },
+  "next_actions": [
+    "Keep public/assets/THIRD_PARTY_NOTICES.md Quaternius entries as import-trial-active until final public-art approval exists.",
+    "Prepare Quaternius first-slice optimization proof.",
+    "Decide whether Help/Credits should exist before Game-icons.net is used.",
+    "Keep AI drafts reference-only until their tool/prompt/input/modification records exist."
+  ]
+}

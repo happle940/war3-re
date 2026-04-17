@@ -1,0 +1,145 @@
+{
+  "pass_id": "public-share-asset-goldmine-composition-pass-a1-001",
+  "branch": "codex/asset-public-share",
+  "prepared_at": "2026-04-16",
+  "status": "goldmine-composition-applied-runtime-proof-passed",
+  "runtime_key_changed": "goldmine",
+  "new_catalog_key": "goldmine_accent",
+  "gameplay_object_changed": false,
+  "pathing_changed": false,
+  "gather_logic_changed": false,
+  "tree_line_imported": false,
+  "source_file": {
+    "path": "artifacts/asset-intake/downloads/poly-pizza/quaternius-ultimate-fantasy-rts/jkqD4dMoz1-resource-gold.glb",
+    "sha256": "014be202047295172158f524d11ecc0a172eef544b4d11fd0fe55b48e55be1f3"
+  },
+  "runtime_file": {
+    "path": "public/assets/models/vendor/quaternius/ultimate-fantasy-rts/resource-gold.glb",
+    "sha256": "a580525d732887e89ab7d538cefd6ce59c2d1657e5fea9f6b3839a484194faa7"
+  },
+  "optimization": {
+    "method": [
+      "prune",
+      "dedup",
+      "weld"
+    ],
+    "original": {
+      "bytes": 51048,
+      "kb": 49.9,
+      "sha256": "014be202047295172158f524d11ecc0a172eef544b4d11fd0fe55b48e55be1f3",
+      "nodes": 2,
+      "meshes": 1,
+      "primitives": 2,
+      "materials": 2,
+      "accessors": 8,
+      "bufferViews": 8,
+      "vertices": 1307,
+      "triangles": 1016,
+      "textures": 0,
+      "images": 0,
+      "animations": 0
+    },
+    "optimized": {
+      "bytes": 38892,
+      "kb": 38.0,
+      "sha256": "a580525d732887e89ab7d538cefd6ce59c2d1657e5fea9f6b3839a484194faa7",
+      "nodes": 2,
+      "meshes": 1,
+      "primitives": 2,
+      "materials": 2,
+      "accessors": 6,
+      "bufferViews": 3,
+      "vertices": 1279,
+      "triangles": 1016,
+      "textures": 0,
+      "images": 0,
+      "animations": 0
+    },
+    "saved_bytes": 12156,
+    "saved_percent": 23.81,
+    "runtime_decoder_changes_required": false
+  },
+  "composition": {
+    "factory": "src/game/BuildingVisualFactory.ts",
+    "catalog": "src/game/AssetCatalog.ts",
+    "root_behavior": "Mine and Resource Gold accent are siblings under a composition root to avoid double-scaling.",
+    "accent_name": "goldmine-resource-gold-accent",
+    "accent_position": {
+      "x": 0.55,
+      "y": 0.02,
+      "z": 0.95
+    },
+    "accent_rotation_y": -0.25,
+    "accent_scale": 1.15
+  },
+  "runtime_slice_total": {
+    "bytes": 946240,
+    "kb": 924.1,
+    "nodes": 12,
+    "meshes": 6,
+    "primitives": 30,
+    "materials": 30,
+    "accessors": 102,
+    "bufferViews": 69,
+    "vertices": 30333,
+    "triangles": 18406,
+    "textures": 0,
+    "images": 0,
+    "animations": 0
+  },
+  "verification": [
+    {
+      "command": "gltf-transform validate artifacts/asset-intake/optimized/quaternius-gold-accent-pass-001/final/resource-gold.glb",
+      "status": "passed",
+      "errors": 0,
+      "warnings": 0
+    },
+    {
+      "command": "npm run build",
+      "status": "passed",
+      "note": "Vite large chunk warning remains."
+    },
+    {
+      "command": "./scripts/run-runtime-tests.sh tests/goldmine-accent-composition-regression.spec.ts --reporter=list",
+      "status": "passed",
+      "passed": 1,
+      "failed": 0,
+      "duration": "30.1s"
+    },
+    {
+      "command": "./scripts/run-runtime-tests.sh tests/asset-pipeline-regression.spec.ts tests/v3-asset-fallback-catalog-proof.spec.ts --reporter=list",
+      "status": "passed",
+      "passed": 11,
+      "failed": 0,
+      "duration": "3.9m"
+    },
+    {
+      "command": "./scripts/run-runtime-tests.sh tests/mining-saturation-regression.spec.ts --reporter=list",
+      "status": "passed",
+      "passed": 2,
+      "failed": 0,
+      "duration": "1.3m"
+    }
+  ],
+  "tree_line_gate": {
+    "source_file": "artifacts/asset-intake/downloads/poly-pizza/quaternius-ultimate-fantasy-rts/jUzojhHoYR-trees.glb",
+    "decision": "do-not-directly-map-to-pine_tree",
+    "reason": "Source is Resource_Tree_Group and would be cloned for every TreeEntry; current runtime has about 187 tree entries.",
+    "import_gate": "docs/PUBLIC_SHARE_ASSET_TREE_LINE_IMPORT_GATE_A1_001.zh-CN.md",
+    "lumber_gate": "docs/PUBLIC_SHARE_ASSET_TREE_LINE_LUMBER_GATE_A1_001.zh-CN.md",
+    "lumber_gate_result": "2/2 passed",
+    "worker_readability_proof": "docs/PUBLIC_SHARE_ASSET_TREE_LINE_WORKER_READABILITY_A1_001.zh-CN.md",
+    "worker_readability_result": "1/1 passed",
+    "current_procedural_tree_line_kept": true
+  },
+  "followup_readability_pass": {
+    "record": "docs/PUBLIC_SHARE_ASSET_GOLDMINE_READABILITY_PASS_A1_002.zh-CN.md",
+    "machine_record": "docs/PUBLIC_SHARE_ASSET_GOLDMINE_READABILITY_PASS_A1_002.json",
+    "trigger": "User feedback: goldmine does not look gold enough.",
+    "result": "goldmine-gold-readability-boost-applied-proof-passed",
+    "resource_gold_accent_roots": 4,
+    "gold_readability_cue_meshes": 3,
+    "gameplay_changed": false,
+    "pathing_changed": false
+  }
+}

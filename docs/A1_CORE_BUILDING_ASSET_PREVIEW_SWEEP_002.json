@@ -1,0 +1,425 @@
+{
+  "sweep_id": "a1-core-building-asset-preview-sweep-002",
+  "branch": "codex/asset-public-share",
+  "prepared_at": "2026-04-16",
+  "batch": "A1 core building readability",
+  "runtime_asset_changes": false,
+  "approved_for_import": [],
+  "approved_for_intake": [
+    "a1-quaternius-town-center-001",
+    "a1-quaternius-barracks-001",
+    "a1-quaternius-farm-001",
+    "a1-quaternius-mine-001",
+    "a1-quaternius-resource-gold-accent-001",
+    "a1-quaternius-tree-line-001",
+    "a1-quaternius-watch-tower-001"
+  ],
+  "source_decisions": [
+    {
+      "candidate_id": "pub-a1-quaternius-ultimate-fantasy-rts-001",
+      "source_name": "Quaternius Ultimate Fantasy RTS",
+      "decision": "partial-approved-for-intake",
+      "reason": "Source index, CC0 model records, seven priority GLB downloads, GLB headers, and default RTS camera preview all passed for core building triage."
+    },
+    {
+      "candidate_id": "pub-a1-kaykit-medieval-hexagon-001",
+      "source_name": "KayKit Medieval Hexagon Pack",
+      "decision": "candidate-source-verified-download-pending",
+      "reason": "Itch download page was reached and free 33 MB package was identified, but the download attempt timed out/canceled before a local zip was available."
+    }
+  ],
+  "artifacts": {
+    "source_pages": [
+      "artifacts/asset-intake/source-pages/quaternius-ultimate-fantasy-rts.html",
+      "artifacts/asset-intake/source-pages/poly-pizza-quaternius-ultimate-fantasy-rts.html",
+      "artifacts/asset-intake/source-pages/kaykit-medieval-hexagon.html",
+      "artifacts/asset-intake/preview/kaykit-browser/kaykit-medieval-hexagon-download-page.controls.json"
+    ],
+    "manifest": "artifacts/asset-intake/manifests/quaternius_ultimate_fantasy_rts_poly_pizza_index.json",
+    "downloads": [
+      "artifacts/asset-intake/downloads/poly-pizza/quaternius-ultimate-fantasy-rts/CoERW5nFdE-town-center.glb",
+      "artifacts/asset-intake/downloads/poly-pizza/quaternius-ultimate-fantasy-rts/dvlksXgxWc-barracks.glb",
+      "artifacts/asset-intake/downloads/poly-pizza/quaternius-ultimate-fantasy-rts/91wMLb9kKo-farm.glb",
+      "artifacts/asset-intake/downloads/poly-pizza/quaternius-ultimate-fantasy-rts/wOJ61Fa0Lt-mine.glb",
+      "artifacts/asset-intake/downloads/poly-pizza/quaternius-ultimate-fantasy-rts/jkqD4dMoz1-resource-gold.glb",
+      "artifacts/asset-intake/downloads/poly-pizza/quaternius-ultimate-fantasy-rts/jUzojhHoYR-trees.glb",
+      "artifacts/asset-intake/downloads/poly-pizza/quaternius-ultimate-fantasy-rts/f2J0aSLVi4-watch-tower.glb"
+    ],
+    "preview_html": "artifacts/asset-intake/preview/quaternius-core-buildings-preview.html",
+    "preview_png": "artifacts/asset-intake/preview/quaternius-core-buildings-rts-preview.png",
+    "preview_metrics": "artifacts/asset-intake/preview/quaternius-core-buildings-preview.metrics.json"
+  },
+  "source_index_summary": {
+    "model_count": 107,
+    "selected_count": 67,
+    "selected_public_ids_by_target": {
+      "barracks": [
+        "XYe1bbeUv9",
+        "FD3GBkVOyX",
+        "5dWpau7C3k",
+        "a1C1L8gJTX",
+        "lnyADheSvA",
+        "jjbNh1vCbj",
+        "puD1kbV4kf",
+        "dvlksXgxWc",
+        "UXCOwRBSxx",
+        "njoPJEjDQD"
+      ],
+      "farm": [
+        "INctJkmEAl",
+        "91wMLb9kKo",
+        "O4wpTLSfIn",
+        "8BQFbUMOeC",
+        "oJJIRwv6Bo",
+        "vZ1CLbWmSx",
+        "L7h0SjZX2K",
+        "YlADpCJU8U",
+        "nihGGju7DW",
+        "RSwoYSLblu",
+        "k6tP5nFUd2",
+        "vCoDG5hFyI",
+        "UvVOeyHh92",
+        "gEjAC1UvVU",
+        "nELNHkk0Uh",
+        "d2ZQWcuhwR",
+        "BsTn4bKSGb",
+        "fkTsDdpQAA",
+        "TvXpjtD2nk",
+        "JrFL3mLOKg",
+        "xm5cViUjra",
+        "EV7pILnaZC"
+      ],
+      "tower": [
+        "xm5cViUjra",
+        "EV7pILnaZC",
+        "fPB3sm5796",
+        "IA5qOjIAiT",
+        "CygapExMf5",
+        "f2J0aSLVi4",
+        "VJZZW37Vsk",
+        "cMxuj2gt7D",
+        "dJLAD6p90F",
+        "Rz4U5dZJz8",
+        "geisKzlSFZ",
+        "xKVeMHa2tJ",
+        "5d80r2XX3O"
+      ],
+      "goldmine": [
+        "wOJ61Fa0Lt",
+        "r93I0pFAE7",
+        "49NgnJzOHc",
+        "jkqD4dMoz1"
+      ],
+      "terrain_readability_aids": [
+        "r93I0pFAE7",
+        "49NgnJzOHc",
+        "jkqD4dMoz1",
+        "4MUaQTcDdc",
+        "JmFMh7ztL9",
+        "RtLRqYjfMs",
+        "Gl3pcrdnpW",
+        "tdeAOh3LQV",
+        "8C9NBoi9cA",
+        "L0TxLurnES",
+        "dJLAD6p90F",
+        "Rz4U5dZJz8",
+        "geisKzlSFZ",
+        "xKVeMHa2tJ",
+        "5d80r2XX3O"
+      ],
+      "townhall": [
+        "opTOmcN3o9",
+        "y15yE6kWLY",
+        "3r6gq3ow6O",
+        "EEojbRn1eX",
+        "CoERW5nFdE",
+        "cuQuFJEIfH",
+        "76GTkSh4KM",
+        "sPY1OPVCAX",
+        "JDUXodrPjL"
+      ],
+      "tree_line": [
+        "oYtDty0fR6",
+        "jUzojhHoYR",
+        "zhm3D5KKRh",
+        "CDzsCXJEBQ"
+      ]
+    }
+  },
+  "browser_validation": {
+    "preview_failures": [],
+    "metrics_count": 7,
+    "canvas_nonblank": true,
+    "non_background_samples": 109,
+    "sample_count": 160
+  },
+  "sub_candidates": [
+    {
+      "sub_candidate_id": "a1-quaternius-town-center-001",
+      "a1_category": "townhall",
+      "runtime_key_candidate": "townhall",
+      "status": "approved-for-intake",
+      "readability": "pass-with-tuning",
+      "decision": "Strong main-base anchor from default RTS camera. Needs scale, pivot, selection ring, team-color/material pass, and fallback proof before import.",
+      "parent_candidate_id": "pub-a1-quaternius-ultimate-fantasy-rts-001",
+      "public_id": "CoERW5nFdE",
+      "title": "Town Center",
+      "source_url": "https://poly.pizza/m/CoERW5nFdE",
+      "glb_url": "https://static.poly.pizza/81e39d77-d2c8-4f53-8e44-13fb6a008e4f.glb",
+      "local_path": "artifacts/asset-intake/downloads/poly-pizza/quaternius-ultimate-fantasy-rts/CoERW5nFdE-town-center.glb",
+      "size_bytes": 159508,
+      "sha256": "fa7d33ff72092a96073b659eba5562ed1eadf5b60a8092d1321769b34e9177a5",
+      "preview_metric": {
+        "key": "townhall",
+        "label": "Town Center",
+        "file": "CoERW5nFdE-town-center.glb",
+        "source_size": [
+          1.264,
+          1.088,
+          1.241
+        ],
+        "preview_size": [
+          3.828,
+          2.582,
+          3.795
+        ],
+        "preview_position": [
+          -4,
+          0,
+          0.1
+        ]
+      },
+      "approved_for_import": false
+    },
+    {
+      "sub_candidate_id": "a1-quaternius-barracks-001",
+      "a1_category": "barracks",
+      "runtime_key_candidate": "barracks",
+      "status": "approved-for-intake",
+      "readability": "pass-with-tuning",
+      "decision": "Reads as a military production building. Needs Human color pass, footprint confirmation, rally-point visual compatibility, and fallback proof.",
+      "parent_candidate_id": "pub-a1-quaternius-ultimate-fantasy-rts-001",
+      "public_id": "dvlksXgxWc",
+      "title": "Barracks",
+      "source_url": "https://poly.pizza/m/dvlksXgxWc",
+      "glb_url": "https://static.poly.pizza/9525bf0f-6ef9-4b9a-9d74-2d2d23352003.glb",
+      "local_path": "artifacts/asset-intake/downloads/poly-pizza/quaternius-ultimate-fantasy-rts/dvlksXgxWc-barracks.glb",
+      "size_bytes": 486740,
+      "sha256": "b62a47e6cf8cdacc87be9afb6c5201a6becaf3e2616fd5d6797958b00e99ef74",
+      "preview_metric": {
+        "key": "barracks",
+        "label": "Barracks",
+        "file": "dvlksXgxWc-barracks.glb",
+        "source_size": [
+          1.711,
+          1.352,
+          1.643
+        ],
+        "preview_size": [
+          3.289,
+          2.093,
+          3.175
+        ],
+        "preview_position": [
+          1.2,
+          0,
+          -0.1
+        ]
+      },
+      "approved_for_import": false
+    },
+    {
+      "sub_candidate_id": "a1-quaternius-farm-001",
+      "a1_category": "farm",
+      "runtime_key_candidate": "farm",
+      "status": "approved-for-intake",
+      "readability": "pass-with-tuning",
+      "decision": "Reads as a civilian supply building. Needs size restraint and occupancy/selection treatment so it does not compete with Town Hall.",
+      "parent_candidate_id": "pub-a1-quaternius-ultimate-fantasy-rts-001",
+      "public_id": "91wMLb9kKo",
+      "title": "Farm",
+      "source_url": "https://poly.pizza/m/91wMLb9kKo",
+      "glb_url": "https://static.poly.pizza/507be572-66bd-419e-bf29-265cce2cf724.glb",
+      "local_path": "artifacts/asset-intake/downloads/poly-pizza/quaternius-ultimate-fantasy-rts/91wMLb9kKo-farm.glb",
+      "size_bytes": 230864,
+      "sha256": "403cd4f1218f2d45392becbf63e1bec64df527152235f99895342c5dd2b8b2c2",
+      "preview_metric": {
+        "key": "farm",
+        "label": "Farm",
+        "file": "91wMLb9kKo-farm.glb",
+        "source_size": [
+          1.912,
+          1.837,
+          1.977
+        ],
+        "preview_size": [
+          2.112,
+          1.719,
+          2.167
+        ],
+        "preview_position": [
+          4.8,
+          0,
+          1.9
+        ]
+      },
+      "approved_for_import": false
+    },
+    {
+      "sub_candidate_id": "a1-quaternius-mine-001",
+      "a1_category": "goldmine",
+      "runtime_key_candidate": "goldmine",
+      "status": "approved-for-intake",
+      "readability": "pass-with-tuning",
+      "decision": "Rock/cave body is readable as mine. Needs gold cue, worker approach lane, selection ring, and mining interaction proof.",
+      "parent_candidate_id": "pub-a1-quaternius-ultimate-fantasy-rts-001",
+      "public_id": "wOJ61Fa0Lt",
+      "title": "Mine",
+      "source_url": "https://poly.pizza/m/wOJ61Fa0Lt",
+      "glb_url": "https://static.poly.pizza/ede9a223-b9e9-4191-b499-4851ca5d9be5.glb",
+      "local_path": "artifacts/asset-intake/downloads/poly-pizza/quaternius-ultimate-fantasy-rts/wOJ61Fa0Lt-mine.glb",
+      "size_bytes": 141868,
+      "sha256": "cfbabb663904483aa9704b7ea63e053a58dbe882abbc2935e65f5a0425b21752",
+      "preview_metric": {
+        "key": "goldmine",
+        "label": "Mine",
+        "file": "wOJ61Fa0Lt-mine.glb",
+        "source_size": [
+          1.284,
+          1.169,
+          1.361
+        ],
+        "preview_size": [
+          2.273,
+          1.718,
+          2.234
+        ],
+        "preview_position": [
+          5,
+          0,
+          -2.2
+        ]
+      },
+      "approved_for_import": false
+    },
+    {
+      "sub_candidate_id": "a1-quaternius-resource-gold-accent-001",
+      "a1_category": "goldmine / terrain readability aids",
+      "runtime_key_candidate": "goldmine_accent",
+      "status": "approved-for-intake",
+      "readability": "pass-as-accent-only",
+      "decision": "Good gold cue next to Mine. Not enough alone to represent Goldmine; use only as accent or terrain resource marker.",
+      "parent_candidate_id": "pub-a1-quaternius-ultimate-fantasy-rts-001",
+      "public_id": "jkqD4dMoz1",
+      "title": "Resource Gold",
+      "source_url": "https://poly.pizza/m/jkqD4dMoz1",
+      "glb_url": "https://static.poly.pizza/34c11de3-309c-48a1-8ac0-7224a40b60b2.glb",
+      "local_path": "artifacts/asset-intake/downloads/poly-pizza/quaternius-ultimate-fantasy-rts/jkqD4dMoz1-resource-gold.glb",
+      "size_bytes": 51048,
+      "sha256": "014be202047295172158f524d11ecc0a172eef544b4d11fd0fe55b48e55be1f3",
+      "preview_metric": {
+        "key": "gold_accent",
+        "label": "Resource Gold",
+        "file": "jkqD4dMoz1-resource-gold.glb",
+        "source_size": [
+          0.698,
+          0.301,
+          0.715
+        ],
+        "preview_size": [
+          0.963,
+          0.378,
+          0.976
+        ],
+        "preview_position": [
+          6.65,
+          0,
+          -1.65
+        ]
+      },
+      "approved_for_import": false
+    },
+    {
+      "sub_candidate_id": "a1-quaternius-tree-line-001",
+      "a1_category": "trees / tree line",
+      "runtime_key_candidate": "tree_line",
+      "status": "approved-for-intake",
+      "readability": "pass-with-tuning",
+      "decision": "Tree cluster reads as resource boundary. Needs repeated placement and worker occlusion test before runtime import.",
+      "parent_candidate_id": "pub-a1-quaternius-ultimate-fantasy-rts-001",
+      "public_id": "jUzojhHoYR",
+      "title": "Trees",
+      "source_url": "https://poly.pizza/m/jUzojhHoYR",
+      "glb_url": "https://static.poly.pizza/953dfd22-7041-4a2b-a234-0e1088bb8340.glb",
+      "local_path": "artifacts/asset-intake/downloads/poly-pizza/quaternius-ultimate-fantasy-rts/jUzojhHoYR-trees.glb",
+      "size_bytes": 92392,
+      "sha256": "a61c2378b7a103276c8deb8ddbeda0d5b21d7cc638bca48500b97baabdf651d5",
+      "preview_metric": {
+        "key": "tree_line",
+        "label": "Trees",
+        "file": "jUzojhHoYR-trees.glb",
+        "source_size": [
+          1.97,
+          0.927,
+          1.864
+        ],
+        "preview_size": [
+          2,
+          0.941,
+          1.892
+        ],
+        "preview_position": [
+          -6.2,
+          0,
+          -2.7
+        ]
+      },
+      "approved_for_import": false
+    },
+    {
+      "sub_candidate_id": "a1-quaternius-watch-tower-001",
+      "a1_category": "tower",
+      "runtime_key_candidate": "tower",
+      "status": "approved-for-intake",
+      "readability": "pass-with-tuning",
+      "decision": "Tall silhouette reads as tower. Needs attack cue, team-color separation, and selection/footprint proof.",
+      "parent_candidate_id": "pub-a1-quaternius-ultimate-fantasy-rts-001",
+      "public_id": "f2J0aSLVi4",
+      "title": "Watch Tower",
+      "source_url": "https://poly.pizza/m/f2J0aSLVi4",
+      "glb_url": "https://static.poly.pizza/af1eb6e4-a1b9-415f-bb4d-6098c4a70b40.glb",
+      "local_path": "artifacts/asset-intake/downloads/poly-pizza/quaternius-ultimate-fantasy-rts/f2J0aSLVi4-watch-tower.glb",
+      "size_bytes": 53188,
+      "sha256": "d70f8855cb45003b4f78a093a23eab61717f9246fdcdeca281bf6b341edb442a",
+      "preview_metric": {
+        "key": "tower",
+        "label": "Watch Tower",
+        "file": "f2J0aSLVi4-watch-tower.glb",
+        "source_size": [
+          0.505,
+          1.463,
+          0.519
+        ],
+        "preview_size": [
+          0.915,
+          2.05,
+          0.929
+        ],
+        "preview_position": [
+          -0.6,
+          0,
+          2.55
+        ]
+      },
+      "approved_for_import": false
+    }
+  ],
+  "blocked_for_import_reasons": [
+    "No runtime path or AssetCatalog mapping has been approved.",
+    "No scale, pivot, selection ring, footprint, obstruction, or worker pathing proof yet.",
+    "No team-color/material unification pass yet.",
+    "No side-by-side proof against the current S0 fallback assets yet.",
+    "No deterministic fallback regression update yet.",
+    "No final public notices / source packet has been promoted into runtime documentation yet."
+  ]
+}

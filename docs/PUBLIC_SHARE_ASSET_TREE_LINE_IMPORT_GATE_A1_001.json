@@ -1,0 +1,77 @@
+{
+  "gate_id": "public-share-asset-tree-line-import-gate-a1-001",
+  "branch": "codex/asset-public-share",
+  "prepared_at": "2026-04-16",
+  "status": "tree-line-direct-import-blocked-current-lumber-and-worker-readability-gates-passed",
+  "decision": "do-not-directly-map-quaternius-trees-glb-to-pine_tree",
+  "source_file": {
+    "path": "artifacts/asset-intake/downloads/poly-pizza/quaternius-ultimate-fantasy-rts/jUzojhHoYR-trees.glb",
+    "sha256": "a61c2378b7a103276c8deb8ddbeda0d5b21d7cc638bca48500b97baabdf651d5",
+    "bytes": 92392,
+    "kb": 90.2,
+    "mesh_name": "Resource_Tree_Group",
+    "nodes": 2,
+    "meshes": 1,
+    "primitives": 2,
+    "materials": 2,
+    "vertices": 2540,
+    "triangles": 4776,
+    "render_vertex_count": 14328,
+    "textures": 0,
+    "images": 0,
+    "animations": 0,
+    "bbox_min": [-0.99633, 0.002, -0.84999],
+    "bbox_max": [0.97357, 0.9285, 1.01359]
+  },
+  "runtime_context": {
+    "current_tree_entries": 187,
+    "manager": "src/game/TreeManager.ts",
+    "pathing": "src/game/PathingGrid.ts",
+    "factory": "Game.createSingleTree()",
+    "current_decision": "keep-procedural-fallback",
+    "lumber_gate": "passed",
+    "worker_readability_gate": "passed"
+  },
+  "blockers": [
+    "Source asset is a Resource_Tree_Group, not a single prepared tree.",
+    "Game.createSingleTree() would clone it for every TreeEntry.",
+    "Visual footprint is close to two world units before runtime random scale.",
+    "Worker obstruction and selection-ring readability are proven only for the current S0 procedural tree line; any replacement candidate must re-run proof.",
+    "Triangle count would scale badly across approximately 187 tree entries."
+  ],
+  "allowed_next_routes": [
+    "Keep S0 procedural fallback.",
+    "Prepare a single-tree or small-cluster GLB with <=1.2 world-unit width and <=1000 triangles.",
+    "Use tree-line clusters only as non-pathing decoration while TreeManager keeps harvestable trees."
+  ],
+  "required_verification_before_import": [
+    "Candidate tree visual worker obstruction screenshot proof.",
+    "Worker right-click enters lumber gather.",
+    "Asset fallback proof still passes when tree model is missing.",
+    "Default camera readability proof."
+  ],
+  "completed_verification": [
+    {
+      "gate_id": "public-share-asset-tree-line-lumber-gate-a1-001",
+      "path": "docs/PUBLIC_SHARE_ASSET_TREE_LINE_LUMBER_GATE_A1_001.zh-CN.md",
+      "test": "tests/tree-line-lumber-gate-regression.spec.ts",
+      "result": "2 passed",
+      "covered": [
+        "Default tree line remains visible, registered, and path-blocking.",
+        "Tree depletion removes the TreeEntry and releases the pathing blocker."
+      ]
+    },
+    {
+      "proof_id": "public-share-asset-tree-line-worker-readability-a1-001",
+      "path": "docs/PUBLIC_SHARE_ASSET_TREE_LINE_WORKER_READABILITY_A1_001.zh-CN.md",
+      "test": "tests/tree-line-worker-readability-proof.spec.ts",
+      "result": "1 passed",
+      "artifact": "artifacts/asset-intake/preview/tree-line-worker-readability-a1-001.png",
+      "covered": [
+        "Selected worker remains readable at the harvest edge of the current procedural tree line.",
+        "Selection ring remains visible.",
+        "Proof used an existing tree-line tile, not a controlled fake tree."
+      ]
+    }
+  ]
+}

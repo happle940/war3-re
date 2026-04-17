@@ -1,0 +1,126 @@
+{
+  "proof_id": "public-share-asset-optimization-proof-a1-001",
+  "branch": "codex/asset-public-share",
+  "prepared_at": "2026-04-16",
+  "status": "optimization-proof-complete-superseded-by-optimization-pass-a1-001",
+  "source_trial": "docs/PUBLIC_SHARE_ASSET_IMPORT_TRIAL_A1_001.zh-CN.md",
+  "superseded_by": "docs/PUBLIC_SHARE_ASSET_OPTIMIZATION_PASS_A1_001.zh-CN.md",
+  "optimization_applied": false,
+  "total": {
+    "bytes": 1072168,
+    "kb": 1047.0,
+    "nodes": 10,
+    "meshes": 5,
+    "primitives": 28,
+    "materials": 28,
+    "vertices": 29054,
+    "triangles": 17390,
+    "textures": 0,
+    "images": 0,
+    "animations": 0
+  },
+  "assets": [
+    {
+      "file": "public/assets/models/vendor/quaternius/ultimate-fantasy-rts/barracks.glb",
+      "bytes": 486740,
+      "kb": 475.3,
+      "nodes": 2,
+      "meshes": 1,
+      "primitives": 9,
+      "materials": 9,
+      "vertices": 13546,
+      "triangles": 6900,
+      "textures": 0,
+      "images": 0,
+      "animations": 0,
+      "priority": "optimize-first"
+    },
+    {
+      "file": "public/assets/models/vendor/quaternius/ultimate-fantasy-rts/farm.glb",
+      "bytes": 230864,
+      "kb": 225.5,
+      "nodes": 2,
+      "meshes": 1,
+      "primitives": 7,
+      "materials": 7,
+      "vertices": 6142,
+      "triangles": 4162,
+      "textures": 0,
+      "images": 0,
+      "animations": 0,
+      "priority": "optimize-second"
+    },
+    {
+      "file": "public/assets/models/vendor/quaternius/ultimate-fantasy-rts/mine.glb",
+      "bytes": 141868,
+      "kb": 138.5,
+      "nodes": 2,
+      "meshes": 1,
+      "primitives": 5,
+      "materials": 5,
+      "vertices": 3789,
+      "triangles": 2294,
+      "textures": 0,
+      "images": 0,
+      "animations": 0,
+      "priority": "hold"
+    },
+    {
+      "file": "public/assets/models/vendor/quaternius/ultimate-fantasy-rts/town-center.glb",
+      "bytes": 159508,
+      "kb": 155.8,
+      "nodes": 2,
+      "meshes": 1,
+      "primitives": 4,
+      "materials": 4,
+      "vertices": 4183,
+      "triangles": 3334,
+      "textures": 0,
+      "images": 0,
+      "animations": 0,
+      "priority": "hold"
+    },
+    {
+      "file": "public/assets/models/vendor/quaternius/ultimate-fantasy-rts/watch-tower.glb",
+      "bytes": 53188,
+      "kb": 51.9,
+      "nodes": 2,
+      "meshes": 1,
+      "primitives": 3,
+      "materials": 3,
+      "vertices": 1394,
+      "triangles": 700,
+      "textures": 0,
+      "images": 0,
+      "animations": 0,
+      "priority": "hold"
+    }
+  ],
+  "budgets": {
+    "total_kb_max": 750,
+    "total_primitives_max": 20,
+    "total_materials_max": 20,
+    "total_vertices_max": 22000,
+    "barracks_kb_max": 320,
+    "farm_kb_max": 160
+  },
+  "runtime_observations": [
+    "Building agency split verification took 3.1m for 5 tests after GLB import.",
+    "Construction lifecycle long run produced 8 pass outputs before SIGTERM; remaining two focused tests passed individually.",
+    "No textures/images/animations exist in the first slice, so texture compression is not the first optimization lever.",
+    "AssetLoader currently deep-clones per-mesh materials to preserve instance isolation for team color, hit flash, selection feedback, and build-complete effects."
+  ],
+  "recommendation": {
+    "next_pass_id": "public-share-asset-optimization-pass-a1-001",
+    "scope": [
+      "barracks.glb",
+      "farm.glb"
+    ],
+    "method": "GLB-side prune/material-primitive consolidation before considering meshopt or draco decoder integration",
+    "must_rerun": [
+      "./scripts/run-runtime-tests.sh tests/asset-pipeline-regression.spec.ts tests/v3-asset-fallback-catalog-proof.spec.ts --reporter=list",
+      "./scripts/run-runtime-tests.sh tests/mining-saturation-regression.spec.ts --reporter=list",
+      "./scripts/run-runtime-tests.sh tests/static-defense-regression.spec.ts --reporter=list"
+    ]
+  }
+}

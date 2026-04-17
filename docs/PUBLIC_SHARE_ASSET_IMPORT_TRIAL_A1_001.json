@@ -1,0 +1,310 @@
+{
+  "trial_id": "public-share-asset-import-trial-a1-001",
+  "branch": "codex/asset-public-share",
+  "prepared_at": "2026-04-16",
+  "status": "import-trial-active-barracks-farm-optimized-goldmine-accent-composed-goldmine-readability-boosted-tree-line-lumber-and-worker-readability-gates-passed-functional-smoke-passed-by-split-verification",
+  "final_approved_for_import": [],
+  "approved_for_import_trial": [
+    "a1-quaternius-town-center-001",
+    "a1-quaternius-barracks-001",
+    "a1-quaternius-farm-001",
+    "a1-quaternius-mine-001",
+    "a1-quaternius-resource-gold-accent-001",
+    "a1-quaternius-watch-tower-001"
+  ],
+  "runtime_asset_changes": true,
+  "fallback_retained": true,
+  "copied_files": [
+    {
+      "runtime_key": "townhall",
+      "target": "public/assets/models/vendor/quaternius/ultimate-fantasy-rts/town-center.glb",
+      "sha256": "fa7d33ff72092a96073b659eba5562ed1eadf5b60a8092d1321769b34e9177a5"
+    },
+    {
+      "runtime_key": "barracks",
+      "target": "public/assets/models/vendor/quaternius/ultimate-fantasy-rts/barracks.glb",
+      "sha256": "1b6607319c7166daec71e60c0473cd85afa4df96a1d4cd4624d6ca7ab36e7de6",
+      "note": "Optimized during PUBLIC_SHARE_ASSET_OPTIMIZATION_PASS_A1_001; original trial hash was b62a47e6cf8cdacc87be9afb6c5201a6becaf3e2616fd5d6797958b00e99ef74."
+    },
+    {
+      "runtime_key": "farm",
+      "target": "public/assets/models/vendor/quaternius/ultimate-fantasy-rts/farm.glb",
+      "sha256": "9ba5dfacf8e469b002e41a60e746fb7d5de64feb46903fb674a8e8174fa2a6bd",
+      "note": "Optimized during PUBLIC_SHARE_ASSET_OPTIMIZATION_PASS_A1_001; original trial hash was 403cd4f1218f2d45392becbf63e1bec64df527152235f99895342c5dd2b8b2c2."
+    },
+    {
+      "runtime_key": "goldmine",
+      "target": "public/assets/models/vendor/quaternius/ultimate-fantasy-rts/mine.glb",
+      "sha256": "cfbabb663904483aa9704b7ea63e053a58dbe882abbc2935e65f5a0425b21752"
+    },
+    {
+      "runtime_key": "goldmine_accent",
+      "target": "public/assets/models/vendor/quaternius/ultimate-fantasy-rts/resource-gold.glb",
+      "sha256": "a580525d732887e89ab7d538cefd6ce59c2d1657e5fea9f6b3839a484194faa7",
+      "note": "Visual-only composition child for goldmine; not a standalone resource object."
+    },
+    {
+      "runtime_key": "tower",
+      "target": "public/assets/models/vendor/quaternius/ultimate-fantasy-rts/watch-tower.glb",
+      "sha256": "d70f8855cb45003b4f78a093a23eab61717f9246fdcdeca281bf6b341edb442a"
+    }
+  ],
+  "catalog_changes": [
+    {
+      "file": "src/game/AssetCatalog.ts",
+      "key": "townhall",
+      "path": "assets/models/vendor/quaternius/ultimate-fantasy-rts/town-center.glb",
+      "scale": 2.5299
+    },
+    {
+      "file": "src/game/AssetCatalog.ts",
+      "key": "barracks",
+      "path": "assets/models/vendor/quaternius/ultimate-fantasy-rts/barracks.glb",
+      "scale": 1.4369
+    },
+    {
+      "file": "src/game/AssetCatalog.ts",
+      "key": "farm",
+      "path": "assets/models/vendor/quaternius/ultimate-fantasy-rts/farm.glb",
+      "scale": 0.8123
+    },
+    {
+      "file": "src/game/AssetCatalog.ts",
+      "key": "goldmine",
+      "path": "assets/models/vendor/quaternius/ultimate-fantasy-rts/mine.glb",
+      "scale": 1.796
+    },
+    {
+      "file": "src/game/AssetCatalog.ts",
+      "key": "goldmine_accent",
+      "path": "assets/models/vendor/quaternius/ultimate-fantasy-rts/resource-gold.glb",
+      "scale": 1.15,
+      "composition_only": true
+    },
+    {
+      "file": "src/game/AssetCatalog.ts",
+      "key": "tower",
+      "path": "assets/models/vendor/quaternius/ultimate-fantasy-rts/watch-tower.glb",
+      "scale": 1.8461
+    }
+  ],
+  "runtime_fix": {
+    "file": "src/game/FeedbackEffects.ts",
+    "issue": "Build-complete effect assumed first mesh material always exposes emissive, which broke on Quaternius glTF materials.",
+    "fix": "Find the first material with THREE.Color emissive before applying the flash; skip emissive flash when unsupported.",
+    "product_behavior_changed": false
+  },
+  "verification": [
+    {
+      "command": "npm run build",
+      "status": "passed"
+    },
+    {
+      "command": "npx tsc --noEmit -p tsconfig.app.json",
+      "status": "passed"
+    },
+    {
+      "command": "./scripts/run-runtime-tests.sh tests/asset-pipeline-regression.spec.ts tests/v3-asset-fallback-catalog-proof.spec.ts --reporter=list",
+      "status": "passed",
+      "passed": 11,
+      "failed": 0,
+      "duration": "2.8m"
+    },
+    {
+      "command": "./scripts/run-runtime-tests.sh tests/building-agency-regression.spec.ts --reporter=list",
+      "status": "passed",
+      "passed": 5,
+      "failed": 0,
+      "duration": "3.1m"
+    },
+    {
+      "command": "./scripts/run-runtime-tests.sh tests/construction-lifecycle-regression.spec.ts --reporter=list",
+      "status": "interrupted-after-8-pass-outputs",
+      "passed_outputs_observed": 8,
+      "failed_outputs_observed": 0,
+      "interruption": "SIGTERM during long browser run"
+    },
+    {
+      "command": "./scripts/run-runtime-tests.sh tests/construction-lifecycle-regression.spec.ts --grep \"second worker cannot steal builder from a builder in MovingToBuild state\" --reporter=list",
+      "status": "passed",
+      "passed": 1,
+      "failed": 0
+    },
+    {
+      "command": "./scripts/run-runtime-tests.sh tests/construction-lifecycle-regression.spec.ts --grep \"reassignment IS allowed when original builder is dead or stopped\" --reporter=list",
+      "status": "passed",
+      "passed": 1,
+      "failed": 0
+    },
+    {
+      "command": "./scripts/run-runtime-tests.sh tests/mining-saturation-regression.spec.ts --reporter=list",
+      "status": "passed",
+      "passed": 2,
+      "failed": 0,
+      "duration": "1.1m"
+    },
+    {
+      "command": "./scripts/run-runtime-tests.sh tests/static-defense-regression.spec.ts --reporter=list",
+      "status": "interrupted-after-6-pass-outputs",
+      "passed_outputs_observed": 6,
+      "failed_outputs_observed": 0,
+      "interruption": "SIGTERM during browser run"
+    },
+    {
+      "command": "./scripts/run-runtime-tests.sh tests/static-defense-regression.spec.ts --grep \"no severe console errors during tower combat\" --reporter=list",
+      "status": "passed",
+      "passed": 1,
+      "failed": 0
+    },
+    {
+      "command": "npm run build",
+      "status": "passed-after-optimization-pass-a1-001",
+      "note": "Vite large chunk warning remains."
+    },
+    {
+      "command": "npx tsc --noEmit -p tsconfig.app.json",
+      "status": "blocked-after-optimization-pass-a1-001-by-unrelated-wip",
+      "error": "src/game/Game.ts(2050,12): error TS2339: Property 'checkHeroLevelUp' does not exist on type 'Game'.",
+      "touched_by_optimization_pass": false
+    },
+    {
+      "command": "./scripts/run-runtime-tests.sh tests/asset-pipeline-regression.spec.ts tests/v3-asset-fallback-catalog-proof.spec.ts --reporter=list",
+      "status": "passed-after-optimization-pass-a1-001",
+      "passed": 11,
+      "failed": 0,
+      "duration": "2.1m"
+    },
+    {
+      "command": "./scripts/run-runtime-tests.sh tests/construction-lifecycle-regression.spec.ts --reporter=list --grep \"stopping an active builder leaves construction resumable\"",
+      "status": "passed-after-optimization-pass-a1-001",
+      "passed": 1,
+      "failed": 0,
+      "duration": "37.8s"
+    },
+    {
+      "command": "./scripts/run-runtime-tests.sh tests/goldmine-accent-composition-regression.spec.ts --reporter=list",
+      "status": "passed-after-goldmine-composition-pass-a1-001",
+      "passed": 1,
+      "failed": 0,
+      "duration": "30.1s"
+    },
+    {
+      "command": "./scripts/run-runtime-tests.sh tests/asset-pipeline-regression.spec.ts tests/v3-asset-fallback-catalog-proof.spec.ts --reporter=list",
+      "status": "passed-after-goldmine-composition-pass-a1-001",
+      "passed": 11,
+      "failed": 0,
+      "duration": "3.9m"
+    },
+    {
+      "command": "./scripts/run-runtime-tests.sh tests/mining-saturation-regression.spec.ts --reporter=list",
+      "status": "passed-after-goldmine-composition-pass-a1-001",
+      "passed": 2,
+      "failed": 0,
+      "duration": "1.3m"
+    },
+    {
+      "command": "./scripts/run-runtime-tests.sh tests/tree-line-lumber-gate-regression.spec.ts --reporter=list",
+      "status": "passed-after-tree-line-lumber-gate-a1-001",
+      "passed": 2,
+      "failed": 0,
+      "duration": "21.6s"
+    },
+    {
+      "command": "./scripts/run-runtime-tests.sh tests/tree-line-worker-readability-proof.spec.ts --reporter=list",
+      "status": "passed-after-tree-line-worker-readability-a1-001",
+      "passed": 1,
+      "failed": 0,
+      "duration": "17.6s"
+    },
+    {
+      "command": "npm run build",
+      "status": "passed-after-goldmine-readability-pass-a1-002",
+      "note": "Vite large chunk warning remains."
+    },
+    {
+      "command": "./scripts/run-runtime-tests.sh tests/goldmine-accent-composition-regression.spec.ts tests/goldmine-gold-readability-proof.spec.ts --reporter=list",
+      "status": "passed-after-goldmine-readability-pass-a1-002",
+      "passed": 2,
+      "failed": 0,
+      "duration": "41.8s"
+    },
+    {
+      "command": "./scripts/run-runtime-tests.sh tests/mining-saturation-regression.spec.ts --reporter=list",
+      "status": "passed-after-goldmine-readability-pass-a1-002",
+      "passed": 2,
+      "failed": 0,
+      "duration": "1.7m"
+    }
+  ],
+  "optimization_pass": {
+    "record": "docs/PUBLIC_SHARE_ASSET_OPTIMIZATION_PASS_A1_001.zh-CN.md",
+    "machine_record": "docs/PUBLIC_SHARE_ASSET_OPTIMIZATION_PASS_A1_001.json",
+    "optimized_runtime_keys": [
+      "barracks",
+      "farm"
+    ],
+    "before_total_bytes": 1072168,
+    "after_total_bytes": 907348,
+    "saved_bytes": 164820,
+    "saved_percent": 15.37,
+    "decoder_changes_required": false
+  },
+  "goldmine_composition_pass": {
+    "record": "docs/PUBLIC_SHARE_ASSET_GOLDMINE_COMPOSITION_PASS_A1_001.zh-CN.md",
+    "machine_record": "docs/PUBLIC_SHARE_ASSET_GOLDMINE_COMPOSITION_PASS_A1_001.json",
+    "runtime_key": "goldmine",
+    "visual_only_key": "goldmine_accent",
+    "gameplay_object_changed": false,
+    "pathing_changed": false,
+    "gather_logic_changed": false,
+    "runtime_file": "public/assets/models/vendor/quaternius/ultimate-fantasy-rts/resource-gold.glb",
+    "sha256": "a580525d732887e89ab7d538cefd6ce59c2d1657e5fea9f6b3839a484194faa7"
+  },
+  "goldmine_readability_pass": {
+    "record": "docs/PUBLIC_SHARE_ASSET_GOLDMINE_READABILITY_PASS_A1_002.zh-CN.md",
+    "machine_record": "docs/PUBLIC_SHARE_ASSET_GOLDMINE_READABILITY_PASS_A1_002.json",
+    "test": "tests/goldmine-gold-readability-proof.spec.ts",
+    "screenshot": "artifacts/asset-intake/preview/goldmine-gold-readability-a1-002.png",
+    "metrics": "artifacts/asset-intake/preview/goldmine-gold-readability-a1-002.json",
+    "resource_gold_accent_roots": 4,
+    "gold_readability_cue_meshes": 3,
+    "remaining_gold": 2000,
+    "gameplay_changed": false,
+    "pathing_changed": false,
+    "mining_saturation": "2/2 passed"
+  },
+  "tree_line_lumber_gate": {
+    "record": "docs/PUBLIC_SHARE_ASSET_TREE_LINE_LUMBER_GATE_A1_001.zh-CN.md",
+    "machine_record": "docs/PUBLIC_SHARE_ASSET_TREE_LINE_LUMBER_GATE_A1_001.json",
+    "test": "tests/tree-line-lumber-gate-regression.spec.ts",
+    "tree_line_imported": false,
+    "current_procedural_tree_line_kept": true,
+    "pathing_blocker_gate": "passed",
+    "depletion_release_gate": "passed",
+    "direct_quaternius_trees_import": "blocked"
+  },
+  "tree_line_worker_readability_proof": {
+    "record": "docs/PUBLIC_SHARE_ASSET_TREE_LINE_WORKER_READABILITY_A1_001.zh-CN.md",
+    "machine_record": "docs/PUBLIC_SHARE_ASSET_TREE_LINE_WORKER_READABILITY_A1_001.json",
+    "test": "tests/tree-line-worker-readability-proof.spec.ts",
+    "screenshot": "artifacts/asset-intake/preview/tree-line-worker-readability-a1-001.png",
+    "metrics": "artifacts/asset-intake/preview/tree-line-worker-readability-a1-001.json",
+    "source": "existing-tree-line",
+    "worker_readability_gate": "passed",
+    "selection_ring_gate": "passed",
+    "final_tree_art_approved": false
+  },
+  "performance_observations": [
+    "Real GLB trial import materially slows some browser runtime tests.",
+    "Building agency full file took 3.1m.",
+    "Construction lifecycle early scenarios reached 40s to 1m+ per scenario in the long run.",
+    "Next asset work should include glTF optimization and draw-call/material/node-count review."
+  ],
+  "remaining_blockers": [
+    "No final public asset approval yet.",
+    "Tree line not imported; current procedural tree line has lumber/pathing and worker-readability proof but not final art approval.",
+    "Help/Credits in-game surface still missing.",
+    "Human unit final asset route still missing.",
+    "Further material/primitive consolidation or decoder-backed compression proof still missing."
+  ]
+}

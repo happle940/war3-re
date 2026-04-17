@@ -1,0 +1,105 @@
+{
+  "sweep_id": "a1-asset-preview-sweep-001",
+  "branch": "codex/asset-public-share",
+  "prepared_at": "2026-04-16",
+  "batch": "A1 battlefield readability",
+  "runtime_asset_changes": false,
+  "approved_for_import": [],
+  "approved_for_intake": [
+    "a1-kenney-castle-tower-square-001",
+    "a1-kenney-castle-tree-line-001",
+    "a1-kenney-td-tree-tile-001",
+    "a1-kenney-castle-rocks-001",
+    "a1-kenney-castle-wall-gate-001"
+  ],
+  "artifacts": {
+    "downloads": [
+      "artifacts/asset-intake/downloads/kenney_tower-defense-kit.zip",
+      "artifacts/asset-intake/downloads/kenney_castle-kit.zip"
+    ],
+    "source_pages": [
+      "artifacts/asset-intake/source-pages/kenney-tower-defense-kit.html",
+      "artifacts/asset-intake/source-pages/kenney-castle-kit.html"
+    ],
+    "manifests": [
+      "artifacts/asset-intake/manifests/kenney_tower-defense-kit.files.txt",
+      "artifacts/asset-intake/manifests/kenney_castle-kit.files.txt",
+      "artifacts/asset-intake/manifests/kenney_selected_glb_inventory.json"
+    ],
+    "preview": "artifacts/asset-intake/preview/kenney-a1-shortlist-rts-preview.png"
+  },
+  "file_plan": "docs/A1_ASSET_FILE_PLAN_001.zh-CN.md",
+  "sources": [
+    {
+      "source_name": "Kenney Tower Defense Kit",
+      "source_url": "https://kenney.nl/assets/tower-defense-kit",
+      "download_url": "https://kenney.nl/media/pages/assets/tower-defense-kit/73f5e756ea-1726471567/kenney_tower-defense-kit.zip",
+      "license": "CC0",
+      "license_file": "License.txt",
+      "zip_entries": 821
+    },
+    {
+      "source_name": "Kenney Castle Kit",
+      "source_url": "https://kenney.nl/assets/castle-kit",
+      "download_url": "https://kenney.nl/media/pages/assets/castle-kit/5e344a4444-1711543616/kenney_castle-kit.zip",
+      "license": "CC0",
+      "license_file": "License.txt",
+      "zip_entries": 406
+    }
+  ],
+  "sub_candidates": [
+    {
+      "sub_candidate_id": "a1-kenney-castle-tower-square-001",
+      "parent_candidate_id": "pub-a1-kenney-castle-kit-001",
+      "source_files": ["Models/GLB format/tower-square.glb"],
+      "a1_category": "tower",
+      "status": "approved-for-intake",
+      "readability": "pass-with-tuning",
+      "decision": "Clear tower silhouette from RTS camera; needs visible attack point, scale, pivot, footprint, and material plan before import."
+    },
+    {
+      "sub_candidate_id": "a1-kenney-castle-tree-line-001",
+      "parent_candidate_id": "pub-a1-kenney-castle-kit-001",
+      "source_files": ["Models/GLB format/tree-large.glb", "Models/GLB format/tree-small.glb"],
+      "a1_category": "trees / tree line",
+      "status": "approved-for-intake",
+      "readability": "pass-with-tuning",
+      "decision": "Clean single-tree silhouettes; needs repeated tree-line placement test and worker occlusion check."
+    },
+    {
+      "sub_candidate_id": "a1-kenney-td-tree-tile-001",
+      "parent_candidate_id": "pub-a1-kenney-tower-defense-001",
+      "source_files": ["Models/GLB format/tile-tree.glb", "Models/GLB format/tile-tree-quad.glb"],
+      "a1_category": "trees / tree line",
+      "status": "approved-for-intake",
+      "readability": "pass-with-tuning",
+      "decision": "Useful to form quick forest boundary; ground tile color must be unified with the current battlefield before import."
+    },
+    {
+      "sub_candidate_id": "a1-kenney-castle-rocks-001",
+      "parent_candidate_id": "pub-a1-kenney-castle-kit-001",
+      "source_files": ["Models/GLB format/rocks-large.glb"],
+      "a1_category": "terrain readability aids",
+      "status": "approved-for-intake",
+      "readability": "pass",
+      "decision": "Good terrain or mine-area prop; blocked as direct goldmine because it has no gold cue or cave entrance."
+    },
+    {
+      "sub_candidate_id": "a1-kenney-castle-wall-gate-001",
+      "parent_candidate_id": "pub-a1-kenney-castle-kit-001",
+      "source_files": ["Models/GLB format/wall.glb", "Models/GLB format/gate.glb"],
+      "a1_category": "terrain readability aids",
+      "status": "approved-for-intake",
+      "readability": "pass-with-tuning",
+      "decision": "Useful as base boundary or Human props; not a direct A1 building replacement."
+    }
+  ],
+  "blocked_for_import_reasons": [
+    "No target runtime key plan yet.",
+    "No scale, pivot, selection ring, or footprint plan yet.",
+    "No team-color or material unification plan yet.",
+    "No side-by-side preview against existing S0 fallback yet.",
+    "No Asset Approval Handoff Packet yet.",
+    "No fallback regression expectations yet."
+  ]
+}

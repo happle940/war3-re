@@ -1,0 +1,106 @@
+{
+  "generatedAt": "2026-04-17T04:52:35.325Z",
+  "milestone": "V9 maintenance and expansion runway",
+  "generator": {
+    "lane": "codex",
+    "mode": "task-synthesis"
+  },
+  "codex": [
+    {
+      "id": "SYN-CODEX-HERO17-01",
+      "title": "Archmage 数据证据复核",
+      "status": "blocked",
+      "milestone": "V9 maintenance and expansion runway",
+      "gate": "V9-HEROCHAIN1",
+      "summary": "复核 Archmage 的第一批数据是否只来自来源边界，没有偷写运行时或技能效果。",
+      "goal": "在 GLM 完成 Archmage 单位数据种子后，验收数据字段、来源映射和禁止范围是否足够保守。",
+      "proofTarget": "V9-HEROCHAIN1 / HERO17-DATA1：Archmage unit data seed exists as sourced data only, with no Water Elemental, Brilliance Aura, Blizzard, Mass Teleport runtime or AI behavior.",
+      "requiresCompletedTaskTitle": "Archmage 单位数据种子证明包",
+      "whyNow": "HERO16 Paladin AI 已收口，HERO17 合同要求 Archmage 必须 source-first；Task262 仍在 live queue 处理中，下一步只能准备其后的数据复核，不能重复来源边界任务。",
+      "stopCondition": "Codex 明确给出 accept / reject / takeover 结论；若数据缺来源、夹带运行时、打开技能或改 AI，则停止并拆回更小任务。",
+      "files": [
+        "src/game/GameData.ts",
+        "docs/V9_HERO17_ARCHMAGE_SOURCE_BOUNDARY.zh-CN.md",
+        "tests/v9-hero17-archmage-data-seed.spec.mjs"
+      ],
+      "requirements": [
+        "只复核 Archmage 单位数据，不关闭完整 Archmage 分支。",
+        "必须确认没有 Game.ts、SimpleAI、命令卡、召唤物、光环、暴风雪、群体传送或素材改动。",
+        "若需要验证，只跑静态 proof、build 和 typecheck；不得启动 Playwright、Vite 或浏览器。"
+      ]
+    },
+    {
+      "id": "SYN-CODEX-HERO17-02",
+      "title": "水元素边界复核",
+      "status": "blocked",
+      "milestone": "V9 maintenance and expansion runway",
+      "gate": "V9-HEROCHAIN1",
+      "summary": "复核水元素后续边界是否清楚，确保它还只是下一段合同和来源，不是召唤运行时。",
+      "goal": "在 GLM 完成 Water Elemental 合同与来源包后，确认召唤物数据、召唤规则和禁区可以安全进入后续小切片。",
+      "proofTarget": "V9-HEROCHAIN1 / HERO17-WE1：Water Elemental contract and source boundary are complete without adding summon runtime, Archmage AI, or other hero branches.",
+      "requiresCompletedTaskTitle": "水元素合同与来源包",
+      "whyNow": "Archmage 单位数据之后，合同顺序要求先定义 Water Elemental 的边界；提前复核能防止下一步直接写召唤逻辑或完整法术系统。",
+      "stopCondition": "合同、来源字段和静态 proof 均可复查后写出复核结论；若出现召唤运行时、技能按钮、AI 施法或其他英雄内容，则拒收并要求拆分。",
+      "files": [
+        "docs/V9_HERO17_WATER_ELEMENTAL_CONTRACT.zh-CN.md",
+        "docs/V9_HERO17_WATER_ELEMENTAL_SOURCE_BOUNDARY.zh-CN.md",
+        "tests/v9-hero17-water-elemental-contract.spec.mjs"
+      ],
+      "requirements": [
+        "只复核合同和来源，不验收任何运行时行为。",
+        "必须保持 Mountain King、Blood Mage、物品、商店、空军、素材和完整 Human 关闭。",
+        "必须说明后续数据种子和召唤运行时如何分开派发。"
+      ]
+    }
+  ],
+  "glm": [
+    {
+      "id": "SYN-GLM-HERO17-01",
+      "title": "Archmage 单位数据种子证明包",
+      "status": "blocked",
+      "milestone": "V9 maintenance and expansion runway",
+      "gate": "V9-HEROCHAIN1",
+      "summary": "在来源边界通过后，只把 Archmage 作为一个有来源的数据条目落地，不做技能或 AI。",
+      "goal": "按 HERO17-SRC1 的来源结论写入 Archmage 单位数据种子，并用静态 proof 证明没有运行时、技能、AI 或素材扩张。",
+      "proofTarget": "V9-HEROCHAIN1 / HERO17-DATA1：Archmage unit data seed is present and source-aligned while Water Elemental, Brilliance Aura, Blizzard, Mass Teleport data/runtime remain closed.",
+      "requiresCompletedTaskTitle": "Task 262 — V9 HERO17-SRC1 Archmage source boundary packet",
+      "whyNow": "当前相邻任务是来源边界，不能重复生成；来源边界 accepted 后，最小下一步是 Archmage 单位数据，不是技能、召唤物或运行时。",
+      "stopCondition": "静态 proof 能证明数据字段来自来源边界、生产代码未写运行时、技能和 AI 仍关闭；若来源字段不足，则停止并产出 source reconciliation 残缺说明。",
+      "writeScope": [
+        "src/game/GameData.ts",
+        "docs/V9_HERO17_ARCHMAGE_SOURCE_BOUNDARY.zh-CN.md",
+        "tests/v9-hero17-archmage-data-seed.spec.mjs"
+      ],
+      "mustProve": [
+        "Archmage 单位数据只包含已来源确认的最小字段。",
+        "没有 Water Elemental、Brilliance Aura、Blizzard 或 Mass Teleport 数据种子。",
+        "没有 Game.ts、SimpleAI、命令卡、训练入口、AI 行为或素材改动。",
+        "当前仍不声明完整 Archmage、完整英雄系统或完整 Human。"
+      ]
+    },
+    {
+      "id": "SYN-GLM-HERO17-02",
+      "title": "水元素合同与来源包",
+      "status": "blocked",
+      "milestone": "V9 maintenance and expansion runway",
+      "gate": "V9-HEROCHAIN1",
+      "summary": "先把水元素该怎么做、数值从哪里来写清楚，暂时不做召唤按钮或战斗表现。",
+      "goal": "为 Water Elemental 写合同和来源边界，确定召唤单位、持续时间、数量、生命、攻击和禁区，供后续数据种子使用。",
+      "proofTarget": "V9-HEROCHAIN1 / HERO17-WE1：Water Elemental contract/source boundary defines the next safe data task without implementing summon runtime or AI casting.",
+      "requiresCompletedTaskTitle": "Archmage 单位数据种子证明包",
+      "whyNow": "HERO17 合同顺序要求 Archmage unit data seed 之后再处理 Water Elemental；先做合同和来源能避免直接跳到召唤运行时。",
+      "stopCondition": "合同和来源 proof 通过，且明确后续只允许 Water Elemental 数据种子；如果开始写召唤、技能按钮、AI 或其他 Archmage 技能，停止。",
+      "writeScope": [
+        "docs/V9_HERO17_WATER_ELEMENTAL_CONTRACT.zh-CN.md",
+        "docs/V9_HERO17_WATER_ELEMENTAL_SOURCE_BOUNDARY.zh-CN.md",
+        "tests/v9-hero17-water-elemental-contract.spec.mjs"
+      ],
+      "mustProve": [
+        "合同明确 Water Elemental 先 source/data，后 runtime。",
+        "来源包记录采用来源、冲突来源和项目映射。",
+        "静态 proof 证明没有召唤运行时、AI 施法、其他 Archmage 技能或新素材。",
+        "后续候选只能进入 Water Elemental 数据种子，不能一次性做完整 Archmage。"
+      ]
+    }
+  ]
+}

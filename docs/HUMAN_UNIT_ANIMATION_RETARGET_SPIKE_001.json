@@ -1,0 +1,64 @@
+{
+  "spike_id": "human-unit-animation-retarget-spike-001",
+  "branch": "codex/asset-public-share",
+  "prepared_at": "2026-04-16",
+  "runtime_asset_changes": false,
+  "approved_for_import": [],
+  "source_sweeps": [
+    "docs/HUMAN_UNIT_ASSET_PREVIEW_SWEEP_001.zh-CN.md",
+    "docs/HUMAN_UNIT_ASSET_PREVIEW_SWEEP_001.json"
+  ],
+  "artifacts": {
+    "preview_page": "artifacts/asset-intake/preview/kaykit-animation-retarget-spike.html",
+    "preview_image": "artifacts/asset-intake/preview/kaykit-animation-retarget-spike.png",
+    "metrics": "artifacts/asset-intake/preview/kaykit-animation-retarget-spike.metrics.json"
+  },
+  "sample_results": [
+    {
+      "character": "Knight.glb",
+      "animation_file": "Rig_Medium_CombatMelee.glb",
+      "clip": "Melee_1H_Attack_Slice_Horizontal",
+      "track_count": 69,
+      "unique_track_targets": 23,
+      "missing_track_targets": 0,
+      "probe_bone": "upperarmr",
+      "probe_angle_delta": 0.2813478459864728,
+      "bind_status": "bound-and-moving",
+      "product_meaning": "Footman melee animation path is plausible for intake."
+    },
+    {
+      "character": "Ranger.glb",
+      "animation_file": "Rig_Medium_CombatRanged.glb",
+      "clip": "Ranged_2H_Shoot",
+      "track_count": 69,
+      "unique_track_targets": 23,
+      "missing_track_targets": 0,
+      "probe_bone": "upperarmr",
+      "probe_angle_delta": 0.5190599237453364,
+      "bind_status": "bound-and-moving",
+      "product_meaning": "Ranged proxy animation path is plausible, but this still does not solve Rifleman firearm identity."
+    },
+    {
+      "character": "Mage.glb",
+      "animation_file": "Rig_Medium_General.glb",
+      "clip": "Idle_A",
+      "track_count": 69,
+      "unique_track_targets": 23,
+      "missing_track_targets": 0,
+      "probe_bone": "spine",
+      "probe_angle_delta": 0.02634928736437328,
+      "bind_status": "bound-and-moving",
+      "product_meaning": "Caster idle animation path is plausible for intake."
+    }
+  ],
+  "remaining_runtime_gates": [
+    "UnitVisualFactory and AssetCatalog are unchanged.",
+    "No runtime AnimationMixer lifecycle validation yet.",
+    "No foot sliding review yet.",
+    "No attack hit-frame or projectile timing review yet.",
+    "No weapon attachment review yet.",
+    "No team-color review yet.",
+    "No selection ring, health bar, or death cleanup regression yet.",
+    "No fallback regression yet."
+  ]
+}

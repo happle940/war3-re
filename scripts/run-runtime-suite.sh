@@ -14,7 +14,7 @@ PASSED_SHARDS=0
 FAILED_SHARD=""
 
 # Shard definitions: name followed by spec files.
-# Covers the same 19 specs as test:runtime:single.
+# Covers the core runtime suite plus the V7 content stability shard.
 shards=(
   core-controls
     tests/closeout.spec.ts
@@ -44,6 +44,17 @@ shards=(
     tests/construction-lifecycle-regression.spec.ts
     tests/static-defense-regression.spec.ts
     tests/m4-player-reported-issues.spec.ts
+
+  v7-content
+    tests/v7-lumber-mill-tower-branch-proof.spec.ts
+    tests/v7-workshop-mortar-combat-model-proof.spec.ts
+    tests/v7-arcane-sanctum-caster-proof.spec.ts
+    tests/v7-ai-same-rule-content-proof.spec.ts
+    tests/v7-beta-stability-regression.spec.ts
+
+  v8-rc
+    tests/v8-demo-path-smoke.spec.ts
+    tests/v8-release-candidate-stability.spec.ts
 )
 
 run_shard() {

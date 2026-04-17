@@ -11,6 +11,10 @@ export enum Phase {
   LoadingMap = 'loading_map',
   /** 正常游戏中 */
   Playing = 'playing',
+  /** 设置壳层打开，冻结模拟但保留当前会话 */
+  Setup = 'setup',
+  /** 会话暂停，保留当前状态但冻结输入与模拟 */
+  Paused = 'paused',
   /** 游戏结束 */
   GameOver = 'game_over',
 }
@@ -28,6 +32,22 @@ export class GamePhase {
 
   isPlaying(): boolean {
     return this.current === Phase.Playing
+  }
+
+  isSetup(): boolean {
+    return this.current === Phase.Setup
+  }
+
+  isPaused(): boolean {
+    return this.current === Phase.Paused
+  }
+
+  isGameOver(): boolean {
+    return this.current === Phase.GameOver
+  }
+
+  isSessionOverlayActive(): boolean {
+    return this.current === Phase.Setup || this.current === Phase.Paused || this.current === Phase.GameOver
   }
 
   isBoot(): boolean {

@@ -138,7 +138,7 @@ After every task closeout, Codex must immediately run this loop unless the user 
 
 1. Check `git status --short --branch`.
 2. Check GitHub Actions status for the latest pushed commit.
-3. Check `./scripts/glm-watch.sh status`.
+3. Check `./scripts/codex-watch.sh status` and `./scripts/glm-watch.sh status`.
 4. If GLM is active, do non-conflicting Codex work from `docs/CODEX_ACTIVE_QUEUE.md`.
 5. If GLM is idle and no human gate is active, dispatch the highest-priority ready GLM task or do the task directly.
 6. If no safe implementation task exists, update the queues until at least one safe next task exists.
@@ -159,6 +159,69 @@ Invalid stop conditions:
 - one commit was pushed
 - a final report was written
 - the queue exists but the next task has not been selected
+- the current Codex feed list was exhausted but no new safe task was seeded
+
+### 3.2.1 Single-Milestone Sprint
+
+Current user directive for this phase:
+
+- stop treating `M2-M7` as user-facing top-level milestones
+- keep Codex and GLM continuously working on one real product milestone
+- use `M2-M7` only as internal evidence / closeout / acceptance labels
+
+The current single real milestone is:
+
+`V2 credible page-product vertical slice`
+
+It means one normal visitor can:
+
+1. enter through a truthful front door
+2. read the battlefield as an RTS instead of a test scene
+3. play a short 5-10 minute loop that feels mechanically credible
+4. pause, finish, read results, and return without the product shell lying
+
+This changes how the loop above should be applied:
+
+1. Codex must always keep one active Codex lane and one active or ready GLM lane that move the real milestone forward.
+2. `M2-M7` packets may still be updated, but only as internal proof or historical closeout. They are no longer the thing the user is being asked to approve one by one.
+3. GLM must never finish a scoped task into an empty queue. Before GLM closeout is accepted, Codex should already have the next `ready` GLM task documented.
+4. If a sub-area still needs human judgment, Codex records that as deferred judgment without turning it into a top-level stop point.
+5. `user-open` means "async human judgment still welcome", not "block the next stage". Codex should keep advancing once engineering blockers are closed, and attach the deferred human review to later follow-up tasks, review packets, or release decisions.
+6. The user no longer needs to synchronously approve milestone-to-milestone progression. Product-stage advancement is automatic after engineering blockers are closed; only labels like `human-approved`, `private-playtest approved`, or `public-share approved` still wait for explicit user judgment.
+7. Heartbeat automations are advisory only. The authoritative continuous-execution mechanism is the tmux-backed worker pair: `./scripts/codex-watch.sh` for Codex and `./scripts/glm-watch.sh` for GLM.
+8. A live worker is not enough by itself. Continuous execution also requires automatic follow-up dispatch after `READY_FOR_NEXT_TASK`, currently via `./scripts/codex-watch-feed.sh` and `./scripts/codex-watch-feed-daemon.sh` for non-conflicting Codex tasks.
+9. The Codex feed queue is a maintained runway, not a one-time bootstrap list. If fewer than three safe Codex tasks remain, Codex must seed more non-conflicting tasks before claiming the sprint is healthy.
+
+Task capture reference:
+
+- `/Users/zhaocong/Documents/war3-re/docs/TASK_CAPTURE_SYSTEM.zh-CN.md`
+
+Allowed pause reasons in baton mode are narrower:
+
+- active same-file conflict with GLM changes
+- missing legal/account/release decision that cannot be simulated
+- a required verification command is still running
+- the user explicitly interrupts or changes direction
+
+Everything else should be converted into the next Codex or GLM queue item instead of becoming idle time.
+
+### 3.2.2 Deep-work caps
+
+Continuous execution is not the same as unlimited parallelism.
+
+To keep both lanes going deep instead of going shallow:
+
+- Codex should keep at most `3` active trunks at a time
+- GLM should keep at most `1` `in_progress` task and `3-5` `ready` follow-ups
+- each GLM task should belong to one Codex trunk
+- the default move after a GLM closeout is the next bounded branch in the same trunk, not a random new frontier
+
+Use this split:
+
+- Codex owns trunks: product/session shape, cross-module integration, product judgment, sourcing/governance, acceptance
+- GLM owns branches: bounded contracts, small repairs, deterministic deepening, narrow extraction/hardening inside one trunk
+
+If a GLM branch discovers a bigger tree than expected, Codex should promote that discovery into a new trunk or a new bounded branch. GLM should not silently widen the task on its own.
 
 ### 3.3 GLM stall handling
 
@@ -182,6 +245,8 @@ When GLM is running, Codex should do one of these non-conflicting tracks:
 - implement a different module with disjoint write scope
 - write human milestone checklist
 - clean local runtime leftovers
+
+Codex continuous execution should run inside `./scripts/codex-watch.sh` when the user wants hands-off progress. The chat thread may pause between replies; the tmux worker is the long-running executor.
 
 If none are possible, Codex must write the exact blocker in `docs/CODEX_ACTIVE_QUEUE.md` instead of silently waiting.
 

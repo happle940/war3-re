@@ -19,12 +19,18 @@ import { MapRuntime } from '../map/MapRuntime'
 import type { ParsedMap, W3ETerrain } from '../map/W3XParser'
 import { disposeObject3DDeep } from '../utils/dispose'
 import {
-  UnitState, BUILDINGS, UNITS, GOLD_GATHER_TIME, LUMBER_GATHER_TIME,
+  UnitState, BUILDINGS, UNITS, RESEARCHES, GOLD_GATHER_TIME, LUMBER_GATHER_TIME,
   GOLD_PER_TRIP, GOLDMINE_MAX_WORKERS,
   LUMBER_PER_TRIP, TREE_LUMBER, GOLDMINE_GOLD,
   PEASANT_BUILD_MENU, MELEE_RANGE, AGGRO_RANGE, CHASE_RANGE, GATHER_RANGE, BUILD_RANGE,
+  AttackType, ArmorType, ResearchEffectType, getTypeMultiplier,
+  ATTACK_TYPE_NAMES, ARMOR_TYPE_NAMES,
+  ABILITIES,
+  HERO_ABILITY_LEVELS,
+  HERO_REVIVE_RULES,
+  HERO_XP_RULES,
 } from './GameData'
-import type { BuildingDef } from './GameData'
+import type { BuildingDef, ResearchEffect } from './GameData'
 import { TeamResources } from './TeamResources'
 import { GamePhase, Phase } from './GamePhase'
 import { issueCommand as dispatchGameCommand } from './GameCommand'
@@ -65,6 +71,13 @@ export type ResourceTarget =
   | { type: 'tree'; entry: TreeEntry }
   | { type: 'goldmine'; mine: Unit }
 
+type MatchResult = 'victory' | 'defeat' | 'stall'
+type CurrentMapSource =
+  | { kind: 'parsed'; mapData: ParsedMap }
+  | { kind: 'procedural' }
+
+const COMMAND_CARD_SLOT_COUNT = 16
+
 // ===== 单位数据 =====
 export interface Unit {
   mesh: THREE.Group
@@ -75,6 +88,11 @@ export interface Unit {
   speed: number
   moveTarget: THREE.Vector3 | null
   isBuilding: boolean
+  isDead?: boolean
+  heroLevel?: number
+  heroXP?: number
+  heroSkillPoints?: number
+  abilityLevels?: Record<string, number>
 
   // 状态机
   state: UnitState
@@ -96,6 +114,13 @@ export interface Unit {
 
   // 训练
   trainingQueue: { type: string; remaining: number }[]
+
+  // 复活队列（祭坛专用，仅英雄）
+  reviveQueue: { heroType: string; remaining: number; totalDuration: number }[]
+
+  // 研究
+  researchQueue: { key: string; remaining: number }[]
+  completedResearches: string[]
 
   // 资源节点数据（仅资源类 Unit 使用）
   remainingGold: number  // 金矿剩余量，非金矿为 0
@@ -127,6 +152,48 @@ export interface Unit {
   // 玩家手动下达 move/stop 后，短时间内禁止 auto-aggro 抢回单位
   // 值为 gameTime 阈值，gameTime < aggroSuppressUntil 时跳过自动索敌
   aggroSuppressUntil: number
+
+  // === Rally Call (Human identity ability) ===
+  // gameTime threshold: unit has damage bonus while gameTime < rallyCallBoostUntil
+  rallyCallBoostUntil: number
+  // gameTime threshold: this unit cannot trigger rally call until gameTime >= rallyCallCooldownUntil
+  rallyCallCooldownUntil: number
+
+  // === Caster system (Priest V7 minimal line) ===
+  mana: number
+  maxMana: number
+  manaRegen: number           // mana per second
+  healCooldownUntil: number   // gameTime threshold: cannot heal until this passes
+
+  // === Building upgrade (HN2-IMPL2 Keep flow) ===
+  upgradeQueue: { targetType: string; remaining: number } | null
+
+  // === Militia morph (HN4-IMPL2 Call to Arms) ===
+  morphExpiresAt: number          // gameTime when morph expires; 0 = not morphed
+  morphOriginalType: string | null  // original unit type before morph (e.g. 'worker')
+
+  // === Defend toggle (HN4-IMPL5 Defend) ===
+  defendActive: boolean             // true while Footman Defend is on
+
+  // === Slow debuff (HN5-IMPL4 Slow) ===
+  slowUntil: number                 // gameTime when slow expires; 0 = not slowed
+  slowSpeedMultiplier: number       // active movement multiplier while slowUntil is in the future
+
+  // === Slow auto-cast (HN5-IMPL5) ===
+  slowAutoCastEnabled: boolean      // true while Sorceress auto-cast is on
+  slowAutoCastCooldownUntil: number // gameTime threshold before the next auto Slow attempt
+
+  // === Divine Shield (HERO12-IMPL1B) ===
+  divineShieldUntil: number           // gameTime when active DS expires; 0 = not active
+  divineShieldCooldownUntil: number   // gameTime threshold: cannot cast DS until this passes
+
+  // === Devotion Aura (HERO13-IMPL1) ===
+  devotionAuraBonus: number           // currently applied DA armor bonus; 0 = none
+
+  // === Resurrection (HERO14-IMPL1C) ===
+  resurrectionCooldownUntil: number   // gameTime threshold: cannot cast Resurrection until this passes
+  resurrectionLastRevivedCount: number // last successful Resurrection count; 0 = no recent feedback
+  resurrectionFeedbackUntil: number    // gameTime threshold: show last revived count while gameTime < this
 }
 
 const TEAM_COLORS = [0x4488ff, 0xff4444]
@@ -146,6 +213,8 @@ const FORMATION_SPACING = 0.7        // formation offset spacing
  * - WASD移动视角，滚轮缩放
  */
 export class Game {
+  static readonly STALL_VERDICT_SECONDS = 12 * 60
+
   private scene: THREE.Scene
   private camera: THREE.PerspectiveCamera
   private renderer: THREE.WebGLRenderer
@@ -163,6 +232,8 @@ export class Game {
 
   // 单位
   private units: Unit[] = []
+  /** Dead unit records eligible for future Resurrection (IMPL1B substrate). */
+  deadUnitRecords: { team: number; type: string; x: number; z: number; diedAt: number }[] = []
   private selectionModel = new SelectionModel()
   private controlGroups = new ControlGroupManager()
   /** Quick access to selected units (delegates to SelectionModel) */
@@ -258,9 +329,23 @@ export class Game {
   private elTrainQueue = document.getElementById('train-queue')!
 
   // 胜利/失败
-  private gameOverResult: 'victory' | 'defeat' | null = null
+  private gameOverResult: MatchResult | null = null
+  private previousPhaseBeforeSetup: Phase | null = null
   private elGameOverOverlay = document.getElementById('game-over-overlay')!
   private elGameOverText = document.getElementById('game-over-text')!
+  private elSetupShell = document.getElementById('setup-shell')!
+  private elSetupReturnButton = document.getElementById('setup-return-button') as HTMLButtonElement
+  private elSetupStartButton = document.getElementById('setup-start-button') as HTMLButtonElement
+  private elPauseShell = document.getElementById('pause-shell')!
+  private elPauseResumeButton = document.getElementById('pause-resume-button') as HTMLButtonElement
+  private elPauseSetupButton = document.getElementById('pause-setup-button') as HTMLButtonElement
+  private elPauseReloadButton = document.getElementById('pause-reload-button') as HTMLButtonElement
+  private elResultsShell = document.getElementById('results-shell')!
+  private elResultsReloadButton = document.getElementById('results-reload-button') as HTMLButtonElement
+  private elResultsShellMessage = document.getElementById('results-shell-message') as HTMLDivElement
+  private elResultsShellSummary = document.getElementById('results-shell-summary') as HTMLDivElement
+  private currentMapSource: CurrentMapSource | null = null
+  private proceduralGroundPlane!: THREE.Mesh
 
   constructor() {
     this.scene = new THREE.Scene()
@@ -297,6 +382,7 @@ export class Game {
 
     const MAP_SIZE = 64
     this.terrain = new Terrain(MAP_SIZE, MAP_SIZE)
+    this.proceduralGroundPlane = this.terrain.groundPlane
     this.mapRuntime = new MapRuntime(this.terrain)
     this.feedback = new FeedbackEffects({
       scene: this.scene,
@@ -321,9 +407,9 @@ export class Game {
     this.treeManager = new TreeManager(MAP_SIZE, MAP_SIZE)
     this.pathingGrid.setTreeManager(this.treeManager)
 
-    this.scene.add(new THREE.AmbientLight(0x999980))
+    this.scene.add(new THREE.AmbientLight(0xb5b090, 1.15))
     // 暖色阳光，从西南方斜照，产生自然阴影感
-    const sun = new THREE.DirectionalLight(0xfff0dd, 1.0)
+    const sun = new THREE.DirectionalLight(0xfff0dd, 1.25)
     sun.position.set(-30, 80, -20)
     sun.castShadow = true
     sun.shadow.mapSize.width = 2048
@@ -337,11 +423,11 @@ export class Game {
     sun.shadow.bias = -0.001
     this.scene.add(sun)
     // 补光，从对侧打一点冷色
-    const fill = new THREE.DirectionalLight(0x8899bb, 0.25)
+    const fill = new THREE.DirectionalLight(0xaab7d8, 0.45)
     fill.position.set(30, 40, 30)
     this.scene.add(fill)
     // 半球光：天空偏蓝、地面偏绿，模拟 war3 环境光
-    const hemi = new THREE.HemisphereLight(0x8899aa, 0x445533, 0.3)
+    const hemi = new THREE.HemisphereLight(0xb8c4d4, 0x52663b, 0.42)
     this.scene.add(hemi)
 
     const selBoxEl = document.getElementById('selection-box') as HTMLDivElement
@@ -360,8 +446,22 @@ export class Game {
     this.spawnTrees()
     this.spawnStartingUnits()
     this.setupInput()
+    this.elSetupReturnButton.addEventListener('click', () => this.closeSetupShell())
+    this.elSetupStartButton.addEventListener('click', () => {
+      this.reloadCurrentMap()
+    })
+    this.elPauseResumeButton.addEventListener('click', () => this.resumeGame())
+    this.elPauseSetupButton.addEventListener('click', () => this.openSetupShell())
+    this.elPauseReloadButton.addEventListener('click', () => {
+      this.reloadCurrentMap()
+    })
+    this.elResultsReloadButton.addEventListener('click', () => {
+      this.reloadCurrentMap()
+    })
     this.createAI()
+    this.currentMapSource = { kind: 'procedural' }
     this.phase.set(Phase.Playing)
+    this.syncSessionOverlays()
     window.addEventListener('resize', () => this.onResize())
 
     // 异步加载资产（不阻塞游戏启动，fallback 自动生效）
@@ -390,8 +490,10 @@ export class Game {
   // ==================== 主循环 ====================
 
   private update(dt: number) {
-    // 相机始终更新（LoadingMap 时也允许缩放/平移）
-    this.cameraCtrl.update(dt)
+    if (!this.phase.isPaused() && !this.phase.isGameOver() && !this.phase.isSetup()) {
+      // 相机始终更新（LoadingMap 时也允许缩放/平移）
+      this.cameraCtrl.update(dt)
+    }
     // 游戏逻辑仅在 Playing 阶段运行
     if (!this.phase.isPlaying()) return
     this.gameTime += dt
@@ -399,6 +501,9 @@ export class Game {
     this.updateUnits(dt)
     this.updateCombat(dt)
     this.updateStaticDefense(dt)
+    this.updateCasterAbilities(dt)
+    this.updateSlowExpiry()
+    this.updateDevotionAura()
     this.updateAutoAggro()
     this.updateHealthBars()
     this.sel.updateSelectionRings()
@@ -415,6 +520,124 @@ export class Game {
     this.composer.render()
   }
 
+  private setPageShellVisible(shell: HTMLElement, visible: boolean) {
+    shell.hidden = !visible
+    shell.setAttribute('aria-hidden', visible ? 'false' : 'true')
+  }
+
+  private syncSessionOverlays() {
+    const setup = this.phase.isSetup()
+    const paused = this.phase.isPaused()
+    const gameOver = this.phase.isGameOver()
+
+    this.setPageShellVisible(this.elSetupShell, setup)
+    this.setPageShellVisible(this.elPauseShell, paused)
+    this.setPageShellVisible(this.elResultsShell, gameOver)
+    if (!gameOver) {
+      this.elResultsShellMessage.textContent = ''
+    }
+    this.elSetupStartButton.disabled = !this.currentMapSource
+    this.elPauseReloadButton.disabled = !this.currentMapSource
+    this.elResultsReloadButton.disabled = !gameOver || !this.currentMapSource
+  }
+
+  private clearGameOverOverlay() {
+    this.elGameOverOverlay.style.display = 'none'
+    this.elGameOverOverlay.classList.remove('victory', 'defeat', 'stall')
+    this.elGameOverText.textContent = ''
+    this.elResultsShellSummary.textContent = ''
+  }
+
+  private resetTransientInputState() {
+    this.isDragging = false
+    this.sel.hideSelectionBox()
+    this.shiftHeld = false
+    this.lastClickTime = 0
+    this.lastClickUnit = null
+  }
+
+  private clearHeldCameraInputs() {
+    const centerX = window.innerWidth / 2
+    const centerY = window.innerHeight / 2
+    window.dispatchEvent(new MouseEvent('mousemove', {
+      clientX: centerX,
+      clientY: centerY,
+      bubbles: true,
+      cancelable: true,
+    }))
+
+    for (const key of ['w', 'a', 's', 'd', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright', 'Shift']) {
+      window.dispatchEvent(new KeyboardEvent('keyup', { key, bubbles: true, cancelable: true }))
+    }
+  }
+
+  private resetSessionStateForMapLoad() {
+    this.gameOverResult = null
+    this.gameTime = 0
+    this.elTime.textContent = '00:00'
+    this.clearGameOverOverlay()
+    this.cancelAllModes()
+    this.resetTransientInputState()
+    this.syncSessionOverlays()
+    this.clearHeldCameraInputs()
+  }
+
+  private isGameplaySurfaceTarget(target: EventTarget | null) {
+    if (!(target instanceof Element)) return false
+    return !!target.closest('#game-canvas, #minimap-canvas')
+  }
+
+  private shouldBlockGameplayInput() {
+    return this.phase.isSessionOverlayActive()
+  }
+
+  public pauseGame() {
+    if (!this.phase.isPlaying()) return
+    this.resetTransientInputState()
+    this.clearHeldCameraInputs()
+    this.phase.set(Phase.Paused)
+    this.syncSessionOverlays()
+  }
+
+  public openSetupShell() {
+    if (!this.phase.isPlaying() && !this.phase.isPaused()) return
+    this.previousPhaseBeforeSetup = this.phase.get()
+    this.resetTransientInputState()
+    this.clearHeldCameraInputs()
+    this.phase.set(Phase.Setup)
+    this.syncSessionOverlays()
+  }
+
+  public closeSetupShell() {
+    if (!this.phase.isSetup()) return
+    const restore = this.previousPhaseBeforeSetup ?? Phase.Playing
+    this.previousPhaseBeforeSetup = null
+    this.phase.set(restore)
+    this.syncSessionOverlays()
+  }
+
+  public resumeGame() {
+    if (!this.phase.isPaused()) return
+    this.phase.set(Phase.Playing)
+    this.syncSessionOverlays()
+  }
+
+  public togglePause() {
+    if (this.phase.isPaused()) {
+      this.resumeGame()
+    } else if (this.phase.isPlaying()) {
+      this.pauseGame()
+    }
+  }
+
+  public isPaused() {
+    return this.phase.isPaused()
+  }
+
+  public isSetupOpen() {
+    return this.phase.isSetup()
+  }
+
   // ==================== 单位AI ====================
 
   private updateUnits(dt: number) {
@@ -422,9 +645,13 @@ export class Game {
       this.updateUnitMovement(unit, dt)
       this.updateUnitState(unit, dt)
       this.updateBuildProgress(unit, dt)
+      this.updateBuildingUpgradeProgress(unit, dt)
       this.updateTrainingQueue(unit, dt)
+      this.updateReviveQueue(unit, dt)
+      this.updateResearchQueue(unit, dt)
       this.feedback.updateCarryIndicator(unit)
     }
+    this.updateMilitiaExpiration()
     // Post-move separation: push apart units that are too close
     this.applySeparation()
   }
@@ -553,11 +780,18 @@ export class Game {
       return
     }
 
-    const step = Math.min(unit.speed * dt, dist)
+    const step = Math.min(this.getEffectiveMovementSpeed(unit) * dt, dist)
     pos.x += (dx / dist) * step
     pos.z += (dz / dist) * step
     pos.y = this.getWorldHeight(pos.x - 0.5, pos.z - 0.5)
     unit.mesh.rotation.y = Math.atan2(dx, dz)
+  }
+
+  private getEffectiveMovementSpeed(unit: Unit): number {
+    if (unit.slowUntil > this.gameTime) {
+      return unit.speed * unit.slowSpeedMultiplier
+    }
+    return unit.speed
   }
 
   /** 状态机 */
@@ -737,6 +971,175 @@ export class Game {
     }
   }
 
+  /** 复活队列（祭坛专用） */
+  private updateReviveQueue(unit: Unit, dt: number) {
+    if (!unit.isBuilding || unit.reviveQueue.length === 0) return
+    if (unit.buildProgress < 1) return
+
+    const item = unit.reviveQueue[0]
+    item.remaining -= dt
+    if (item.remaining <= 0) {
+      unit.reviveQueue.shift()
+      // Restore the dead hero
+      const hero = this.units.find(
+        u => u.team === unit.team && u.type === item.heroType && !u.isBuilding && u.isDead,
+      )
+      if (hero) {
+        const heroDef = UNITS[item.heroType]
+        if (!heroDef) return
+        hero.isDead = false
+        hero.hp = Math.min(hero.maxHp, Math.floor(hero.maxHp * HERO_REVIVE_RULES.lifeFactor))
+        hero.mana = HERO_REVIVE_RULES.simplifiedManaMapping === 'maxMana'
+          ? hero.maxMana
+          : Math.min(hero.maxMana, Math.floor(hero.maxMana * HERO_REVIVE_RULES.manaStartFactor))
+        hero.state = UnitState.Idle
+        hero.attackTarget = null
+        hero.moveTarget = null
+        hero.gatherType = null
+        hero.resourceTarget = null
+        hero.waypoints = []
+        hero.moveQueue = []
+        hero.attackMoveTarget = null
+        hero.previousState = null
+        hero.previousGatherType = null
+        hero.previousResourceTarget = null
+        hero.previousMoveTarget = null
+        hero.previousWaypoints = []
+        hero.previousMoveQueue = []
+        hero.previousAttackMoveTarget = null
+        hero.buildTarget = null
+        hero.slowUntil = 0
+        hero.slowSpeedMultiplier = 1
+        hero.healCooldownUntil = 0
+        hero.divineShieldUntil = 0
+        hero.divineShieldCooldownUntil = 0
+        hero.resurrectionCooldownUntil = 0
+        hero.resurrectionLastRevivedCount = 0
+        hero.resurrectionFeedbackUntil = 0
+        hero.aggroSuppressUntil = Math.max(hero.aggroSuppressUntil, this.gameTime + 1)
+        hero.mesh.visible = true
+        // Place hero near altar
+        const angle = Math.random() * Math.PI * 2
+        const reviveX = unit.mesh.position.x + Math.cos(angle) * 2
+        const reviveZ = unit.mesh.position.z + Math.sin(angle) * 2
+        hero.mesh.position.set(
+          reviveX,
+          this.getWorldHeight(reviveX - 0.5, reviveZ - 0.5),
+          reviveZ,
+        )
+        if (!this.outlineObjects.includes(hero.mesh)) {
+          this.outlineObjects.push(hero.mesh)
+        }
+        if (!this.healthBars.has(hero)) {
+          this.createHealthBar(hero)
+        }
+      }
+    }
+  }
+
+  /** 研究队列更新 */
+  private updateResearchQueue(unit: Unit, dt: number) {
+    if (!unit.isBuilding || unit.researchQueue.length === 0) return
+    if (unit.buildProgress < 1) return
+
+    const item = unit.researchQueue[0]
+    item.remaining -= dt
+    if (item.remaining <= 0) {
+      unit.researchQueue.shift()
+      if (!this.hasCompletedResearch(item.key, unit.team)) {
+        unit.completedResearches.push(item.key)
+        this.applyResearchEffects(item.key, unit.team)
+      }
+    }
+  }
+
+  /** Returns true if the type is a main hall (townhall / keep / castle) */
+  private isMainHall(type: string): boolean {
+    return type === 'townhall' || type === 'keep' || type === 'castle'
+  }
+
+  /** Building upgrade progress for data-driven main hall upgrades. */
+  private updateBuildingUpgradeProgress(unit: Unit, dt: number) {
+    if (!unit.isBuilding || !unit.upgradeQueue) return
+    if (unit.buildProgress < 1) return
+
+    unit.upgradeQueue.remaining -= dt
+    if (unit.upgradeQueue.remaining <= 0) {
+      const targetKey = unit.upgradeQueue.targetType
+      const targetDef = BUILDINGS[targetKey]
+      unit.upgradeQueue = null
+      if (!targetDef) return
+
+      // Swap building type
+      unit.type = targetKey
+      unit.maxHp = targetDef.hp
+      unit.hp = targetDef.hp
+      // Keep position, team, selection semantics — do not touch mesh position
+
+      // Force HUD refresh
+      this._lastCmdKey = ''
+    }
+  }
+
+  /** Apply data-driven research effects to existing units on the researching team */
+  private applyResearchEffects(researchKey: string, team: number) {
+    const rDef = RESEARCHES[researchKey]
+    if (!rDef?.effects) return
+    for (const effect of rDef.effects) {
+      for (const u of this.units) {
+        if (u.type !== effect.targetUnitType) continue
+        if (u.team !== team) continue
+        if (u.isBuilding || u.hp <= 0) continue
+        this.applyFlatDeltaEffect(u, effect)
+      }
+    }
+  }
+
+  /** Apply a single FlatDelta effect to a unit's stat */
+  private applyFlatDeltaEffect(unit: Unit, effect: ResearchEffect) {
+    if (effect.type !== ResearchEffectType.FlatDelta) return
+    switch (effect.stat) {
+      case 'attackRange':
+        unit.attackRange += effect.value
+        break
+      case 'attackDamage':
+        unit.attackDamage += effect.value
+        break
+      case 'armor':
+        unit.armor += effect.value
+        break
+      case 'maxHp':
+        unit.maxHp += effect.value
+        unit.hp += effect.value
+        break
+    }
+  }
+
+  /** Apply data-driven research effects to a newly spawned unit */
+  private applyCompletedResearchesToUnit(unit: Unit) {
+    const appliedResearches = new Set<string>()
+    for (const building of this.units) {
+      if (building.team !== unit.team || !building.isBuilding) continue
+      for (const rKey of building.completedResearches) {
+        if (appliedResearches.has(rKey)) continue
+        appliedResearches.add(rKey)
+        const rDef = RESEARCHES[rKey]
+        if (!rDef?.effects) continue
+        for (const effect of rDef.effects) {
+          if (effect.targetUnitType !== unit.type) continue
+          this.applyFlatDeltaEffect(unit, effect)
+        }
+      }
+    }
+  }
+
+  /** Check if a team has completed a specific research */
+  private hasCompletedResearch(researchKey: string, team: number): boolean {
+    return this.units.some(
+      u => u.team === team && u.isBuilding && u.completedResearches.includes(researchKey),
+    )
+  }
+
   // ==================== 战斗系统 ====================
 
   /** 战斗状态更新（Attacking / AttackMove / HoldPosition） */
@@ -897,6 +1300,475 @@ export class Game {
     }
   }
 
+  // ==================== 集结号令（人族 identity ability）====================
+
+  /**
+   * Trigger Rally Call from a player-owned unit.
+   * Buffs all nearby friendly non-building units with a temporary damage bonus.
+   */
+  triggerRallyCall(source: Unit): boolean {
+    if (source.isBuilding || source.team !== 0) return false
+    if (this.gameTime < source.rallyCallCooldownUntil) return false
+
+    const rc = ABILITIES.rally_call
+    const now = this.gameTime
+    const buffEnd = now + rc.duration
+    let affected = 0
+
+    for (const u of this.units) {
+      if (u.team !== source.team || u.isBuilding || u.hp <= 0) continue
+      const dist = u.mesh.position.distanceTo(source.mesh.position)
+      if (dist > rc.range) continue
+      u.rallyCallBoostUntil = buffEnd
+      affected++
+    }
+
+    if (affected > 0) {
+      source.rallyCallCooldownUntil = now + rc.cooldown
+      // Visual feedback: spawn an impact ring at source
+      this.feedback.spawnImpactRing(source.mesh.position)
+      return true
+    }
+    return false
+  }
+
+  /** Update rally call buff expiry — clears expired buffs each tick */
+  private updateRallyCallBuff() {
+    // Buffs are self-expiring via gameTime comparison in dealDamage.
+    // No per-unit cleanup needed — the boost field is a timestamp threshold.
+    // This hook exists for any future visual/state cleanup if needed.
+  }
+
+  // ==================== Militia 变身系统（HN4-IMPL2 Call to Arms）====================
+
+  /**
+   * Morph a Worker into Militia using ABILITIES.call_to_arms and UNITS.militia data.
+   * Clears gather/build/attack state, swaps combat stats.
+   */
+  morphToMilitia(unit: Unit): boolean {
+    if (unit.type !== 'worker') return false
+    if (unit.team !== 0) return false
+    if (unit.isBuilding) return false
+
+    const cta = ABILITIES.call_to_arms
+    // Must be near a completed friendly main hall (townhall / keep / castle)
+    const nearHall = this.units.some(u =>
+      this.isMainHall(u.type) &&
+      u.team === unit.team &&
+      u.buildProgress >= 1 &&
+      u.hp > 0 &&
+      u.mesh.position.distanceTo(unit.mesh.position) <= cta.range
+    )
+    if (!nearHall) return false
+
+    const militiaDef = UNITS[cta.morphTarget!]
+    if (!militiaDef) return false
+
+    // Clear active states
+    unit.gatherType = null
+    unit.carryAmount = 0
+    unit.gatherTimer = 0
+    unit.resourceTarget = null
+    if (unit.buildTarget?.builder === unit) {
+      unit.buildTarget.builder = null
+    }
+    unit.buildTarget = null
+    unit.attackTarget = null
+    unit.moveTarget = null
+    unit.moveQueue = []
+    unit.waypoints = []
+    unit.attackMoveTarget = null
+    unit.state = UnitState.Idle
+    this.clearPreviousOrder(unit)
+
+    // Morph stats
+    unit.morphOriginalType = unit.type
+    unit.type = cta.morphTarget!
+    unit.attackDamage = militiaDef.attackDamage
+    unit.armor = militiaDef.armor
+    unit.attackRange = militiaDef.attackRange
+    unit.attackCooldown = militiaDef.attackCooldown
+    unit.speed = militiaDef.speed
+    unit.maxHp = militiaDef.hp
+    unit.hp = Math.min(unit.hp, militiaDef.hp)
+
+    this.replaceUnitMeshVisual(unit, createUnitVisual(unit.type, unit.team))
+
+    // Set expiration
+    unit.morphExpiresAt = this.gameTime + cta.duration
+
+    return true
+  }
+
+  /** Revert a Militia back to its original unit form. */
+  revertMilitia(unit: Unit): boolean {
+    if (unit.type !== 'militia') return false
+    if (!unit.morphOriginalType) return false
+    const workerDef = UNITS[unit.morphOriginalType]
+    if (!workerDef) return false
+
+    unit.type = unit.morphOriginalType
+    unit.morphOriginalType = null
+    unit.morphExpiresAt = 0
+    unit.attackDamage = workerDef.attackDamage
+    unit.armor = workerDef.armor
+    unit.attackRange = workerDef.attackRange
+    unit.attackCooldown = workerDef.attackCooldown
+    unit.speed = workerDef.speed
+    unit.maxHp = workerDef.hp
+    unit.attackTarget = null
+    unit.state = UnitState.Idle
+    this.replaceUnitMeshVisual(unit, createUnitVisual(unit.type, unit.team))
+    return true
+  }
+
+  /** Execute ABILITIES.back_to_work: Militia immediately returns to Worker. */
+  backToWork(unit: Unit): boolean {
+    const btw = ABILITIES.back_to_work
+    const ownedByBackToWork = Array.isArray(btw.ownerType)
+      ? btw.ownerType.includes(unit.type)
+      : unit.type === btw.ownerType
+    if (!ownedByBackToWork) return false
+    if (unit.morphExpiresAt <= 0) return false
+    if (unit.morphOriginalType !== btw.morphTarget) return false
+    return this.revertMilitia(unit)
+  }
+
+  /** Check and revert expired Militia units each tick */
+  private updateMilitiaExpiration() {
+    for (const unit of this.units) {
+      if (unit.morphExpiresAt > 0 && this.gameTime >= unit.morphExpiresAt) {
+        this.revertMilitia(unit)
+      }
+    }
+  }
+
+  // ==================== 法师系统（Priest V7 最小线）====================
+
+  /**
+   * Caster ability update tick: mana regen + auto-heal for Priests.
+   *
+   * Auto-heal rules (minimal):
+   * - Priest scans for the lowest-HP friendly non-building unit within Heal ability range
+   * - Target must be injured (hp < maxHp) and not at full health
+   * - Priest must have enough mana and not be on heal cooldown
+   * - Priest must be in Idle, Attacking, AttackMove, or HoldPosition state
+   */
+  private updateCasterAbilities(dt: number) {
+    for (const unit of this.units) {
+      // Mana regeneration for all units with maxMana > 0
+      if (unit.maxMana > 0 && unit.mana < unit.maxMana) {
+        unit.mana = Math.min(unit.maxMana, unit.mana + unit.manaRegen * dt)
+      }
+
+      // Sorceress auto-cast Slow
+      if (unit.type === 'sorceress' && unit.hp > 0 && !unit.isBuilding && unit.slowAutoCastEnabled) {
+        const slowDef = ABILITIES.slow
+        if (unit.mana >= (slowDef.cost.mana ?? 0) && this.gameTime >= unit.slowAutoCastCooldownUntil) {
+          // Only auto-cast in combat-ready states
+          if (unit.state === UnitState.Idle || unit.state === UnitState.Attacking
+            || unit.state === UnitState.AttackMove || unit.state === UnitState.HoldPosition) {
+            const bestAutoTarget = this.findSlowAutoTarget(unit)
+            if (bestAutoTarget) {
+              const casted = this.castSlow(unit, bestAutoTarget)
+              if (casted) {
+                unit.slowAutoCastCooldownUntil = this.gameTime + Math.max(1, slowDef.cooldown ?? 0)
+              }
+            }
+          }
+        }
+      }
+
+      // Priest auto-heal
+      if (unit.type !== 'priest' || unit.hp <= 0 || unit.isBuilding) continue
+      const healDef = ABILITIES.priest_heal
+      if (unit.mana < (healDef.cost.mana ?? 0)) continue
+      if (this.gameTime < unit.healCooldownUntil) continue
+      // Only auto-heal when in these states (not moving, gathering, building)
+      if (unit.state !== UnitState.Idle && unit.state !== UnitState.Attacking
+        && unit.state !== UnitState.AttackMove && unit.state !== UnitState.HoldPosition) continue
+
+      // Find lowest-HP injured friendly within heal range
+      let bestTarget: Unit | null = null
+      let bestMissing = 0
+      for (const other of this.units) {
+        if (other.team !== unit.team || other.hp <= 0 || other.isBuilding) continue
+        if (other.hp >= other.maxHp) continue
+        const dist = unit.mesh.position.distanceTo(other.mesh.position)
+        if (dist > healDef.range) continue
+        const missing = other.maxHp - other.hp
+        if (missing > bestMissing) {
+          bestMissing = missing
+          bestTarget = other
+        }
+      }
+
+      if (bestTarget) {
+        this.castHeal(unit, bestTarget)
+      }
+    }
+  }
+
+  private findSlowAutoTarget(caster: Unit): Unit | null {
+    const slowDef = ABILITIES.slow
+    let bestTarget: Unit | null = null
+    let bestPriority = Number.POSITIVE_INFINITY
+    let bestDistance = Number.POSITIVE_INFINITY
+
+    for (const other of this.units) {
+      if (other.team === caster.team || other.hp <= 0 || other.isBuilding) continue
+      const distance = caster.mesh.position.distanceTo(other.mesh.position)
+      if (distance > slowDef.range) continue
+
+      let priority = 0
+      if (other.slowUntil > this.gameTime) {
+        const remaining = other.slowUntil - this.gameTime
+        if (remaining > 3) continue
+        priority = 1
+      }
+
+      if (priority < bestPriority || (priority === bestPriority && distance < bestDistance)) {
+        bestTarget = other
+        bestPriority = priority
+        bestDistance = distance
+      }
+    }
+
+    return bestTarget
+  }
+
+  /**
+   * Cast Heal: Priest heals a target friendly unit.
+   *
+   * Deducts mana, applies cooldown, heals the target.
+   * Returns true if heal was cast successfully.
+   */
+  castHeal(priest: Unit, target: Unit): boolean {
+    const healDef = ABILITIES.priest_heal
+    const manaCost = healDef.cost.mana ?? 0
+    if (priest.type !== 'priest') return false
+    if (target.team !== priest.team) return false
+    if (priest.mana < manaCost) return false
+    if (this.gameTime < priest.healCooldownUntil) return false
+    if (target.hp <= 0 || target.hp >= target.maxHp) return false
+    if (priest.mesh.position.distanceTo(target.mesh.position) > healDef.range) return false
+
+    priest.mana -= manaCost
+    priest.healCooldownUntil = this.gameTime + healDef.cooldown
+
+    const before = target.hp
+    target.hp = Math.min(target.maxHp, target.hp + healDef.effectValue)
+    const healed = target.hp - before
+
+    // Visual feedback
+    this.feedback.spawnDamageNumber(target, healed)
+    this.feedback.spawnImpactRing(target.mesh.position)
+
+    return true
+  }
+
+  /** Holy Light — Paladin heal (not self), uses learned level */
+  private castHolyLight(paladin: Unit, target: Unit): boolean {
+    const learnedLevel = paladin.abilityLevels?.holy_light ?? 0
+    if (learnedLevel < 1) return false
+    const hlDef = HERO_ABILITY_LEVELS.holy_light
+    const castLevel = Math.min(learnedLevel, hlDef.maxLevel)
+    const levelData = hlDef.levels[castLevel - 1]
+    if (!levelData) return false
+    const manaCost = levelData.mana
+    if (paladin.type !== 'paladin') return false
+    if (paladin.isDead) return false
+    if (target.team !== paladin.team) return false
+    if (target === paladin) return false
+    if (paladin.mana < manaCost) return false
+    if (this.gameTime < paladin.healCooldownUntil) return false
+    if (target.hp <= 0 || target.hp >= target.maxHp) return false
+    if (target.isBuilding) return false
+    if (paladin.mesh.position.distanceTo(target.mesh.position) > levelData.range) return false
+
+    paladin.mana -= manaCost
+    paladin.healCooldownUntil = this.gameTime + levelData.cooldown
+
+    const before = target.hp
+    target.hp = Math.min(target.maxHp, target.hp + levelData.effectValue)
+    const healed = target.hp - before
+
+    this.feedback.spawnDamageNumber(target, healed)
+    this.feedback.spawnImpactRing(target.mesh.position)
+
+    return true
+  }
+
+  /** AI-safe Holy Light wrapper — delegates to private castHolyLight */
+  aiCastHolyLight(caster: Unit, target: Unit): boolean {
+    return this.castHolyLight(caster, target)
+  }
+
+  /** AI-safe Divine Shield wrapper — delegates to private castDivineShield */
+  aiCastDivineShield(caster: Unit): boolean {
+    return this.castDivineShield(caster)
+  }
+
+  /** AI-safe Resurrection wrapper — delegates to castResurrection */
+  aiCastResurrection(caster: Unit): boolean {
+    return this.castResurrection(caster)
+  }
+
+  /** Divine Shield — Paladin self-cast invulnerability, uses learned level */
+  private castDivineShield(paladin: Unit): boolean {
+    const learnedLevel = paladin.abilityLevels?.divine_shield ?? 0
+    if (learnedLevel < 1) return false
+    const dsDef = HERO_ABILITY_LEVELS.divine_shield
+    const castLevel = Math.min(learnedLevel, dsDef.maxLevel)
+    const levelData = dsDef.levels[castLevel - 1]
+    if (!levelData) return false
+    if (paladin.type !== 'paladin') return false
+    if (paladin.isDead) return false
+    if (paladin.mana < levelData.mana) return false
+    if (this.gameTime < paladin.divineShieldCooldownUntil) return false
+
+    paladin.mana -= levelData.mana
+    paladin.divineShieldUntil = this.gameTime + (levelData.duration ?? 0)
+    paladin.divineShieldCooldownUntil = this.gameTime + levelData.cooldown
+    return true
+  }
+
+  /** Resurrection — Paladin ultimate: revive up to maxTargets dead friendly units */
+  castResurrection(paladin: Unit): boolean {
+    const learnedLevel = paladin.abilityLevels?.resurrection ?? 0
+    if (learnedLevel < 1) return false
+    const resDef = HERO_ABILITY_LEVELS.resurrection
+    const castLevel = Math.min(learnedLevel, resDef.maxLevel)
+    const levelData = resDef.levels[castLevel - 1]
+    if (!levelData) return false
+    const manaCost = levelData.mana
+    if (paladin.type !== 'paladin') return false
+    if (paladin.isDead) return false
+    if (paladin.mana < manaCost) return false
+    if (this.gameTime < paladin.resurrectionCooldownUntil) return false
+
+    const eligible = this.getResurrectionEligibleRecordIndices(paladin, levelData)
+    if (eligible.length === 0) return false
+
+    const revivedRecords = eligible.map(idx => this.deadUnitRecords[idx])
+    paladin.mana -= manaCost
+    paladin.resurrectionCooldownUntil = this.gameTime + levelData.cooldown
+
+    for (const rec of revivedRecords) {
+      this.spawnUnit(rec.type, rec.team, rec.x - 0.5, rec.z - 0.5)
+    }
+    for (const idx of [...eligible].sort((a, b) => b - a)) {
+      this.deadUnitRecords.splice(idx, 1)
+    }
+
+    if (revivedRecords.length > 0) {
+      paladin.resurrectionLastRevivedCount = revivedRecords.length
+      paladin.resurrectionFeedbackUntil = this.gameTime + 5
+      this.feedback.spawnDamageNumber(paladin, revivedRecords.length)
+    }
+
+    return true
+  }
+
+  private getResurrectionEligibleRecordIndices(
+    paladin: Unit,
+    levelData: { areaRadius?: number; maxTargets?: number },
+  ): number[] {
+    const radius = levelData.areaRadius ?? 0
+    const maxTargets = levelData.maxTargets ?? 0
+    if (radius <= 0 || maxTargets <= 0) return []
+    const radiusSq = radius * radius
+    const px = paladin.mesh.position.x
+    const pz = paladin.mesh.position.z
+
+    return this.deadUnitRecords
+      .map((rec, index) => ({ rec, index }))
+      .filter(({ rec }) => {
+        if (rec.team !== paladin.team) return false
+        const uDef = UNITS[rec.type]
+        if (!uDef || uDef.isHero) return false
+        const dx = rec.x - px
+        const dz = rec.z - pz
+        return dx * dx + dz * dz <= radiusSq
+      })
+      .sort((a, b) => (a.rec.diedAt - b.rec.diedAt) || (a.index - b.index))
+      .slice(0, maxTargets)
+      .map(({ index }) => index)
+  }
+
+  /** Slow — Sorceress speed debuff on enemy */
+  castSlow(caster: Unit, target: Unit): boolean {
+    const slowDef = ABILITIES.slow
+    const manaCost = slowDef.cost.mana ?? 0
+    if (caster.type !== 'sorceress') return false
+    if (target.team === caster.team) return false
+    if (target.hp <= 0) return false
+    if (target.isBuilding) return false
+    if (caster.mana < manaCost) return false
+    if (caster.mesh.position.distanceTo(target.mesh.position) > slowDef.range) return false
+
+    caster.mana -= manaCost
+
+    // Apply or refresh slow debuff without mutating the base speed. Other systems
+    // such as Defend and Militia still own unit.speed.
+    target.slowUntil = this.gameTime + slowDef.duration
+    target.slowSpeedMultiplier = slowDef.speedMultiplier ?? 1
+
+    this.feedback.spawnImpactRing(target.mesh.position)
+    return true
+  }
+
+  /** Update slow expiry — restore speed when debuff ends */
+  private updateSlowExpiry() {
+    for (const unit of this.units) {
+      if (unit.slowUntil > 0 && unit.slowUntil <= this.gameTime) {
+        unit.slowUntil = 0
+        unit.slowSpeedMultiplier = 1
+      }
+    }
+  }
+
+  /** Update Devotion Aura — apply/remove passive armor bonus */
+  private updateDevotionAura() {
+    // Step 1: Remove all existing DA bonuses
+    for (const unit of this.units) {
+      if (unit.devotionAuraBonus > 0) {
+        unit.armor -= unit.devotionAuraBonus
+        unit.devotionAuraBonus = 0
+      }
+    }
+    // Step 2: For each alive Paladin with learned DA, apply bonus to self + nearby friendlies
+    for (const paladin of this.units) {
+      if (paladin.type !== 'paladin') continue
+      if (paladin.isDead || paladin.hp <= 0) continue
+      const daLevel = paladin.abilityLevels?.devotion_aura ?? 0
+      if (daLevel < 1) continue
+      const daDef = HERO_ABILITY_LEVELS.devotion_aura
+      const castLevel = Math.min(daLevel, daDef.maxLevel)
+      const levelData = daDef.levels[castLevel - 1]
+      if (!levelData) continue
+      const bonus = levelData.armorBonus ?? 0
+      const radius = levelData.auraRadius ?? 0
+      if (bonus <= 0) continue
+      // Apply to self
+      paladin.armor += bonus
+      paladin.devotionAuraBonus = bonus
+      // Apply to nearby friendly non-building units
+      for (const unit of this.units) {
+        if (unit === paladin) continue
+        if (unit.isDead || unit.hp <= 0) continue
+        if (unit.isBuilding) continue
+        if (unit.team !== paladin.team) continue
+        if (unit.devotionAuraBonus > 0) continue // already affected by another source
+        const dist = paladin.mesh.position.distanceTo(unit.mesh.position)
+        if (dist <= radius) {
+          unit.armor += bonus
+          unit.devotionAuraBonus = bonus
+        }
+      }
+    }
+  }
+
   /** 攻击移动完成：清理所有 attack-move 状态，回到 Idle */
   private finishAttackMove(unit: Unit) {
     unit.state = UnitState.Idle
@@ -1026,16 +1898,57 @@ export class Game {
     }
   }
 
-  /** 计算伤害（含护甲减伤）*/
+  setDefend(unit: Unit, active: boolean): boolean {
+    const defend = ABILITIES.defend
+    const isDefendOwner = Array.isArray(defend.ownerType)
+      ? defend.ownerType.includes(unit.type)
+      : unit.type === defend.ownerType
+    if (!isDefendOwner || unit.isBuilding || unit.hp <= 0) return false
+
+    unit.defendActive = active
+    const baseSpeed = UNITS[unit.type]?.speed ?? unit.speed
+    unit.speed = active
+      ? baseSpeed * (defend.speedMultiplier ?? 1)
+      : baseSpeed
+    return true
+  }
+
+  toggleDefend(unit: Unit): boolean {
+    return this.setDefend(unit, !unit.defendActive)
+  }
+
+  /** 计算伤害（含攻击类型倍率 + 护甲减伤 + AOE 溅射）*/
   private dealDamage(attacker: Unit, target: Unit) {
-    const rawDamage = attacker.attackDamage
+    // Divine Shield: invulnerable while active
+    if (target.divineShieldUntil > this.gameTime) return
+    let rawDamage = attacker.attackDamage
+    // Rally Call buff: temporary damage bonus
+    if (attacker.rallyCallBoostUntil > this.gameTime) {
+      rawDamage += ABILITIES.rally_call.effectValue
+    }
+    // 攻击类型 × 护甲类型 倍率（查表，未命中返回 1.0）
+    const atkType = UNITS[attacker.type]?.attackType ?? BUILDINGS[attacker.type]?.attackType ?? AttackType.Normal
+    const armType = UNITS[target.type]?.armorType ?? BUILDINGS[target.type]?.armorType ?? ArmorType.Medium
+    const typeMultiplier = getTypeMultiplier(atkType, armType)
+    const defend = ABILITIES.defend
+    const isDefendOwner = Array.isArray(defend.ownerType)
+      ? defend.ownerType.includes(target.type)
+      : target.type === defend.ownerType
+    const defendMultiplier = target.defendActive && isDefendOwner && atkType === defend.affectedAttackType
+      ? (defend.damageReduction ?? 1)
+      : 1
     // war3护甲公式: 减伤 = (armor * 0.06) / (1 + 0.06 * armor)
     const armor = target.armor
     const reduction = armor > 0
       ? (armor * 0.06) / (1 + 0.06 * armor)
       : 0
-    const finalDamage = Math.max(1, Math.round(rawDamage * (1 - reduction)))
+    const finalDamage = Math.max(1, Math.round(rawDamage * typeMultiplier * defendMultiplier * (1 - reduction)))
     target.hp -= finalDamage
+
+    // AOE splash for Siege attack type (mortar team)
+    if (atkType === AttackType.Siege && (ABILITIES.mortar_aoe.aoeRadius ?? 0) > 0) {
+      this.dealAoeSplash(attacker, target, rawDamage, atkType)
+    }
 
     // 攻击动画不能把 glTF/root asset scale 重置成 1。
     const originalScale = attacker.mesh.scale.clone()
@@ -1066,10 +1979,48 @@ export class Game {
     }
   }
 
+  /**
+   * AOE splash damage for siege units.
+   *
+   * Applies reduced damage to all enemy units within the Mortar AOE ability
+   * radius, using linear distance-based falloff. The primary target is excluded
+   * (already took full damage). Goldmine units are filtered out.
+   */
+  private dealAoeSplash(attacker: Unit, primaryTarget: Unit, rawDamage: number, atkType: AttackType) {
+    const ma = ABILITIES.mortar_aoe
+    const aoeRadius = ma.aoeRadius ?? 0
+    const aoeFalloff = ma.aoeFalloff ?? 0
+    const splashPos = primaryTarget.mesh.position
+    for (const unit of this.units) {
+      // Skip self, primary target, same team, dead units, and neutral goldmines.
+      if (unit === primaryTarget) continue
+      if (unit === attacker) continue
+      if (unit.team === attacker.team) continue
+      if (unit.hp <= 0) continue
+      if (unit.type === 'goldmine') continue
+
+      const dist = splashPos.distanceTo(unit.mesh.position)
+      if (dist > aoeRadius) continue
+
+      // Linear falloff: 1.0 at center → aoeFalloff at edge
+      const falloff = 1.0 - (1.0 - aoeFalloff) * (dist / aoeRadius)
+      const armType = UNITS[unit.type]?.armorType ?? BUILDINGS[unit.type]?.armorType ?? ArmorType.Medium
+      const typeMultiplier = getTypeMultiplier(atkType, armType)
+      const armor = unit.armor
+      const reduction = armor > 0 ? (armor * 0.06) / (1 + 0.06 * armor) : 0
+      const splashDamage = Math.max(1, Math.round(rawDamage * falloff * typeMultiplier * (1 - reduction)))
+      unit.hp -= splashDamage
+
+      // Visual feedback for splash victims
+      this.feedback.flashHit(unit)
+      this.feedback.spawnDamageNumber(unit, splashDamage)
+    }
+  }
+
   /** 自动反击：侦测附近的敌人 */
   private updateAutoAggro() {
     for (const unit of this.units) {
-      if (unit.isBuilding || unit.attackTarget) continue
+      if (unit.isBuilding || unit.hp <= 0 || unit.isDead || unit.attackTarget) continue
       // 只有 Idle / AttackMove 的单位才走自动 aggro
       // Moving 单位不被 auto-aggro 打断——war3 行为：玩家显式移动优先级高于自动反击
       if (unit.state !== UnitState.Idle && unit.state !== UnitState.AttackMove) continue
@@ -1118,8 +2069,8 @@ export class Game {
   private createHealthBar(unit: Unit) {
     const group = new THREE.Group()
 
-    const barWidth = unit.isBuilding ? 2.0 : 1.2
-    const barHeight = 0.14
+    const barWidth = unit.isBuilding ? 2.0 : unit.type === 'worker' ? 0.95 : 1.2
+    const barHeight = unit.type === 'worker' ? 0.10 : 0.14
 
     // 金色边框（略大于血条本身）
     const borderGeo = new THREE.PlaneGeometry(barWidth + 0.1, barHeight + 0.1)
@@ -1200,9 +2151,93 @@ export class Game {
     const dead = this.units.filter((u) => u.hp <= 0 && u.type !== 'goldmine')
     if (dead.length === 0) return
 
-    const deadSet = new Set(dead)
+    // Separate heroes from normal dead units
+    const deadHeroes = dead.filter(u => !u.isBuilding && UNITS[u.type]?.isHero)
+    for (const hero of deadHeroes) {
+      if (hero.isDead) continue // already processed
+      hero.hp = 0
+      hero.isDead = true
+      hero.attackTarget = null
+      hero.moveTarget = null
+      hero.gatherType = null
+      hero.resourceTarget = null
+      hero.state = UnitState.Idle
+      hero.waypoints = []
+      hero.moveQueue = []
+      hero.attackMoveTarget = null
+      // Hide visual
+      hero.mesh.visible = false
+    }
 
-    for (const unit of dead) {
+    // Clear attack/build refs pointing at dead heroes (same as normal cleanup below)
+    for (const hero of deadHeroes) {
+      const selIdx = this.selectionModel.contains(hero) ? this.selectedUnits.indexOf(hero) : -1
+      if (selIdx >= 0) {
+        this.selectionModel.remove(hero)
+        this.sel.removeSelectionRingAt(selIdx)
+      }
+      for (const other of this.units) {
+        if (other === hero) continue
+        if (other.attackTarget === hero) {
+          other.attackTarget = null
+          if (other.state === UnitState.AttackMove) {
+            this.resumeAttackMove(other)
+          } else {
+            this.restorePreviousOrder(other)
+          }
+        }
+      }
+      // Remove health bar
+      const bars = this.healthBars.get(hero)
+      if (bars) {
+        disposeObject3DDeep(bars.bg.parent!)
+        this.healthBars.delete(hero)
+      }
+      const oi = this.outlineObjects.indexOf(hero.mesh)
+      if (oi >= 0) this.outlineObjects.splice(oi, 1)
+    }
+
+    // Normal dead units (non-heroes)
+    const normalDead = dead.filter(u => !deadHeroes.includes(u))
+    const deadSet = new Set(normalDead)
+
+    // HERO10-IMPL1: only player-team normal unit deaths award minimal XP.
+    // Neutral/creep XP is source-bounded data but intentionally not wired yet.
+    for (const unit of normalDead) {
+      if (unit.isBuilding) continue
+      if (unit.team !== 0 && unit.team !== 1) continue
+      const uDef = UNITS[unit.type]
+      if (!uDef || uDef.isHero) continue
+      const xpGain = HERO_XP_RULES.normalUnitXpByLevel[1] ?? 0
+      if (xpGain <= 0) continue
+      const opposingTeam = unit.team === 0 ? 1 : 0
+      const hero = this.units.find(
+        u => u.team === opposingTeam && !u.isBuilding && UNITS[u.type]?.isHero && !u.isDead && u.hp > 0,
+      )
+      if (!hero) continue
+      if ((hero.heroLevel ?? 1) >= HERO_XP_RULES.maxHeroLevel) continue
+      hero.heroXP = (hero.heroXP ?? 0) + xpGain
+      // Check level-up
+      this.checkHeroLevelUp(hero)
+    }
+
+    // HERO14/16: record Resurrection-eligible dead units before mesh disposal.
+    // Keep this to controllable player/AI teams; neutral/creep corpses remain deferred.
+    for (const unit of normalDead) {
+      if (unit.isBuilding) continue
+      if (unit.team !== 0 && unit.team !== 1) continue
+      const uDef = UNITS[unit.type]
+      if (!uDef || uDef.isHero) continue
+      this.deadUnitRecords.push({
+        team: unit.team,
+        type: unit.type,
+        x: unit.mesh.position.x,
+        z: unit.mesh.position.z,
+        diedAt: this.gameTime,
+      })
+    }
+
+    for (const unit of normalDead) {
       // 从选择中移除
       const selIdx = this.selectionModel.contains(unit) ? this.selectedUnits.indexOf(unit) : -1
       if (selIdx >= 0) {
@@ -1266,32 +2301,57 @@ export class Game {
   private checkGameOver() {
     if (this.gameOverResult) return
 
-    // Player 0 (human) defeat: no living townhall
-    const playerTH = this.units.some(u => u.team === 0 && u.type === 'townhall' && u.isBuilding && u.hp > 0)
+    // Player 0 (human) defeat: no living main hall
+    const playerTH = this.units.some(u => u.team === 0 && this.isMainHall(u.type) && u.isBuilding && u.hp > 0)
     if (!playerTH) {
       this.endGame('defeat')
       return
     }
 
-    // Player 1 (AI) defeat: no living townhall
-    const aiTH = this.units.some(u => u.team === 1 && u.type === 'townhall' && u.isBuilding && u.hp > 0)
+    // Player 1 (AI) defeat: no living main hall
+    const aiTH = this.units.some(u => u.team === 1 && this.isMainHall(u.type) && u.isBuilding && u.hp > 0)
     if (!aiTH) {
       this.endGame('victory')
+      return
+    }
+
+    if (this.gameTime >= Game.STALL_VERDICT_SECONDS) {
+      this.endGame('stall')
     }
   }
 
-  private endGame(result: 'victory' | 'defeat') {
+  private endGame(result: MatchResult) {
+    this.cancelAllModes()
+    this.resetTransientInputState()
+    this.clearHeldCameraInputs()
     this.gameOverResult = result
     this.phase.set(Phase.GameOver)
 
     // Show end-state HUD overlay
     this.elGameOverOverlay.style.display = 'flex'
     this.elGameOverOverlay.classList.add(result)
-    this.elGameOverText.textContent = result === 'victory' ? '胜利' : '失败'
+    const label = result === 'victory' ? '胜利' : result === 'defeat' ? '失败' : '僵局'
+    this.elGameOverText.textContent = label
+    this.elResultsShellMessage.textContent = label
+
+    // Populate summary from real match state
+    const alive = (team: number) => this.units.filter((u: any) => u.team === team && u.hp > 0)
+    const p0Units = alive(0).filter((u: any) => !u.isBuilding).length
+    const p0Buildings = alive(0).filter((u: any) => u.isBuilding).length
+    const p1Units = alive(1).filter((u: any) => !u.isBuilding).length
+    const p1Buildings = alive(1).filter((u: any) => u.isBuilding).length
+    const min = Math.floor(this.gameTime / 60).toString().padStart(2, '0')
+    const sec = Math.floor(this.gameTime % 60).toString().padStart(2, '0')
+    this.elResultsShellSummary.textContent =
+      `时长 ${min}:${sec}\n` +
+      `我方 单位:${p0Units} 建筑:${p0Buildings}\n` +
+      `敌方 单位:${p1Units} 建筑:${p1Buildings}`
+
+    this.syncSessionOverlays()
   }
 
   /** Public accessor for runtime tests */
-  getMatchResult(): 'victory' | 'defeat' | null {
+  getMatchResult(): MatchResult | null {
     return this.gameOverResult
   }
 
@@ -1442,6 +2502,12 @@ export class Game {
   enterPlacementMode(buildingKey: string) {
     const def = BUILDINGS[buildingKey]
     if (!def) return
+
+    // Tech prerequisite gate
+    if (def.techPrereq && !this.units.some(
+      u => u.team === 0 && u.type === def.techPrereq && u.isBuilding
+        && u.buildProgress >= 1 && u.hp > 0,
+    )) return
 
     // 检查资源
     if (!this.resources.canAfford(0, def.cost)) return
@@ -1645,6 +2711,24 @@ export class Game {
   private setupInput() {
     const canvas = this.renderer.domElement
 
+    const blockSessionInput = (e: Event) => {
+      if (!this.shouldBlockGameplayInput()) return
+      if (e instanceof KeyboardEvent) {
+        if (e.key.toLowerCase() === 'p') return
+        if (this.phase.isPaused() && e.key === 'Escape') return
+        e.preventDefault()
+        e.stopImmediatePropagation()
+        return
+      }
+      if (!this.isGameplaySurfaceTarget(e.target)) return
+      e.preventDefault()
+      e.stopImmediatePropagation()
+    }
+
+    for (const type of ['keydown', 'keyup', 'mousemove', 'mousedown', 'mouseup', 'contextmenu', 'wheel']) {
+      window.addEventListener(type, blockSessionInput, true)
+    }
+
     canvas.addEventListener('mousemove', (e) => {
       this.mouseNDC.x = (e.clientX / window.innerWidth) * 2 - 1
       this.mouseNDC.y = -(e.clientY / window.innerHeight) * 2 + 1
@@ -1759,7 +2843,17 @@ export class Game {
     window.addEventListener('keydown', (e) => {
       // Esc = 取消当前模式（最高优先级）
       if (e.key === 'Escape') {
-        this.cancelAllModes()
+        if (this.placement.mode || this.attackMoveMode || this.rallyMode) {
+          this.cancelAllModes()
+          return
+        }
+        if (this.phase.isPaused()) {
+          this.resumeGame()
+          return
+        }
+        if (this.phase.isPlaying()) {
+          this.pauseGame()
+        }
         return
       }
 
@@ -2393,6 +3487,95 @@ export class Game {
       )
       shieldRim.position.set(-0.38, 0.55, 0)
       group.add(shieldRim)
+    } else if (type === 'priest') {
+      // 牧师：瘦长长袍 + 团队色头巾 + 治疗光环暗示
+      const body = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.22, 0.30, 0.8, 8),
+        new THREE.MeshLambertMaterial({ color: 0xf0e8d0 }),
+      )
+      body.position.y = 0.4
+      group.add(body)
+      // 团队色肩带
+      const sash = new THREE.Mesh(
+        new THREE.BoxGeometry(0.06, 0.6, 0.40),
+        new THREE.MeshLambertMaterial({ color }),
+      )
+      sash.position.set(0, 0.55, 0.14)
+      group.add(sash)
+      // 头（肤色）
+      const head = new THREE.Mesh(
+        new THREE.SphereGeometry(0.14, 8, 6),
+        new THREE.MeshLambertMaterial({ color: 0xddc8a0 }),
+      )
+      head.position.y = 0.96
+      group.add(head)
+      // 兜帽（团队色，覆盖头顶）
+      const hood = new THREE.Mesh(
+        new THREE.ConeGeometry(0.18, 0.24, 8),
+        new THREE.MeshLambertMaterial({ color }),
+      )
+      hood.position.y = 1.10
+      group.add(hood)
+      // 法杖（细长杆 + 顶部光球）
+      const staff = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.02, 0.02, 1.1, 4),
+        new THREE.MeshLambertMaterial({ color: 0x8b6914 }),
+      )
+      staff.position.set(0.28, 0.65, 0)
+      group.add(staff)
+      const orb = new THREE.Mesh(
+        new THREE.SphereGeometry(0.08, 8, 6),
+        new THREE.MeshLambertMaterial({ color: 0xffffff, emissive: 0x88aaff }),
+      )
+      orb.position.set(0.28, 1.25, 0)
+      group.add(orb)
+    } else if (type === 'mortar_team') {
+      // 迫击炮小队：矮胖 + 大口径炮管 + 团队色头巾
+      const body = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.24, 0.30, 0.55, 8),
+        new THREE.MeshLambertMaterial({ color: 0x6b5b3a }),
+      )
+      body.position.y = 0.28
+      group.add(body)
+      // 头（肤色）
+      const mtHead = new THREE.Mesh(
+        new THREE.SphereGeometry(0.13, 8, 6),
+        new THREE.MeshLambertMaterial({ color: 0xddc8a0 }),
+      )
+      mtHead.position.y = 0.68
+      group.add(mtHead)
+      // 团队色头巾
+      const bandana = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.15, 0.15, 0.06, 8),
+        new THREE.MeshLambertMaterial({ color }),
+      )
+      bandana.position.y = 0.72
+      group.add(bandana)
+      // 炮管（粗圆管）
+      const barrel = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.08, 0.08, 0.7, 6),
+        new THREE.MeshLambertMaterial({ color: 0x555555 }),
+      )
+      barrel.position.set(0.25, 0.55, 0)
+      barrel.rotation.z = -Math.PI / 6
+      group.add(barrel)
+      // 炮座（方盒）
+      const mount = new THREE.Mesh(
+        new THREE.BoxGeometry(0.35, 0.18, 0.3),
+        new THREE.MeshLambertMaterial({ color: 0x666655 }),
+      )
+      mount.position.set(0, 0.18, 0)
+      group.add(mount)
+      // 炮轮（两侧）
+      for (const sx of [-1, 1]) {
+        const wheel = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.12, 0.12, 0.04, 8),
+          new THREE.MeshLambertMaterial({ color: 0x5c3a1e }),
+        )
+        wheel.position.set(sx * 0.22, 0.12, 0)
+        wheel.rotation.z = Math.PI / 2
+        group.add(wheel)
+      }
     } else if (type === 'townhall') {
       // 城镇大厅：size=4 的锚定建筑，视觉上要大于所有其他建筑
       const stone = new THREE.Mesh(
@@ -2565,6 +3748,100 @@ export class Game {
       )
       towerFlag.position.set(0, 2.7, 0)
       group.add(towerFlag)
+    } else if (type === 'workshop') {
+      // 车间：工业风格 + 大门 + 团队色旗帜
+      const stonework = new THREE.Mesh(
+        new THREE.BoxGeometry(2.6, 0.3, 2.4),
+        new THREE.MeshLambertMaterial({ color: 0x707060 }),
+      )
+      stonework.position.y = 0.15
+      group.add(stonework)
+      // 主墙体
+      const wsBase = new THREE.Mesh(
+        new THREE.BoxGeometry(2.4, 0.9, 2.2),
+        new THREE.MeshLambertMaterial({ color: 0x504030 }),
+      )
+      wsBase.position.y = 0.75
+      group.add(wsBase)
+      // 大门口（暗色凹陷，比兵营更宽）
+      const wsDoor = new THREE.Mesh(
+        new THREE.BoxGeometry(1.0, 0.8, 0.06),
+        new THREE.MeshLambertMaterial({ color: 0x1a1208 }),
+      )
+      wsDoor.position.set(0, 0.55, 1.13)
+      group.add(wsDoor)
+      // 屋顶
+      const wsRoof = new THREE.Mesh(
+        new THREE.ConeGeometry(1.9, 1.1, 4),
+        new THREE.MeshLambertMaterial({ color: 0x4a3a2a }),
+      )
+      wsRoof.position.y = 1.8
+      wsRoof.rotation.y = Math.PI / 4
+      group.add(wsRoof)
+      // 齿轮装饰（门口上方）
+      const gear = new THREE.Mesh(
+        new THREE.TorusGeometry(0.15, 0.04, 6, 8),
+        new THREE.MeshLambertMaterial({ color: 0x888888 }),
+      )
+      gear.position.set(0, 1.1, 1.14)
+      group.add(gear)
+      // 烟囱
+      const chimney = new THREE.Mesh(
+        new THREE.BoxGeometry(0.2, 0.7, 0.2),
+        new THREE.MeshLambertMaterial({ color: 0x606060 }),
+      )
+      chimney.position.set(0.8, 2.3, -0.5)
+      group.add(chimney)
+      // 团队色旗
+      const wsFlag = new THREE.Mesh(
+        new THREE.PlaneGeometry(0.4, 0.25),
+        new THREE.MeshLambertMaterial({ color, side: THREE.DoubleSide }),
+      )
+      wsFlag.position.set(-0.8, 2.0, 0.7)
+      group.add(wsFlag)
+    } else if (type === 'arcane_sanctum') {
+      // 奥秘圣殿：高塔 + 紫色魔法光球 + 团队色旗帜
+      const base = new THREE.Mesh(
+        new THREE.BoxGeometry(2.4, 0.3, 2.2),
+        new THREE.MeshLambertMaterial({ color: 0x606070 }),
+      )
+      base.position.y = 0.15
+      group.add(base)
+      // 主墙体（蓝灰色石砖）
+      const asWalls = new THREE.Mesh(
+        new THREE.BoxGeometry(2.2, 1.2, 2.0),
+        new THREE.MeshLambertMaterial({ color: 0x7070a0 }),
+      )
+      asWalls.position.y = 0.9
+      group.add(asWalls)
+      // 拱门
+      const asDoor = new THREE.Mesh(
+        new THREE.BoxGeometry(0.7, 1.0, 0.06),
+        new THREE.MeshLambertMaterial({ color: 0x1a1208 }),
+      )
+      asDoor.position.set(0, 0.65, 1.03)
+      group.add(asDoor)
+      // 尖塔
+      const asSpire = new THREE.Mesh(
+        new THREE.ConeGeometry(0.6, 1.5, 6),
+        new THREE.MeshLambertMaterial({ color: 0x5555aa }),
+      )
+      asSpire.position.y = 2.25
+      group.add(asSpire)
+      // 魔法光球（顶部发光）
+      const asOrb = new THREE.Mesh(
+        new THREE.SphereGeometry(0.2, 8, 6),
+        new THREE.MeshLambertMaterial({ color: 0xccccff, emissive: 0x6666cc }),
+      )
+      asOrb.position.y = 3.15
+      group.add(asOrb)
+      // 团队色旗
+      const asFlag = new THREE.Mesh(
+        new THREE.PlaneGeometry(0.4, 0.25),
+        new THREE.MeshLambertMaterial({ color, side: THREE.DoubleSide }),
+      )
+      asFlag.position.set(0.5, 2.8, 0)
+      group.add(asFlag)
     } else if (type === 'goldmine') {
       // 金矿：更大岩壁 + 更多更大晶体 + 强金光
       const rock = new THREE.Mesh(
@@ -2651,6 +3928,25 @@ export class Game {
     // worker 排成一排，紧贴 TH 南面，第一趟采金路径自然
     for (let i = 0; i < 5; i++) this.spawnUnit('worker', 0, 10 + i, 11)
 
+    // 自动派玩家初始农民去采金（War3 开局惯例：农民自动进金矿）
+    const playerWorkers = this.units.filter(
+      (u) => u.team === 0 && u.type === 'worker' && u.hp > 0 && u.state === 0,
+    )
+    const playerMine = this.findNearestGoldmine(
+      this.units.find((u) => u.team === 0 && this.isMainHall(u.type) && u.hp > 0)!,
+    )
+    if (playerMine && playerWorkers.length > 0) {
+      dispatchGameCommand(playerWorkers, {
+        type: 'gather',
+        resourceType: 'gold',
+        target: playerMine.mesh.position.clone(),
+      })
+      for (const u of playerWorkers) {
+        u.resourceTarget = { type: 'goldmine', mine: playerMine }
+      }
+      this.planPathForUnits(playerWorkers, playerMine.mesh.position)
+    }
+
     // ===== AI 基地区（地图右上角，镜像布局）=====
     const far = 50
     this.spawnBuilding('townhall', 1, far, far)
@@ -2686,6 +3982,9 @@ export class Game {
       armor: def?.armor ?? 0,
       buildProgress: 1, builder: null, buildTarget: null,
       trainingQueue: [],
+      reviveQueue: [],
+      researchQueue: [],
+      completedResearches: [],
       remainingGold: 0,
       waypoints: [],
       moveQueue: [],
@@ -2700,9 +3999,37 @@ export class Game {
       previousMoveQueue: [],
       previousAttackMoveTarget: null,
       aggroSuppressUntil: 0,
+      rallyCallBoostUntil: 0,
+      rallyCallCooldownUntil: 0,
+      mana: UNITS[type]?.maxMana ?? 0,
+      maxMana: UNITS[type]?.maxMana ?? 0,
+      manaRegen: UNITS[type]?.manaRegen ?? 0,
+      healCooldownUntil: 0,
+      upgradeQueue: null,
+      morphExpiresAt: 0,
+      morphOriginalType: null,
+      defendActive: false,
+      slowUntil: 0,
+      slowSpeedMultiplier: 1,
+      slowAutoCastEnabled: false,
+      slowAutoCastCooldownUntil: 0,
+      divineShieldUntil: 0,
+      divineShieldCooldownUntil: 0,
+      devotionAuraBonus: 0,
+      resurrectionCooldownUntil: 0,
+      resurrectionLastRevivedCount: 0,
+      resurrectionFeedbackUntil: 0,
+      heroLevel: UNITS[type]?.heroLevel,
+      heroXP: UNITS[type]?.isHero ? (UNITS[type]?.heroXP ?? 0) : undefined,
+      heroSkillPoints: UNITS[type]?.isHero ? (UNITS[type]?.heroSkillPoints ?? HERO_XP_RULES.initialSkillPoints) : undefined,
+      abilityLevels: UNITS[type]?.isHero ? {} : undefined,
     }
     this.units.push(unit)
     this.createHealthBar(unit)
+
+    // Apply completed research bonuses to newly spawned units
+    this.applyCompletedResearchesToUnit(unit)
+
     return unit
   }
 
@@ -2726,6 +4053,9 @@ export class Game {
       attackDamage: def?.attackDamage ?? 0, attackRange: def?.attackRange ?? 0, attackCooldown: def?.attackCooldown ?? 2, armor: def?.key === 'tower' ? 0 : 2,
       buildProgress: 1, builder: null, buildTarget: null,
       trainingQueue: [],
+      reviveQueue: [],
+      researchQueue: [],
+      completedResearches: [],
       remainingGold: type === 'goldmine' ? GOLDMINE_GOLD : 0,
       waypoints: [],
       moveQueue: [],
@@ -2740,6 +4070,26 @@ export class Game {
       previousMoveQueue: [],
       previousAttackMoveTarget: null,
       aggroSuppressUntil: 0,
+      rallyCallBoostUntil: 0,
+      rallyCallCooldownUntil: 0,
+      mana: 0,
+      maxMana: 0,
+      manaRegen: 0,
+      healCooldownUntil: 0,
+      upgradeQueue: null,
+      morphExpiresAt: 0,
+      morphOriginalType: null,
+      defendActive: false,
+      slowUntil: 0,
+      slowSpeedMultiplier: 1,
+      slowAutoCastEnabled: false,
+      slowAutoCastCooldownUntil: 0,
+      divineShieldUntil: 0,
+      divineShieldCooldownUntil: 0,
+      devotionAuraBonus: 0,
+      resurrectionCooldownUntil: 0,
+      resurrectionLastRevivedCount: 0,
+      resurrectionFeedbackUntil: 0,
     }
     this.units.push(unit)
     if (type !== 'goldmine') this.createHealthBar(unit)
@@ -3047,6 +4397,9 @@ export class Game {
       spawnBuilding: (type, team, x, z) => this.spawnBuilding(type, team, x, z),
       getWorldHeight: (wx, wz) => this.getWorldHeight(wx, wz),
       planPath: (unit, target) => this.planPath(unit, target),
+      castHolyLight: (caster, target) => this.aiCastHolyLight(caster, target),
+      castDivineShield: (caster) => this.aiCastDivineShield(caster),
+      castResurrection: (caster) => this.aiCastResurrection(caster),
     }
     this.ai = new SimpleAI(ctx)
   }
@@ -3104,45 +4457,44 @@ export class Game {
       if (!unit.isBuilding && getAssetStatus(unit.type) !== 'loaded') continue
       if (unit.isBuilding && getAssetStatus(unit.type) !== 'loaded') continue
 
-      // 保留旧位置/旋转，但不复制 fallback 的 scale
-      // 新 glTF 的 scale 已由 AssetLoader 按 AssetCatalog 设置好，
-      // 复制旧 fallback scale 会覆盖正确的资产缩放导致单位"变小/消失"
-      const pos = unit.mesh.position.clone()
-      const rot = unit.mesh.rotation.clone()
-
-      // 从 outlineObjects 中移除旧 mesh
-      const oi = this.outlineObjects.indexOf(unit.mesh)
-      if (oi >= 0) this.outlineObjects.splice(oi, 1)
-
-      // 从 scene 中移除旧 mesh（不 dispose children，由新 mesh 替代）
-      this.scene.remove(unit.mesh)
-      disposeObject3DDeep(unit.mesh)
-
-      // 设置新 mesh
-      unit.mesh = newVisual
-      unit.mesh.position.copy(pos)
-      unit.mesh.rotation.copy(rot)
-      // scale：默认使用 glTF 自身 scale（来自 AssetCatalog），不复制 fallback
-      // 仅对建造中的建筑保留 buildProgress 缩放语义
-      if (unit.isBuilding && unit.buildProgress < 1) {
-        const buildScale = 0.3 + 0.7 * unit.buildProgress
-        unit.mesh.scale.setScalar(buildScale)
-      }
-      this.scene.add(unit.mesh)
-      this.outlineObjects.push(unit.mesh)
-
-      // 更新血条位置（下一帧 updateHealthBars 会处理）
-      // 重建血条（因为旧血条引用了旧的 parent）
-      const bars = this.healthBars.get(unit)
-      if (bars) {
-        disposeObject3DDeep(bars.bg.parent!)
-        this.healthBars.delete(unit)
-        this.createHealthBar(unit)
-      }
+      this.replaceUnitMeshVisual(unit, newVisual)
     }
 
     // 替换树木
     this.refreshTreeVisuals()
+  }
+
+  private replaceUnitMeshVisual(unit: Unit, newVisual: THREE.Group) {
+    // 保留旧位置/旋转，但不复制 fallback 的 scale。
+    // 新 glTF 的 scale 已由 AssetLoader 按 AssetCatalog 设置好。
+    const pos = unit.mesh.position.clone()
+    const rot = unit.mesh.rotation.clone()
+    const oldMesh = unit.mesh
+
+    const oi = this.outlineObjects.indexOf(oldMesh)
+    if (oi >= 0) this.outlineObjects.splice(oi, 1)
+
+    this.scene.remove(oldMesh)
+    disposeObject3DDeep(oldMesh)
+
+    unit.mesh = newVisual
+    unit.mesh.position.copy(pos)
+    unit.mesh.rotation.copy(rot)
+
+    if (unit.isBuilding && unit.buildProgress < 1) {
+      const buildScale = 0.3 + 0.7 * unit.buildProgress
+      unit.mesh.scale.setScalar(buildScale)
+    }
+
+    this.scene.add(unit.mesh)
+    this.outlineObjects.push(unit.mesh)
+
+    const bars = this.healthBars.get(unit)
+    if (bars) {
+      disposeObject3DDeep(bars.bg.parent!)
+      this.healthBars.delete(unit)
+      this.createHealthBar(unit)
+    }
   }
 
   /** 刷新所有树木视觉（如果 pine_tree glTF 已加载） */
@@ -3322,28 +4674,124 @@ export class Game {
 
     switch (type) {
       case 'worker': {
-        // 农民：简笔人物 + 镐
-        // 身体
-        ctx.fillStyle = '#8b6914'
-        ctx.fillRect(-6, -4, 12, 18)
-        // 头
-        ctx.fillStyle = '#ddc8a0'
+        // 农民：半身头像 + 草帽 + 胡子 + 工具，选中面板里要比地图小人更有质感。
+        const teamCol = team === 0 ? '#4488ff' : '#ff4444'
+        const rimCol = team === 0 ? '#8ec0ff' : '#ff9a88'
+
+        const portraitGlow = ctx.createRadialGradient(0, -8, 8, 0, 2, 39)
+        portraitGlow.addColorStop(0, 'rgba(255,221,124,0.18)')
+        portraitGlow.addColorStop(0.55, 'rgba(42,86,122,0.16)')
+        portraitGlow.addColorStop(1, 'rgba(0,0,0,0)')
+        ctx.fillStyle = portraitGlow
+        ctx.fillRect(-38, -38, 76, 76)
+
+        // 背后的镐，先画让人物压在前面。
+        ctx.save()
+        ctx.rotate(-0.55)
+        ctx.strokeStyle = '#8b6914'
+        ctx.lineWidth = 4
+        ctx.lineCap = 'round'
         ctx.beginPath()
-        ctx.arc(0, -12, 8, 0, Math.PI * 2)
-        ctx.fill()
-        // 帽子（团队色）
-        ctx.fillStyle = team === 0 ? '#4488ff' : '#ff4444'
-        ctx.fillRect(-7, -20, 14, 6)
-        ctx.fillRect(-5, -22, 10, 4)
-        // 镐
-        ctx.strokeStyle = '#888'
-        ctx.lineWidth = 2
-        ctx.beginPath()
-        ctx.moveTo(8, -8)
-        ctx.lineTo(18, 10)
+        ctx.moveTo(8, -28)
+        ctx.lineTo(8, 26)
         ctx.stroke()
-        ctx.fillStyle = '#777'
-        ctx.fillRect(15, 6, 8, 3)
+        ctx.strokeStyle = '#c7c0aa'
+        ctx.lineWidth = 5
+        ctx.beginPath()
+        ctx.moveTo(-3, -29)
+        ctx.lineTo(23, -29)
+        ctx.stroke()
+        ctx.restore()
+
+        // 肩膀和皮革背带。
+        const bodyGrad = ctx.createLinearGradient(0, -2, 0, 28)
+        bodyGrad.addColorStop(0, '#c69248')
+        bodyGrad.addColorStop(1, '#6f451f')
+        ctx.fillStyle = bodyGrad
+        ctx.beginPath()
+        ctx.moveTo(-24, 28)
+        ctx.quadraticCurveTo(-20, 4, -10, 0)
+        ctx.lineTo(10, 0)
+        ctx.quadraticCurveTo(20, 4, 24, 28)
+        ctx.closePath()
+        ctx.fill()
+
+        ctx.fillStyle = teamCol
+        ctx.fillRect(-8, 7, 16, 19)
+        ctx.fillStyle = 'rgba(10,8,4,0.35)'
+        ctx.fillRect(-2, 7, 4, 19)
+        ctx.strokeStyle = '#4c2d15'
+        ctx.lineWidth = 3
+        ctx.beginPath()
+        ctx.moveTo(-15, 1)
+        ctx.lineTo(-3, 28)
+        ctx.moveTo(15, 1)
+        ctx.lineTo(3, 28)
+        ctx.stroke()
+
+        // 脖子和脸。
+        ctx.fillStyle = '#c99b6d'
+        ctx.fillRect(-6, -1, 12, 7)
+        const faceGrad = ctx.createLinearGradient(0, -27, 0, -4)
+        faceGrad.addColorStop(0, '#f0d3a2')
+        faceGrad.addColorStop(1, '#c9915f')
+        ctx.fillStyle = faceGrad
+        ctx.beginPath()
+        ctx.ellipse(0, -15, 12, 14, 0, 0, Math.PI * 2)
+        ctx.fill()
+
+        // 胡子、鼻子和脸部阴影。
+        ctx.fillStyle = '#5a3518'
+        ctx.beginPath()
+        ctx.moveTo(-10, -10)
+        ctx.quadraticCurveTo(0, 7, 10, -10)
+        ctx.quadraticCurveTo(5, 0, 0, 4)
+        ctx.quadraticCurveTo(-5, 0, -10, -10)
+        ctx.fill()
+        ctx.fillStyle = '#b77748'
+        ctx.beginPath()
+        ctx.moveTo(0, -18)
+        ctx.lineTo(4, -11)
+        ctx.lineTo(-2, -11)
+        ctx.closePath()
+        ctx.fill()
+        ctx.fillStyle = '#2b1d10'
+        ctx.fillRect(-6, -18, 3, 2)
+        ctx.fillRect(4, -18, 3, 2)
+
+        // 草帽：大帽檐是最像农民的部分，队伍色只做帽带。
+        const brimGrad = ctx.createLinearGradient(0, -34, 0, -18)
+        brimGrad.addColorStop(0, '#f0d58a')
+        brimGrad.addColorStop(1, '#b88c38')
+        ctx.fillStyle = brimGrad
+        ctx.beginPath()
+        ctx.ellipse(0, -25, 25, 8, 0, 0, Math.PI * 2)
+        ctx.fill()
+        ctx.strokeStyle = '#6b4e1f'
+        ctx.lineWidth = 1.5
+        ctx.stroke()
+
+        ctx.fillStyle = '#d7b85e'
+        ctx.beginPath()
+        ctx.moveTo(-13, -25)
+        ctx.quadraticCurveTo(0, -43, 13, -25)
+        ctx.closePath()
+        ctx.fill()
+        ctx.strokeStyle = '#806020'
+        ctx.stroke()
+
+        ctx.fillStyle = teamCol
+        ctx.fillRect(-13, -28, 26, 4)
+        ctx.fillStyle = rimCol
+        ctx.fillRect(-13, -28, 26, 1)
+
+        // 前景高光让头像别像平面色块。
+        ctx.strokeStyle = 'rgba(255,245,205,0.55)'
+        ctx.lineWidth = 1
+        ctx.beginPath()
+        ctx.moveTo(-20, -26)
+        ctx.quadraticCurveTo(0, -31, 20, -26)
+        ctx.stroke()
         break
       }
       case 'footman': {
@@ -3527,6 +4975,98 @@ export class Game {
         ctx.fillRect(-18, -20, 36, 36)
         break
       }
+      case 'lumber_mill': {
+        // 伐木场：锯木台 + 木材堆 + 烟囱
+        ctx.fillStyle = '#604020'
+        ctx.fillRect(-16, 2, 32, 14)
+        // 锯台
+        ctx.fillStyle = '#888'
+        ctx.fillRect(-8, -6, 16, 10)
+        // 锯轮
+        ctx.fillStyle = '#aaa'
+        ctx.beginPath()
+        ctx.arc(6, -2, 5, 0, Math.PI * 2)
+        ctx.fill()
+        // 木材堆
+        ctx.fillStyle = '#8b6914'
+        ctx.fillRect(-14, -10, 8, 10)
+        ctx.fillRect(-8, -14, 6, 14)
+        // 烟囱
+        ctx.fillStyle = '#706050'
+        ctx.fillRect(10, -18, 6, 22)
+        // 旗帜（团队色）
+        ctx.fillStyle = team === 0 ? '#4488ff' : '#ff4444'
+        ctx.fillRect(10, -22, 8, 4)
+        break
+      }
+      case 'priest': {
+        // 牧师：长袍 + 兜帽 + 法杖 + 光球
+        ctx.fillStyle = '#f0e8d0'
+        ctx.fillRect(-6, -2, 12, 20)
+        // 团队色肩带
+        ctx.fillStyle = team === 0 ? '#4488ff' : '#ff4444'
+        ctx.fillRect(-5, 4, 10, 4)
+        // 兜帽
+        ctx.fillStyle = team === 0 ? '#4488ff' : '#ff4444'
+        ctx.beginPath()
+        ctx.arc(0, -10, 8, 0, Math.PI * 2)
+        ctx.fill()
+        // 法杖
+        ctx.fillStyle = '#8b6914'
+        ctx.fillRect(8, -14, 2, 28)
+        // 光球
+        ctx.fillStyle = '#ccf'
+        ctx.beginPath()
+        ctx.arc(9, -16, 4, 0, Math.PI * 2)
+        ctx.fill()
+        break
+      }
+      case 'sorceress': {
+        // 女巫：蓝白长袍 + 法杖 + 冰蓝法球
+        ctx.fillStyle = '#dcecff'
+        ctx.fillRect(-6, -2, 12, 20)
+        ctx.fillStyle = team === 0 ? '#4488ff' : '#ff4444'
+        ctx.fillRect(-6, 3, 12, 5)
+        ctx.fillStyle = '#cfd7ff'
+        ctx.beginPath()
+        ctx.arc(0, -10, 8, 0, Math.PI * 2)
+        ctx.fill()
+        ctx.fillStyle = '#8b6914'
+        ctx.fillRect(9, -14, 2, 28)
+        ctx.fillStyle = '#88ddff'
+        ctx.beginPath()
+        ctx.arc(10, -17, 4, 0, Math.PI * 2)
+        ctx.fill()
+        break
+      }
+      case 'arcane_sanctum': {
+        // 奥秘圣殿：石塔 + 紫色光球
+        ctx.fillStyle = '#606070'
+        ctx.fillRect(-16, 2, 32, 14)
+        // 主墙
+        ctx.fillStyle = '#7070a0'
+        ctx.fillRect(-14, -10, 28, 14)
+        // 拱门
+        ctx.fillStyle = '#1a1208'
+        ctx.fillRect(-4, -2, 8, 14)
+        // 尖塔
+        ctx.fillStyle = '#5555aa'
+        ctx.beginPath()
+        ctx.moveTo(-10, -10)
+        ctx.lineTo(0, -24)
+        ctx.lineTo(10, -10)
+        ctx.closePath()
+        ctx.fill()
+        // 光球
+        ctx.fillStyle = '#ccf'
+        ctx.beginPath()
+        ctx.arc(0, -28, 5, 0, Math.PI * 2)
+        ctx.fill()
+        // 团队色旗
+        ctx.fillStyle = team === 0 ? '#4488ff' : '#ff4444'
+        ctx.fillRect(8, -24, 7, 4)
+        break
+      }
       default: {
         // 通用问号
         ctx.fillStyle = '#5a4e22'
@@ -3565,14 +5105,35 @@ export class Game {
 
     switch (type) {
       case 'worker': {
-        ctx.fillStyle = '#8b6914'
-        ctx.fillRect(-3, -2, 6, 9)
-        ctx.fillStyle = '#ddc8a0'
+        ctx.fillStyle = '#b88a48'
         ctx.beginPath()
-        ctx.arc(0, -6, 4, 0, Math.PI * 2)
+        ctx.roundRect(-5, -1, 10, 10, 2)
         ctx.fill()
         ctx.fillStyle = teamCol
-        ctx.fillRect(-4, -10, 8, 3)
+        ctx.fillRect(-3, 3, 6, 5)
+        ctx.fillStyle = '#ddc8a0'
+        ctx.beginPath()
+        ctx.arc(0, -6, 4.5, 0, Math.PI * 2)
+        ctx.fill()
+        ctx.fillStyle = '#5a3518'
+        ctx.beginPath()
+        ctx.moveTo(-3.5, -4)
+        ctx.quadraticCurveTo(0, 1, 3.5, -4)
+        ctx.lineTo(0, 1.5)
+        ctx.closePath()
+        ctx.fill()
+        ctx.fillStyle = '#d1b765'
+        ctx.beginPath()
+        ctx.ellipse(0, -10, 8, 2.8, 0, 0, Math.PI * 2)
+        ctx.fill()
+        ctx.fillStyle = teamCol
+        ctx.fillRect(-5, -11, 10, 1.5)
+        ctx.strokeStyle = '#9d9d92'
+        ctx.lineWidth = 1.5
+        ctx.beginPath()
+        ctx.moveTo(5, -7)
+        ctx.lineTo(9, 6)
+        ctx.stroke()
         break
       }
       case 'footman': {
@@ -3586,6 +5147,35 @@ export class Game {
         ctx.fillRect(-3, 1, 6, 5)
         ctx.fillStyle = '#ccc'
         ctx.fillRect(6, -7, 2, 12)
+        break
+      }
+      case 'priest': {
+        ctx.fillStyle = '#f0e8d0'
+        ctx.fillRect(-3, 0, 6, 8)
+        ctx.fillStyle = teamCol
+        ctx.fillRect(-3, 2, 6, 3)
+        ctx.beginPath()
+        ctx.arc(0, -3, 3, 0, Math.PI * 2)
+        ctx.fill()
+        ctx.fillStyle = '#ccf'
+        ctx.beginPath()
+        ctx.arc(4, -5, 2, 0, Math.PI * 2)
+        ctx.fill()
+        break
+      }
+      case 'sorceress': {
+        ctx.fillStyle = '#dcecff'
+        ctx.fillRect(-3, 0, 6, 8)
+        ctx.fillStyle = teamCol
+        ctx.fillRect(-3, 2, 6, 3)
+        ctx.fillStyle = '#cfd7ff'
+        ctx.beginPath()
+        ctx.arc(0, -3, 3, 0, Math.PI * 2)
+        ctx.fill()
+        ctx.fillStyle = '#88ddff'
+        ctx.beginPath()
+        ctx.arc(4, -5, 2, 0, Math.PI * 2)
+        ctx.fill()
         break
       }
       default: {
@@ -3654,9 +5244,6 @@ export class Game {
       const primaryType = this.selectionModel.primaryType
       if (selKey !== this._lastSelKey) {
         this.elMultiBreakdown.innerHTML = ''
-        const names: Record<string, string> = {
-          worker: '农民', footman: '步兵',
-        }
         for (const [type, count] of Object.entries(typeCounts).sort()) {
           const row = document.createElement('div')
           row.className = type === primaryType ? 'breakdown-row breakdown-primary' : 'breakdown-row'
@@ -3667,7 +5254,7 @@ export class Game {
           this.drawMiniPortrait(miniCanvas, type, 0)
           row.appendChild(miniCanvas)
           const label = document.createElement('span')
-          label.textContent = `${names[type] ?? type} x${count}`
+          label.textContent = `${UNITS[type]?.name ?? BUILDINGS[type]?.name ?? type} x${count}`
           row.appendChild(label)
           this.elMultiBreakdown.appendChild(row)
         }
@@ -3689,12 +5276,22 @@ export class Game {
     const bpKey = u.buildProgress < 1 ? Math.floor(u.buildProgress * 100) : 100
     const goldKey = u.type === 'goldmine' ? Math.floor(u.remainingGold / 10) : 0
     const queueLen = u.trainingQueue.length
+    const reviveQueueLen = u.reviveQueue.length
     // 训练进度量化到 1%（每秒约 1 次更新，不是每帧）
     const trainProgressKey = queueLen > 0 ? Math.floor(u.trainingQueue[0].remaining * 10) : 0
+    const reviveProgressKey = reviveQueueLen > 0 ? Math.floor(u.reviveQueue[0].remaining * 10) : 0
     const rallyKey = u.rallyPoint ? 'r' : 'n'
     const hpKey = `${u.hp}:${u.maxHp}`
     const moveQueueKey = u.moveQueue.length
-    const selKeyFull = `${u.type}:${u.team}:${bpKey}:${goldKey}:${queueLen}:${trainProgressKey}:${rallyKey}:${hpKey}:${u.state}:${moveQueueKey}`
+    const rallyCallKey = u.rallyCallBoostUntil > this.gameTime ? Math.floor(u.rallyCallBoostUntil) : 0
+    const manaKey = u.maxMana > 0 ? Math.floor(u.mana) : -1
+    const healCooldownKey = u.healCooldownUntil > this.gameTime ? Math.ceil(u.healCooldownUntil * 10) : 0
+    const heroLevelKey = UNITS[u.type]?.isHero ? (u.heroLevel ?? 1) : -1
+    const heroXpKey = UNITS[u.type]?.isHero ? (u.heroXP ?? 0) : -1
+    const heroSpKey = UNITS[u.type]?.isHero ? (u.heroSkillPoints ?? 0) : -1
+    const abilityKey = UNITS[u.type]?.isHero ? JSON.stringify(u.abilityLevels ?? {}) : ''
+    const dsActiveKey = u.divineShieldUntil > this.gameTime ? Math.ceil(u.divineShieldUntil - this.gameTime) : 0
+    const selKeyFull = `${u.type}:${u.team}:${bpKey}:${goldKey}:${queueLen}:${trainProgressKey}:${reviveQueueLen}:${reviveProgressKey}:${rallyKey}:${hpKey}:${u.state}:${moveQueueKey}:${rallyCallKey}:${manaKey}:${healCooldownKey}:${heroLevelKey}:${heroXpKey}:${heroSpKey}:${abilityKey}:${dsActiveKey}`
 
     if (selKeyFull === this._lastSelKey) return
     this._lastSelKey = selKeyFull
@@ -3702,17 +5299,13 @@ export class Game {
     this.elSingleSelect.style.display = ''
     this.elMultiSelect.style.display = 'none'
 
-    const names: Record<string, string> = {
-      worker: '农民', footman: '步兵', townhall: '城镇大厅',
-      barracks: '兵营', farm: '农场', tower: '箭塔', goldmine: '金矿',
-    }
     const stateNames = ['空闲', '移动', '前往采集', '采集中', '运送资源', '前往建造', '建造中', '攻击中', '攻击移动', '驻守']
 
     // Portrait
     this.drawPortrait(u.type, u.team)
 
     // 名称
-    this.elUnitName.textContent = names[u.type] ?? u.type
+    this.elUnitName.textContent = UNITS[u.type]?.name ?? BUILDINGS[u.type]?.name ?? u.type
 
     // HP 条 + 数值
     const pct = u.maxHp > 0 ? (u.hp / u.maxHp) * 100 : 0
@@ -3727,29 +5320,89 @@ export class Game {
     const queueText = !u.isBuilding && u.moveQueue.length > 0
       ? ` (队列: ${u.moveQueue.length})`
       : ''
-    this.elUnitState.textContent = stateText + queueText
+    const rallyText = (!u.isBuilding && u.rallyCallBoostUntil > this.gameTime)
+      ? ` [集结号令 +${ABILITIES.rally_call.effectValue}伤害]`
+      : ''
+    this.elUnitState.textContent = stateText + queueText + rallyText
 
     // 类型标签
     const badges: Record<string, string> = {
-      worker: '采集', footman: '近战', townhall: '主基地',
-      barracks: '军事', farm: '人口', tower: '防御', goldmine: '资源',
+      worker: '采集', footman: '近战', rifleman: '远程', mortar_team: '攻城', priest: '治疗', sorceress: '法师',
+      townhall: '主基地',
+      barracks: '军事', farm: '人口', tower: '防御', goldmine: '资源', blacksmith: '科技',
+      lumber_mill: '木材', workshop: '攻城', arcane_sanctum: '法师',
     }
     this.elTypeBadge.textContent = badges[u.type] ?? ''
     this.elTypeBadge.style.display = 'block'
 
-    // 属性行
+    // 属性行统一从 GameData 读取，避免按单位类型写死数值。
     const def = UNITS[u.type]
     const bDef = BUILDINGS[u.type]
-    if (u.type === 'worker') {
-      this.elUnitStats.innerHTML =
-        `<span class="stat">⚔ ${def?.attackDamage ?? 5}</span>` +
-        `<span class="stat">🛡 ${def?.armor ?? 0}</span>` +
-        `<span class="stat">💨 ${(def?.speed ?? 3.5).toFixed(1)}</span>`
-    } else if (u.type === 'footman') {
-      this.elUnitStats.innerHTML =
-        `<span class="stat">⚔ ${def?.attackDamage ?? 13}</span>` +
-        `<span class="stat">🛡 ${def?.armor ?? 2}</span>` +
-        `<span class="stat">💨 ${(def?.speed ?? 3).toFixed(1)}</span>`
+    if (!u.isBuilding && def) {
+      let statsHtml = `<span class="stat">⚔ ${def.attackDamage}</span>`
+      statsHtml += `<span class="stat">🛡 ${def.armor}</span>`
+      statsHtml += `<span class="stat">💨 ${def.speed.toFixed(1)}</span>`
+      // 远程单位显示射程（近战不显示，因为都是 MELEE_RANGE）
+      if (def.attackRange > MELEE_RANGE) {
+        statsHtml += `<span class="stat">🎯 ${def.attackRange}</span>`
+      }
+      // 法师单位显示 mana
+      if (u.maxMana > 0) {
+        statsHtml += `<span class="stat">💧 ${Math.floor(u.mana)}/${u.maxMana}</span>`
+      }
+      // 攻击/护甲类型来自 GameData。
+      if (def.attackType !== undefined) {
+        statsHtml += `<span class="stat">${ATTACK_TYPE_NAMES[def.attackType]}</span>`
+      }
+      if (def.armorType !== undefined) {
+        statsHtml += `<span class="stat">${ARMOR_TYPE_NAMES[def.armorType]}</span>`
+      }
+      if (def.isHero) {
+        const level = u.heroLevel ?? 1
+        const xp = u.heroXP ?? 0
+        const sp = u.heroSkillPoints ?? 0
+        statsHtml += `<span class="stat">等级 ${level}</span>`
+        if (level >= HERO_XP_RULES.maxHeroLevel) {
+          statsHtml += `<span class="stat">XP 最高等级</span>`
+        } else {
+          const nextThreshold = HERO_XP_RULES.xpThresholdsByLevel[level + 1] ?? 0
+          statsHtml += `<span class="stat">XP ${xp}/${nextThreshold}</span>`
+        }
+        statsHtml += `<span class="stat">技能点 ${sp}</span>`
+        if (u.abilityLevels) {
+          const hlLv = u.abilityLevels.holy_light ?? 0
+          if (hlLv > 0) {
+            statsHtml += `<span class="stat">圣光术 Lv${hlLv}</span>`
+          }
+          const dsLv = u.abilityLevels.divine_shield ?? 0
+          if (dsLv > 0) {
+            statsHtml += `<span class="stat">神圣护盾 Lv${dsLv}</span>`
+          }
+          const daLv = u.abilityLevels.devotion_aura ?? 0
+          if (daLv > 0) {
+            statsHtml += `<span class="stat">虔诚光环 Lv${daLv}</span>`
+          }
+          const resLv = u.abilityLevels.resurrection ?? 0
+          if (resLv > 0) {
+            statsHtml += `<span class="stat">复活术 Lv${resLv}</span>`
+          }
+        }
+      }
+      if (u.divineShieldUntil > this.gameTime) {
+        const remaining = Math.ceil(u.divineShieldUntil - this.gameTime)
+        statsHtml += `<span class="stat">神圣护盾生效 ${remaining}s</span>`
+      }
+      if (u.devotionAuraBonus > 0) {
+        statsHtml += `<span class="stat">虔诚光环 +${u.devotionAuraBonus} 护甲</span>`
+      }
+      if (u.resurrectionCooldownUntil > this.gameTime) {
+        const remaining = Math.ceil(u.resurrectionCooldownUntil - this.gameTime)
+        statsHtml += `<span class="stat">复活冷却 ${remaining}s</span>`
+      }
+      if (u.resurrectionLastRevivedCount > 0 && u.resurrectionFeedbackUntil > this.gameTime) {
+        statsHtml += `<span class="stat">刚复活 ${u.resurrectionLastRevivedCount} 个单位</span>`
+      }
+      this.elUnitStats.innerHTML = statsHtml
     } else if (u.isBuilding && u.type !== 'goldmine') {
       let statsHtml = ''
       const supplyVal = bDef?.supply ?? 0
@@ -3775,11 +5428,26 @@ export class Game {
           statsHtml += `<span class="stat">队列 ${u.trainingQueue.length}</span>`
         }
       }
+      if (u.reviveQueue.length > 0) {
+        const first = u.reviveQueue[0]
+        const heroDef = UNITS[first.heroType]
+        if (heroDef) {
+          const progress = Math.floor(((first.totalDuration - first.remaining) / first.totalDuration) * 100)
+          statsHtml += `<span class="stat">复活 ${heroDef.name} ${progress}%</span>`
+        }
+      }
       // Weapon stats for combat buildings (e.g., tower)
       if (bDef?.attackDamage) {
         statsHtml += `<span class="stat">⚔ ${bDef.attackDamage}</span>`
         if (bDef.attackRange) statsHtml += `<span class="stat">射程 ${bDef.attackRange}</span>`
         if (bDef.attackCooldown) statsHtml += `<span class="stat">冷却 ${bDef.attackCooldown}s</span>`
+      }
+      // 攻击/护甲类型来自 GameData。
+      if (bDef?.attackType !== undefined) {
+        statsHtml += `<span class="stat">${ATTACK_TYPE_NAMES[bDef.attackType]}</span>`
+      }
+      if (bDef?.armorType !== undefined) {
+        statsHtml += `<span class="stat">${ARMOR_TYPE_NAMES[bDef.armorType]}</span>`
       }
       this.elUnitStats.innerHTML = statsHtml
     } else if (u.type === 'goldmine') {
@@ -3802,8 +5470,52 @@ export class Game {
     const supply = this.resources.computeSupply(0, this.units)
     const queuedSupply = this.getQueuedSupply(0)
     const primaryQueueKey = primary ? primary.trainingQueue.map(item => `${item.type}:${Math.ceil(item.remaining * 10)}`).join('|') : ''
+    const primaryReviveKey = primary ? primary.reviveQueue.map(item => `${item.heroType}:${Math.ceil(item.remaining * 10)}`).join('|') : ''
+    // Include completed prerequisite building count so tech-gated buttons refresh
+    const prereqKey = this.units
+      .filter(u => u.team === 0 && u.isBuilding && u.buildProgress >= 1 && u.hp > 0)
+      .map(u => u.type).sort().join(',')
+    // Include research state so research buttons refresh on completion
+    const researchKey = this.units
+      .filter(u => u.team === 0 && u.isBuilding)
+      .flatMap(u => [...u.completedResearches, ...u.researchQueue.map(r => `${r.key}:${Math.ceil(r.remaining * 10)}`)])
+      .sort().join(',')
+    const rallyCooldownKey = primary && !primary.isBuilding && primary.team === 0
+      ? Math.ceil(primary.rallyCallCooldownUntil * 10)
+      : 0
+    const cmdManaKey = primary && primary.maxMana > 0
+      ? Math.floor(primary.mana)
+      : -1
+    const cmdHealCdKey = primary && primary.healCooldownUntil > this.gameTime
+      ? Math.ceil(primary.healCooldownUntil * 10)
+      : 0
+    const upgradeKey = primary?.upgradeQueue
+      ? `upg:${primary.upgradeQueue.targetType}:${Math.ceil(primary.upgradeQueue.remaining * 10)}`
+      : ''
+    const heroReviveStateKey = primary && BUILDINGS[primary.type]?.trains
+      ? BUILDINGS[primary.type]!.trains!
+        .filter(heroKey => UNITS[heroKey]?.isHero)
+        .map(heroKey => {
+          const hero = this.units.find(u => u.team === primary.team && u.type === heroKey && !u.isBuilding)
+          return `${heroKey}:${hero ? (hero.isDead ? 'dead' : 'live') : 'none'}:${hero?.hp ?? 0}:${hero?.mana ?? 0}:${hero?.heroLevel ?? 1}`
+        })
+        .join('|')
+      : ''
+    const morphKey = primary?.morphExpiresAt
+      ? `morph:${Math.ceil(primary.morphExpiresAt * 10)}`
+      : ''
+    const defendKey = primary?.defendActive ? 'defend:1' : 'defend:0'
+    const heroCommandKey = primary && UNITS[primary.type]?.isHero
+      ? `hero:${primary.heroLevel ?? 1}:${primary.heroSkillPoints ?? 0}:${JSON.stringify(primary.abilityLevels ?? {})}:${primary.isDead ? 'dead' : 'live'}`
+      : ''
+    const divineShieldKey = primary?.type === 'paladin'
+      ? `ds:${Math.ceil(Math.max(0, primary.divineShieldUntil - this.gameTime) * 10)}:${Math.ceil(Math.max(0, primary.divineShieldCooldownUntil - this.gameTime) * 10)}`
+      : ''
+    const resurrectionKey = primary?.type === 'paladin'
+      ? `res:${Math.ceil(Math.max(0, primary.resurrectionCooldownUntil - this.gameTime) * 10)}:${primary.resurrectionLastRevivedCount}:${Math.ceil(Math.max(0, primary.resurrectionFeedbackUntil - this.gameTime) * 10)}`
+      : ''
     const selKey = primary
-      ? `${primary.type}:${primary.team}:${bpKey}:${res.gold}:${res.lumber}:${supply.used}:${supply.total}:${queuedSupply}:${primaryQueueKey}`
+      ? `${primary.type}:${primary.team}:${bpKey}:${res.gold}:${res.lumber}:${supply.used}:${supply.total}:${queuedSupply}:${primaryQueueKey}:${primaryReviveKey}:${heroReviveStateKey}:${prereqKey}:${researchKey}:${rallyCooldownKey}:${cmdManaKey}:${cmdHealCdKey}:${upgradeKey}:${morphKey}:${defendKey}:${heroCommandKey}:${divineShieldKey}:${resurrectionKey}`
       : ''
     if (selKey === this._lastCmdKey) return
     this._lastCmdKey = selKey
@@ -3811,8 +5523,8 @@ export class Game {
     this.elCommandCard.innerHTML = ''
 
     if (this.selectedUnits.length === 0 || !primary || primary.team !== 0) {
-      // 显示8个空插槽
-      for (let i = 0; i < 8; i++) {
+      // 显示固定命令卡空槽，保持 HUD 布局稳定。
+      for (let i = 0; i < COMMAND_CARD_SLOT_COUNT; i++) {
         const slot = document.createElement('div')
         slot.className = 'cmd-slot'
         this.elCommandCard.appendChild(slot)
@@ -3832,7 +5544,7 @@ export class Game {
         const availability = this.getBuildAvailability(capturedKey, 0)
         buttons.push({
           label: def.name,
-          cost: `${def.cost.gold}g ${def.cost.lumber}w`,
+          cost: `${def.cost.gold}g ${def.cost.lumber}w · ${def.buildTime}s`,
           enabled: availability.ok,
           disabledReason: availability.reason,
           onClick: () => {
@@ -3842,6 +5554,29 @@ export class Game {
           },
         })
       }
+      // Call to Arms — Militia morph (HN4-IMPL2)
+      const cta = ABILITIES.call_to_arms
+      const nearHall = this.units.some(u =>
+        this.isMainHall(u.type) &&
+        u.team === 0 &&
+        u.buildProgress >= 1 &&
+        u.hp > 0 &&
+        u.mesh.position.distanceTo(primary.mesh.position) <= cta.range
+      )
+      buttons.push({
+        label: cta.name,
+        cost: `${cta.duration}s`,
+        enabled: nearHall,
+        disabledReason: nearHall ? '' : '需要靠近城镇大厅',
+        onClick: () => {
+          const sel = this.selectedUnits.filter((u) => u.type === 'worker' && u.team === 0 && !u.isBuilding)
+          for (const u of sel) {
+            this.morphToMilitia(u)
+          }
+          this._lastCmdKey = ''
+        },
+        hotkey: 'T',
+      })
     }
 
     // 未完成建筑：显示取消建造
@@ -3880,8 +5615,367 @@ export class Game {
         onClick: () => { this.enterAttackMoveMode() },
         hotkey: 'A',
       })
-    }
+      // Rally Call — Human identity ability
+      const rallyOnCooldown = primary.rallyCallCooldownUntil > this.gameTime
+      const rallyReason = rallyOnCooldown
+        ? `冷却中 ${(primary.rallyCallCooldownUntil - this.gameTime).toFixed(0)}s`
+        : ''
+      buttons.push({
+        label: '集结号令',
+        cost: `伤害+${ABILITIES.rally_call.effectValue} ${ABILITIES.rally_call.duration}s`,
+        enabled: !rallyOnCooldown,
+        disabledReason: rallyReason,
+        onClick: () => {
+          const sel = this.selectedUnits.filter((u) => u.team === 0 && !u.isBuilding)
+          for (const u of sel) {
+            this.triggerRallyCall(u)
+          }
+          this._lastCmdKey = '' // force refresh
+        },
+        hotkey: 'R',
+      })
+      const defend = ABILITIES.defend
+      const isDefendOwner = (unit: Unit) => Array.isArray(defend.ownerType)
+        ? defend.ownerType.includes(unit.type)
+        : unit.type === defend.ownerType
+      if (isDefendOwner(primary)) {
+        const nextActive = !primary.defendActive
+        buttons.push({
+          label: primary.defendActive ? `${defend.name} ✓` : defend.name,
+          cost: `穿刺伤害×${defend.damageReduction ?? 1} 移速×${defend.speedMultiplier ?? 1}`,
+          onClick: () => {
+            const sel = this.selectedUnits.filter((u) => isDefendOwner(u))
+            for (const u of sel) {
+              this.setDefend(u, nextActive)
+            }
+            this._lastCmdKey = ''
+          },
+          hotkey: 'D',
+        })
+      }
+      // Heal — Priest ability
+      if (primary.type === 'priest') {
+        const healOnCooldown = primary.healCooldownUntil > this.gameTime
+        const noMana = primary.mana < (ABILITIES.priest_heal.cost.mana ?? 0)
+        const healReason = healOnCooldown
+          ? `治疗冷却中 ${(primary.healCooldownUntil - this.gameTime).toFixed(1)}s`
+          : noMana
+            ? '魔力不足'
+            : ''
+        buttons.push({
+          label: '治疗',
+          cost: `💧${ABILITIES.priest_heal.cost.mana ?? 0} 回复${ABILITIES.priest_heal.effectValue}HP`,
+          enabled: !healOnCooldown && !noMana,
+          disabledReason: healReason,
+          onClick: () => {
+            // Manual heal: find lowest-HP injured friendly in range
+            const injuredFriendlies = this.units
+              .filter(u => u.team === 0 && u.hp > 0 && !u.isBuilding && u.hp < u.maxHp
+                && u.mesh.position.distanceTo(primary.mesh.position) <= ABILITIES.priest_heal.range)
+              .sort((a, b) => (a.hp / a.maxHp) - (b.hp / b.maxHp))
+            if (injuredFriendlies.length > 0) {
+              this.castHeal(primary, injuredFriendlies[0])
+            }
+            this._lastCmdKey = '' // force refresh
+          },
+          hotkey: 'E',
+        })
+      }
+      const btw = ABILITIES.back_to_work
+      const isBackToWorkOwner = (unit: Unit) => Array.isArray(btw.ownerType)
+        ? btw.ownerType.includes(unit.type)
+        : unit.type === btw.ownerType
+      if (isBackToWorkOwner(primary) && primary.morphExpiresAt > 0) {
+        buttons.push({
+          label: btw.name,
+          cost: '',
+          onClick: () => {
+            const sel = this.selectedUnits.filter((u) => isBackToWorkOwner(u) && u.morphExpiresAt > 0)
+            for (const u of sel) {
+              this.backToWork(u)
+            }
+            this._lastCmdKey = '' // force refresh
+          },
+          hotkey: 'B',
+        })
+      }
+      // Slow — Sorceress ability
+      if (primary.type === 'sorceress') {
+        const slow = ABILITIES.slow
+        const noMana = primary.mana < (slow.cost.mana ?? 0)
+        buttons.push({
+          label: slow.name,
+          cost: `💧${slow.cost.mana ?? 0} 移速×${slow.speedMultiplier ?? 1} ${slow.duration}s`,
+          enabled: !noMana,
+          disabledReason: noMana ? '魔力不足' : '',
+          onClick: () => {
+            const enemies = this.units
+              .filter(u => u.team !== primary.team && u.hp > 0 && !u.isBuilding
+                && u.mesh.position.distanceTo(primary.mesh.position) <= slow.range)
+              .sort((a, b) =>
+                a.mesh.position.distanceTo(primary.mesh.position)
+                - b.mesh.position.distanceTo(primary.mesh.position))
+            if (enemies.length > 0) {
+              this.castSlow(primary, enemies[0])
+            }
+            this._lastCmdKey = ''
+          },
+          hotkey: 'W',
+        })
+        // Auto-cast Slow toggle
+        const nextAutoCast = !primary.slowAutoCastEnabled
+        buttons.push({
+          label: primary.slowAutoCastEnabled ? `${slow.name} (自动) ✓` : `${slow.name} (自动)`,
+          cost: nextAutoCast ? '开启自动施法' : '关闭自动施法',
+          enabled: true,
+          onClick: () => {
+            const sel = this.selectedUnits.filter((u) => u.type === 'sorceress')
+            for (const u of sel) {
+              u.slowAutoCastEnabled = nextAutoCast
+            }
+            this._lastCmdKey = ''
+          },
+          hotkey: 'Q',
+        })
+      }
+      // Holy Light — Paladin hero ability (requires learned level)
+      if (primary.type === 'paladin') {
+        const hl = ABILITIES.holy_light
+        const learnedLevel = primary.abilityLevels?.holy_light ?? 0
+        const hlDef = HERO_ABILITY_LEVELS.holy_light
 
+        // Learn button: visible when skill points available and next level exists
+        if (learnedLevel < hlDef.maxLevel) {
+          const sp = primary.heroSkillPoints ?? 0
+          const nextLevel = learnedLevel + 1
+          const nextData = hlDef.levels[nextLevel - 1]
+          const heroLvl = primary.heroLevel ?? 1
+          const meetsHeroLvl = heroLvl >= nextData.requiredHeroLevel
+          const isDead = !!primary.isDead
+          const canLearn = sp > 0 && meetsHeroLvl && !isDead
+          let learnReason = ''
+          if (isDead) learnReason = '已死亡'
+          else if (sp <= 0) learnReason = '无技能点'
+          else if (!meetsHeroLvl) learnReason = `需要英雄等级 ${nextData.requiredHeroLevel}`
+          buttons.push({
+            label: `学习圣光术 (Lv${nextLevel})`,
+            cost: `治疗${nextData.effectValue} 亡灵${nextData.undeadDamage}`,
+            enabled: canLearn,
+            disabledReason: learnReason,
+            onClick: () => {
+              const currentLevel = primary.abilityLevels?.holy_light ?? 0
+              const currentNextLevel = currentLevel + 1
+              const currentNextData = hlDef.levels[currentNextLevel - 1]
+              if (!currentNextData || currentLevel >= hlDef.maxLevel) return
+              if ((primary.heroSkillPoints ?? 0) <= 0) return
+              if (primary.isDead) return
+              if ((primary.heroLevel ?? 1) < currentNextData.requiredHeroLevel) return
+              if (!primary.abilityLevels) primary.abilityLevels = {}
+              primary.abilityLevels.holy_light = currentNextLevel
+              primary.heroSkillPoints = (primary.heroSkillPoints ?? 1) - 1
+              this._lastCmdKey = ''
+            },
+            hotkey: 'L',
+          })
+        }
+
+        // Cast button: only when at least level 1 learned
+        if (learnedLevel >= 1) {
+          const displayLevel = Math.min(learnedLevel, hlDef.maxLevel)
+          const levelData = hlDef.levels[displayLevel - 1]
+          if (levelData) {
+            const hlOnCooldown = primary.healCooldownUntil > this.gameTime
+            const noMana = primary.mana < levelData.mana
+            let hlReason = ''
+            if (hlOnCooldown) hlReason = `冷却中 ${(primary.healCooldownUntil - this.gameTime).toFixed(1)}s`
+            else if (noMana) hlReason = '魔力不足'
+            buttons.push({
+              label: `${hl.name} (Lv${displayLevel})`,
+              cost: `💧${levelData.mana} 回复${levelData.effectValue}HP`,
+              enabled: !hlOnCooldown && !noMana,
+              disabledReason: hlReason,
+              onClick: () => {
+                const injuredFriendlies = this.units
+                  .filter(u => u.team === 0 && u.hp > 0 && !u.isBuilding && u.hp < u.maxHp
+                    && u !== primary
+                    && u.mesh.position.distanceTo(primary.mesh.position) <= levelData.range)
+                  .sort((a, b) => (a.hp / a.maxHp) - (b.hp / b.maxHp))
+                if (injuredFriendlies.length > 0) {
+                  this.castHolyLight(primary, injuredFriendlies[0])
+                }
+                this._lastCmdKey = ''
+              },
+              hotkey: 'E',
+            })
+          }
+        }
+
+        // Divine Shield — learn button only (no cast in IMPL1A)
+        const dsDef = HERO_ABILITY_LEVELS.divine_shield
+        if (dsDef) {
+          const dsLearned = primary.abilityLevels?.divine_shield ?? 0
+          if (dsLearned < dsDef.maxLevel) {
+            const sp = primary.heroSkillPoints ?? 0
+            const nextLevel = dsLearned + 1
+            const nextData = dsDef.levels[nextLevel - 1]
+            const heroLvl = primary.heroLevel ?? 1
+            const meetsHeroLvl = heroLvl >= nextData.requiredHeroLevel
+            const isDead = !!primary.isDead
+            const canLearn = sp > 0 && meetsHeroLvl && !isDead
+            let learnReason = ''
+            if (isDead) learnReason = '已死亡'
+            else if (sp <= 0) learnReason = '无技能点'
+            else if (!meetsHeroLvl) learnReason = `需要英雄等级 ${nextData.requiredHeroLevel}`
+            buttons.push({
+              label: `学习神圣护盾 (Lv${nextLevel})`,
+              cost: `无敌${nextData.duration}s 冷却${nextData.cooldown}s`,
+              enabled: canLearn,
+              disabledReason: learnReason,
+              onClick: () => {
+                const currentLevel = primary.abilityLevels?.divine_shield ?? 0
+                const currentNextLevel = currentLevel + 1
+                const currentNextData = dsDef.levels[currentNextLevel - 1]
+                if (!currentNextData || currentLevel >= dsDef.maxLevel) return
+                if ((primary.heroSkillPoints ?? 0) <= 0) return
+                if (primary.isDead) return
+                if ((primary.heroLevel ?? 1) < currentNextData.requiredHeroLevel) return
+                if (!primary.abilityLevels) primary.abilityLevels = {}
+                primary.abilityLevels.divine_shield = currentNextLevel
+                primary.heroSkillPoints = (primary.heroSkillPoints ?? 1) - 1
+                this._lastCmdKey = ''
+              },
+              hotkey: 'D',
+            })
+          }
+          // Divine Shield — cast button (self-cast invulnerability)
+          if (dsLearned >= 1) {
+            const displayLevel = Math.min(dsLearned, dsDef.maxLevel)
+            const levelData = dsDef.levels[displayLevel - 1]
+            if (levelData) {
+              const dsActive = primary.divineShieldUntil > this.gameTime
+              const dsOnCooldown = primary.divineShieldCooldownUntil > this.gameTime
+              const noMana = primary.mana < levelData.mana
+              let dsReason = ''
+              if (dsActive) dsReason = `生效中 ${(primary.divineShieldUntil - this.gameTime).toFixed(1)}s`
+              else if (dsOnCooldown) dsReason = `冷却中 ${(primary.divineShieldCooldownUntil - this.gameTime).toFixed(1)}s`
+              else if (noMana) dsReason = '魔力不足'
+              buttons.push({
+                label: `神圣护盾 (Lv${displayLevel})`,
+                cost: `💧${levelData.mana} 无敌${levelData.duration ?? 0}s`,
+                enabled: !dsActive && !dsOnCooldown && !noMana,
+                disabledReason: dsReason,
+                onClick: () => {
+                  this.castDivineShield(primary)
+                  this._lastCmdKey = ''
+                },
+                hotkey: 'D',
+              })
+            }
+          }
+        }
+        // Devotion Aura — learn button only (passive, no cast button)
+        const daDef = HERO_ABILITY_LEVELS.devotion_aura
+        if (daDef) {
+          const daLearned = primary.abilityLevels?.devotion_aura ?? 0
+          if (daLearned < daDef.maxLevel) {
+            const sp = primary.heroSkillPoints ?? 0
+            const nextLevel = daLearned + 1
+            const nextData = daDef.levels[nextLevel - 1]
+            const heroLvl = primary.heroLevel ?? 1
+            const meetsHeroLvl = heroLvl >= nextData.requiredHeroLevel
+            const isDead = !!primary.isDead
+            const canLearn = sp > 0 && meetsHeroLvl && !isDead
+            let learnReason = ''
+            if (isDead) learnReason = '已死亡'
+            else if (sp <= 0) learnReason = '无技能点'
+            else if (!meetsHeroLvl) learnReason = `需要英雄等级 ${nextData.requiredHeroLevel}`
+            buttons.push({
+              label: `学习虔诚光环 (Lv${nextLevel})`,
+              cost: `护甲+${nextData.armorBonus ?? 0} 半径${nextData.auraRadius ?? 0}`,
+              enabled: canLearn,
+              disabledReason: learnReason,
+              onClick: () => {
+                const currentLevel = primary.abilityLevels?.devotion_aura ?? 0
+                const currentNextLevel = currentLevel + 1
+                const currentNextData = daDef.levels[currentNextLevel - 1]
+                if (!currentNextData || currentLevel >= daDef.maxLevel) return
+                if ((primary.heroSkillPoints ?? 0) <= 0) return
+                if (primary.isDead) return
+                if ((primary.heroLevel ?? 1) < currentNextData.requiredHeroLevel) return
+                if (!primary.abilityLevels) primary.abilityLevels = {}
+                primary.abilityLevels.devotion_aura = currentNextLevel
+                primary.heroSkillPoints = (primary.heroSkillPoints ?? 1) - 1
+                this._lastCmdKey = ''
+              },
+              hotkey: 'V',
+            })
+          }
+        }
+        // Resurrection — learn button + cast button
+        const resDef = HERO_ABILITY_LEVELS.resurrection
+        if (resDef) {
+          const resLearned = primary.abilityLevels?.resurrection ?? 0
+          if (resLearned < resDef.maxLevel) {
+            const sp = primary.heroSkillPoints ?? 0
+            const nextLevel = resLearned + 1
+            const nextData = resDef.levels[nextLevel - 1]
+            const heroLvl = primary.heroLevel ?? 1
+            const meetsHeroLvl = heroLvl >= nextData.requiredHeroLevel
+            const isDead = !!primary.isDead
+            const canLearn = sp > 0 && meetsHeroLvl && !isDead
+            let learnReason = ''
+            if (isDead) learnReason = '已死亡'
+            else if (sp <= 0) learnReason = '无技能点'
+            else if (!meetsHeroLvl) learnReason = `需要英雄等级 ${nextData.requiredHeroLevel}`
+            buttons.push({
+              label: `学习复活 (Lv${nextLevel})`,
+              cost: `复活最多${nextData.maxTargets ?? 0}个友方单位`,
+              enabled: canLearn,
+              disabledReason: learnReason,
+              onClick: () => {
+                const currentLevel = primary.abilityLevels?.resurrection ?? 0
+                const currentNextLevel = currentLevel + 1
+                const currentNextData = resDef.levels[currentNextLevel - 1]
+                if (!currentNextData || currentLevel >= resDef.maxLevel) return
+                if ((primary.heroSkillPoints ?? 0) <= 0) return
+                if (primary.isDead) return
+                if ((primary.heroLevel ?? 1) < currentNextData.requiredHeroLevel) return
+                if (!primary.abilityLevels) primary.abilityLevels = {}
+                primary.abilityLevels.resurrection = currentNextLevel
+                primary.heroSkillPoints = (primary.heroSkillPoints ?? 1) - 1
+                this._lastCmdKey = ''
+              },
+              hotkey: 'R',
+            })
+          }
+          // Cast button — shown when Resurrection is learned
+          if (resLearned >= 1) {
+            const levelData = resDef.levels[0]
+            const isDead = !!primary.isDead
+            const notEnoughMana = primary.mana < levelData.mana
+            const onCooldown = this.gameTime < primary.resurrectionCooldownUntil
+            const hasTargets = this.getResurrectionEligibleRecordIndices(primary, levelData).length > 0
+            const canCast = !isDead && !notEnoughMana && !onCooldown && hasTargets
+            let castReason = ''
+            if (isDead) castReason = '已死亡'
+            else if (notEnoughMana) castReason = '法力不足'
+            else if (onCooldown) castReason = `冷却中 ${(primary.resurrectionCooldownUntil - this.gameTime).toFixed(1)}s`
+            else if (!hasTargets) castReason = '无可复活单位'
+            buttons.push({
+              label: '复活',
+              cost: `法力${levelData.mana} 复活≤${levelData.maxTargets ?? 6}单位`,
+              enabled: canCast,
+              disabledReason: castReason,
+              onClick: () => {
+                this.castResurrection(primary)
+                this._lastCmdKey = ''
+              },
+              hotkey: 'R',
+            })
+          }
+        }
+      }
+    }
     // 城镇大厅/兵营：显示可训练的单位（支持多建筑选择 alpha）
     const buildingDef = BUILDINGS[primary.type]
     if (buildingDef?.trains && primary.buildProgress >= 1) {
@@ -3892,11 +5986,12 @@ export class Game {
       for (const uKey of buildingDef.trains) {
         const uDef = UNITS[uKey]
         if (!uDef) continue
+        if (uDef.isHero) continue // hero units use a dedicated summon path, not generic trains
         const capturedUKey = uKey
         const availability = this.getTrainAvailability(capturedUKey, 0)
         buttons.push({
           label: uDef.name,
-          cost: `${uDef.cost.gold}g`,
+          cost: `${uDef.cost.gold}g${uDef.cost.lumber > 0 ? ` ${uDef.cost.lumber}w` : ''} (${uDef.supply}口) · ${uDef.trainTime}s`,
           enabled: availability.ok,
           disabledReason: availability.reason,
           onClick: () => {
@@ -3915,13 +6010,159 @@ export class Game {
       })
     }
 
-    // 先渲染已填充的按钮（最多8个）
-    for (let i = 0; i < Math.min(buttons.length, 8); i++) {
+    // 英雄祭坛：英雄专用召唤路径（非通用 trains 循环）
+    if (buildingDef?.trains && primary.buildProgress >= 1) {
+      for (const heroKey of buildingDef.trains) {
+        const heroDef = UNITS[heroKey]
+        if (!heroDef || !heroDef.isHero) continue
+        const hasExistingHero = this.units.some(
+          u => u.team === 0 && u.type === heroKey && !u.isBuilding,
+        )
+        const hasQueuedHero = this.units.some(
+          u => u.team === 0 && u.isBuilding && u.trainingQueue.some((item: any) => item.type === heroKey),
+        )
+        const resourceReason = this.getCostBlockReason(0, heroDef.cost)
+        const supply = this.resources.computeSupply(0, this.units)
+        const queuedSupply = this.getQueuedSupply(0)
+        const supplyBlocked = supply.used + queuedSupply + heroDef.supply > supply.total
+        let disabledReason = ''
+        if (hasExistingHero) {
+          const isDeadHero = this.units.find(
+            u => u.team === 0 && u.type === heroKey && !u.isBuilding,
+          )?.isDead
+          disabledReason = isDeadHero ? `${heroDef.name}已阵亡（需复活）` : `${heroDef.name}已存活`
+        }
+        else if (hasQueuedHero) disabledReason = '正在召唤'
+        else if (resourceReason) disabledReason = resourceReason
+        else if (supplyBlocked) disabledReason = '人口不足'
+        const capturedHeroKey = heroKey
+        buttons.push({
+          label: heroDef.name,
+          cost: `${heroDef.cost.gold}g${heroDef.cost.lumber > 0 ? ` ${heroDef.cost.lumber}w` : ''} · ${heroDef.trainTime}s`,
+          enabled: !disabledReason,
+          disabledReason,
+          onClick: () => {
+            this.trainUnit(primary, capturedHeroKey)
+          },
+        })
+      }
+    }
+
+    // 英雄祭坛：复活按钮（死亡英雄存在时显示）
+    if (buildingDef?.trains && primary.buildProgress >= 1) {
+      for (const heroKey of buildingDef.trains) {
+        const heroDef = UNITS[heroKey]
+        if (!heroDef || !heroDef.isHero) continue
+        const deadHero = this.units.find(
+          u => u.team === 0 && u.type === heroKey && !u.isBuilding && u.isDead,
+        )
+        if (!deadHero) continue
+
+        const reviveQuote = this.getHeroReviveQuote(deadHero)
+        if (!reviveQuote) continue
+
+        // Check if already queued for revive on any altar
+        const isAlreadyQueued = this.units.some(
+          u => u.team === primary.team && u.isBuilding && u.reviveQueue.some((rv: any) => rv.heroType === heroKey),
+        )
+
+        let reviveDisabledReason = ''
+        if (isAlreadyQueued) reviveDisabledReason = '正在复活'
+        else {
+          reviveDisabledReason = this.getCostBlockReason(0, { gold: reviveQuote.gold, lumber: reviveQuote.lumber })
+        }
+
+        const capturedHeroKey = heroKey
+        buttons.push({
+          label: `复活${heroDef.name}`,
+          cost: `${reviveQuote.gold}g · ${reviveQuote.totalDuration}s`,
+          enabled: !reviveDisabledReason,
+          disabledReason: reviveDisabledReason,
+          onClick: () => {
+            this.startReviveHero(primary, capturedHeroKey)
+          },
+        })
+      }
+    }
+
+    // 建筑：显示升级按钮（如 Town Hall -> Keep）
+    if (buildingDef?.upgradeTo && primary.isBuilding && primary.buildProgress >= 1 && !primary.upgradeQueue) {
+      const upgradeDef = BUILDINGS[buildingDef.upgradeTo]
+      if (upgradeDef) {
+        const upgradeCost = upgradeDef.cost
+        const costReason = this.getCostBlockReason(0, upgradeCost)
+        buttons.push({
+          label: '升级主城',
+          cost: `${upgradeCost.gold}g ${upgradeCost.lumber}w · ${upgradeDef.buildTime}s`,
+          enabled: !costReason,
+          disabledReason: costReason,
+          onClick: () => {
+            this.startBuildingUpgrade(primary, buildingDef.upgradeTo!)
+          },
+        })
+      }
+    }
+
+    // 建筑：显示升级进度（如 Town Hall 正在升级为主城）
+    if (primary.isBuilding && primary.buildProgress >= 1 && primary.upgradeQueue) {
+      const targetDef = BUILDINGS[primary.upgradeQueue.targetType]
+      const remaining = Math.ceil(primary.upgradeQueue.remaining)
+      buttons.push({
+        label: `升级${targetDef?.name ?? '中'}…`,
+        cost: `${remaining}秒`,
+        enabled: false,
+        disabledReason: `正在升级${targetDef?.name ?? ''}`,
+        onClick: () => {},
+      })
+    }
+
+    // 建筑：显示可用研究（如铁匠铺的 Long Rifles）
+    if (buildingDef?.researches && primary.buildProgress >= 1) {
+      for (const rKey of buildingDef.researches) {
+        const rDef = RESEARCHES[rKey]
+        if (!rDef) continue
+        const capturedRKey = rKey
+        const avail = this.getResearchAvailability(capturedRKey, 0)
+        // If already completed, show completed state
+        if (this.hasCompletedResearch(capturedRKey, 0)) {
+          // 完成态仍展示研究效果，避免只显示“已完成”。
+          const effectDesc = rDef.effects?.map(e => `${e.stat === 'attackRange' ? '射程' : e.stat} +${e.value}`).join(', ') ?? ''
+          buttons.push({
+            label: `${rDef.name} ✓`,
+            cost: effectDesc || '已完成',
+            enabled: false,
+            disabledReason: '已研究',
+            onClick: () => {},
+          })
+        } else {
+          // 研究按钮展示费用和数据化效果。
+          const effectDesc = rDef.effects?.map(e => {
+            const unitName = UNITS[e.targetUnitType]?.name ?? e.targetUnitType
+            const statName = e.stat === 'attackRange' ? '射程' : e.stat
+            return `${unitName} ${statName}+${e.value}`
+          }).join(', ') ?? rDef.description
+          buttons.push({
+            label: rDef.name,
+            cost: `${rDef.cost.gold}g ${rDef.cost.lumber}w · ${effectDesc}`,
+            enabled: avail.ok,
+            disabledReason: avail.reason,
+            onClick: () => {
+              this.startResearch(primary, capturedRKey)
+            },
+          })
+        }
+      }
+    }
+
+    const renderedButtons = Math.min(buttons.length, COMMAND_CARD_SLOT_COUNT)
+
+    // 先渲染已填充的按钮。
+    for (let i = 0; i < renderedButtons; i++) {
       const b = buttons[i]
       this.addCommandButton(b.label, b.cost, b.onClick, b.hotkey, b.enabled ?? true, b.disabledReason ?? '')
     }
     // 剩余位置用空插槽补齐
-    for (let i = buttons.length; i < 8; i++) {
+    for (let i = renderedButtons; i < COMMAND_CARD_SLOT_COUNT; i++) {
       const slot = document.createElement('div')
       slot.className = 'cmd-slot'
       this.elCommandCard.appendChild(slot)
@@ -3966,9 +6207,47 @@ export class Game {
     return reasons.join(' / ')
   }
 
+  private getHeroReviveQuote(deadHero: Unit): { gold: number; lumber: number; totalDuration: number } | null {
+    const heroDef = UNITS[deadHero.type]
+    if (!heroDef?.isHero) return null
+
+    const level = deadHero.heroLevel ?? heroDef.heroLevel ?? 1
+    const goldFactor = Math.min(
+      HERO_REVIVE_RULES.goldBaseFactor + HERO_REVIVE_RULES.goldLevelFactor * (level - 1),
+      HERO_REVIVE_RULES.goldMaxFactor,
+    )
+    const gold = Math.min(
+      Math.floor(heroDef.cost.gold * goldFactor),
+      HERO_REVIVE_RULES.goldHardCap,
+    )
+    const lumberFactor = HERO_REVIVE_RULES.lumberBaseFactor + HERO_REVIVE_RULES.lumberLevelFactor * (level - 1)
+    const lumber = Math.floor(heroDef.cost.lumber * lumberFactor)
+    const rawTime = heroDef.trainTime * level * HERO_REVIVE_RULES.timeFactor
+    const cappedTime = Math.min(
+      rawTime,
+      heroDef.trainTime * HERO_REVIVE_RULES.timeMaxFactor,
+      HERO_REVIVE_RULES.timeHardCap,
+    )
+
+    return { gold, lumber, totalDuration: Math.round(cappedTime) }
+  }
+
   private getBuildAvailability(buildingType: string, team: number): { ok: boolean; reason: string } {
     const def = BUILDINGS[buildingType]
     if (!def) return { ok: false, reason: '不可用' }
+
+    // Tech prerequisite: require a completed building of the specified type
+    if (def.techPrereq) {
+      const hasPrereq = this.units.some(
+        u => u.team === team && u.type === def.techPrereq && u.isBuilding
+          && u.buildProgress >= 1 && u.hp > 0,
+      )
+      if (!hasPrereq) {
+        const prereqDef = BUILDINGS[def.techPrereq]
+        return { ok: false, reason: `需要${prereqDef?.name ?? def.techPrereq}` }
+      }
+    }
+
     const reason = this.getCostBlockReason(team, def.cost)
     return reason ? { ok: false, reason } : { ok: true, reason: '' }
   }
@@ -3976,6 +6255,33 @@ export class Game {
   private getTrainAvailability(unitType: string, team: number): { ok: boolean; reason: string } {
     const def = UNITS[unitType]
     if (!def) return { ok: false, reason: '不可用' }
+
+    // Tech prerequisite: require a completed building of the specified type
+    if (def.techPrereq) {
+      const hasPrereq = this.units.some(
+        u => u.team === team && u.type === def.techPrereq && u.isBuilding
+          && u.buildProgress >= 1 && u.hp > 0,
+      )
+      if (!hasPrereq) {
+        const prereqDef = BUILDINGS[def.techPrereq]
+        return { ok: false, reason: `需要${prereqDef?.name ?? def.techPrereq}` }
+      }
+    }
+
+    // Multi-building prerequisite: all buildings in techPrereqs must be completed
+    if (def.techPrereqs && def.techPrereqs.length > 0) {
+      for (const prereqKey of def.techPrereqs) {
+        const hasPrereq = this.units.some(
+          u => u.team === team && u.type === prereqKey && u.isBuilding
+            && u.buildProgress >= 1 && u.hp > 0,
+        )
+        if (!hasPrereq) {
+          const prereqDef = BUILDINGS[prereqKey]
+          return { ok: false, reason: `需要${prereqDef?.name ?? prereqKey}` }
+        }
+      }
+    }
+
     const resourceReason = this.getCostBlockReason(team, def.cost)
     if (resourceReason) return { ok: false, reason: resourceReason }
 
@@ -3987,9 +6293,74 @@ export class Game {
     return { ok: true, reason: '' }
   }
 
+  /** Start hero revive on an Altar */
+  private startReviveHero(altar: Unit, heroKey: string) {
+    if (altar.team !== 0) return
+    if (!altar.isBuilding || altar.buildProgress < 1) return
+    const buildingDef = BUILDINGS[altar.type]
+    if (!buildingDef?.trains?.includes(heroKey)) return
+
+    // Verify dead hero still exists
+    const deadHero = this.units.find(
+      u => u.team === altar.team && u.type === heroKey && !u.isBuilding && u.isDead,
+    )
+    if (!deadHero) return
+
+    // Reject if already queued on any altar
+    const alreadyQueued = this.units.some(
+      u => u.team === altar.team && u.isBuilding && u.reviveQueue.some((rv: any) => rv.heroType === heroKey),
+    )
+    if (alreadyQueued) return
+
+    const quote = this.getHeroReviveQuote(deadHero)
+    if (!quote) return
+
+    // Check and spend resources
+    if (!this.resources.canAfford(altar.team, { gold: quote.gold, lumber: quote.lumber })) return
+    this.resources.spend(altar.team, { gold: quote.gold, lumber: quote.lumber })
+
+    altar.reviveQueue.push({ heroType: heroKey, remaining: quote.totalDuration, totalDuration: quote.totalDuration })
+  }
+
+  private checkHeroLevelUp(hero: Unit) {
+    const currentLevel = hero.heroLevel ?? 1
+    if (currentLevel >= HERO_XP_RULES.maxHeroLevel) return
+    const nextLevel = currentLevel + 1
+    const threshold = HERO_XP_RULES.xpThresholdsByLevel[nextLevel]
+    if (threshold === undefined) return
+    if ((hero.heroXP ?? 0) < threshold) return
+    hero.heroLevel = nextLevel
+    hero.heroSkillPoints = (hero.heroSkillPoints ?? 0) + HERO_XP_RULES.skillPointsPerLevel
+    // Recurse for multi-level jumps
+    this.checkHeroLevelUp(hero)
+  }
+
   private trainUnit(building: Unit, unitType: string) {
     const def = UNITS[unitType]
     if (!def) return
+    if (def.isHero) {
+      const hasExistingHero = this.units.some(
+        u => u.team === building.team && u.type === unitType && !u.isBuilding,
+      )
+      const hasQueuedHero = this.units.some(
+        u => u.team === building.team && u.isBuilding && u.trainingQueue.some((item: any) => item.type === unitType),
+      )
+      if (hasExistingHero || hasQueuedHero) return
+    }
+    // Tech prerequisite gate — same check as getTrainAvailability
+    if (def.techPrereq && !this.units.some(
+      u => u.team === 0 && u.type === def.techPrereq && u.isBuilding
+        && u.buildProgress >= 1 && u.hp > 0,
+    )) return
+    // Multi-building prerequisite gate
+    if (def.techPrereqs) {
+      for (const prereqKey of def.techPrereqs) {
+        if (!this.units.some(
+          u => u.team === 0 && u.type === prereqKey && u.isBuilding
+            && u.buildProgress >= 1 && u.hp > 0,
+        )) return
+      }
+    }
     if (!this.resources.canAfford(0, def.cost)) return
 
     // 检查人口上限（含训练队列中的单位，防止超额训练）
@@ -4001,11 +6372,104 @@ export class Game {
     dispatchGameCommand([], { type: 'train', building, unitType, trainTime: def.trainTime })
   }
 
+  // ==================== 建筑升级（数据驱动主基地升级）====================
+
+  private startBuildingUpgrade(building: Unit, targetKey: string) {
+    const team = building.team
+    if (team !== 0) return
+    if (!building.isBuilding || building.buildProgress < 1) return
+    if (building.upgradeQueue) return // already upgrading
+
+    const currentDef = BUILDINGS[building.type]
+    if (currentDef?.upgradeTo !== targetKey) return
+
+    const targetDef = BUILDINGS[targetKey]
+    if (!targetDef) return
+    if (!this.resources.canAfford(team, targetDef.cost)) return
+
+    this.resources.spend(team, targetDef.cost)
+    dispatchGameCommand([], { type: 'upgradeBuilding', building, targetKey, upgradeTime: targetDef.buildTime })
+  }
+
+  // ==================== 研究 ====================
+
+  private getResearchAvailability(researchKey: string, team: number): { ok: boolean; reason: string } {
+    const def = RESEARCHES[researchKey]
+    if (!def) return { ok: false, reason: '不可用' }
+
+    // Already completed
+    if (this.hasCompletedResearch(researchKey, team)) {
+      return { ok: false, reason: '已研究' }
+    }
+
+    // Already in a research queue somewhere on this team
+    const inProgress = this.units.some(
+      u => u.team === team && u.isBuilding && u.researchQueue.some(r => r.key === researchKey),
+    )
+    if (inProgress) {
+      return { ok: false, reason: '正在研究中' }
+    }
+
+    // Required building
+    if (def.requiresBuilding) {
+      const hasBuilding = this.units.some(
+        u => u.team === team && u.type === def.requiresBuilding && u.isBuilding
+          && u.buildProgress >= 1 && u.hp > 0,
+      )
+      if (!hasBuilding) {
+        const bDef = BUILDINGS[def.requiresBuilding]
+        return { ok: false, reason: `需要${bDef?.name ?? def.requiresBuilding}` }
+      }
+    }
+
+    // Additional required buildings (multi-building prerequisites)
+    if (def.requiresBuildings?.length) {
+      const missing: string[] = []
+      for (const bType of def.requiresBuildings) {
+        const hasIt = this.units.some(
+          u => u.team === team && u.type === bType && u.isBuilding
+            && u.buildProgress >= 1 && u.hp > 0,
+        )
+        if (!hasIt) {
+          const bDef = BUILDINGS[bType]
+          missing.push(bDef?.name ?? bType)
+        }
+      }
+      if (missing.length > 0) {
+        return { ok: false, reason: `需要${missing.join('、')}` }
+      }
+    }
+
+    // Prerequisite research (ordered tier chain)
+    if (def.prerequisiteResearch) {
+      if (!this.hasCompletedResearch(def.prerequisiteResearch, team)) {
+        const preDef = RESEARCHES[def.prerequisiteResearch]
+        return { ok: false, reason: `需要先研究${preDef?.name ?? def.prerequisiteResearch}` }
+      }
+    }
+
+    // Resources
+    const reason = this.getCostBlockReason(team, def.cost)
+    if (reason) return { ok: false, reason }
+
+    return { ok: true, reason: '' }
+  }
+
+  private startResearch(building: Unit, researchKey: string) {
+    const def = RESEARCHES[researchKey]
+    if (!def) return
+    const team = building.team
+    if (!this.getResearchAvailability(researchKey, team).ok) return
+
+    this.resources.spend(team, def.cost)
+    building.researchQueue.push({ key: researchKey, remaining: def.researchTime })
+  }
+
   private updateTrainQueueUI() {
     this.elTrainQueue.innerHTML = ''
-    // 显示所有有训练队列的玩家建筑
+    // 显示所有有训练/研究队列的玩家建筑
     for (const unit of this.units) {
-      if (unit.team !== 0 || !unit.isBuilding || unit.trainingQueue.length === 0) continue
+      if (unit.team !== 0 || !unit.isBuilding) continue
       for (const item of unit.trainingQueue) {
         const def = UNITS[item.type]
         if (!def) continue
@@ -4014,6 +6478,16 @@ export class Game {
         const div = document.createElement('div')
         div.className = 'train-item'
         div.innerHTML = `${def.name} <div class="train-bar"><div class="train-fill" style="width:${pct}%"></div></div>`
+        this.elTrainQueue.appendChild(div)
+      }
+      for (const item of unit.researchQueue) {
+        const def = RESEARCHES[item.key]
+        if (!def) continue
+        const total = def.researchTime
+        const pct = ((total - item.remaining) / total) * 100
+        const div = document.createElement('div')
+        div.className = 'train-item'
+        div.innerHTML = `R: ${def.name} <div class="train-bar"><div class="train-fill" style="width:${pct}%"></div></div>`
         this.elTrainQueue.appendChild(div)
       }
     }
@@ -4102,14 +6576,12 @@ export class Game {
    * 替换当前程序化地形为真实war3地图
    */
   loadMap(mapData: ParsedMap) {
+    this.currentMapSource = { kind: 'parsed', mapData }
     this.phase.set(Phase.LoadingMap)
+    this.resetSessionStateForMapLoad()
+    this.clearLoadedMapRenderer()
 
     // ===== 1. 清理旧 W3X 渲染器（如果有）=====
-    if (this.w3xRenderer) {
-      disposeObject3DDeep(this.w3xRenderer.group)
-      this.w3xRenderer = null
-    }
-
     // ===== 2. 清理旧单位（含血条 GPU 资源）=====
     this.disposeAllUnits()
 
@@ -4155,6 +6627,70 @@ export class Game {
     this.createAI()
 
     this.phase.set(Phase.Playing)
+    this.syncSessionOverlays()
+  }
+
+  reloadCurrentMap(): boolean {
+    if (!this.currentMapSource) return false
+    if (this.currentMapSource.kind === 'procedural') {
+      this.resetToProceduralStart()
+    } else {
+      this.loadMap(this.currentMapSource.mapData)
+    }
+    return true
+  }
+
+  /**
+   * Return to menu: reset session to procedural start and freeze simulation.
+   * The caller (main.ts) is responsible for showing #menu-shell and syncing
+   * the source label after this call.
+   */
+  returnToMenu() {
+    this.resetToProceduralStart()
+    this.pauseGame()
+  }
+
+  private clearLoadedMapRenderer() {
+    if (!this.w3xRenderer) return
+    this.scene.remove(this.w3xRenderer.group)
+    disposeObject3DDeep(this.w3xRenderer.group)
+    this.w3xRenderer = null
+  }
+
+  private resetToProceduralStart() {
+    this.phase.set(Phase.LoadingMap)
+    this.resetSessionStateForMapLoad()
+    this.clearLoadedMapRenderer()
+
+    this.disposeAllUnits()
+    this.treeManager.disposeAll()
+
+    this.mapRuntime.reset()
+    this.terrain.groundPlane = this.proceduralGroundPlane
+    this.scene.add(this.terrain.mesh)
+    this.scene.add(this.proceduralGroundPlane)
+
+    const mapW = this.terrain.width
+    const mapH = this.terrain.height
+    this.occupancy.resize(mapW, mapH)
+    this.placementValidator.updateReferences(this.occupancy, this.mapRuntime)
+    this.pathingGrid.updateReferences(this.mapRuntime, this.occupancy)
+    this.treeManager.resize(mapW, mapH)
+
+    this.resources.reset()
+    this.resources.init(0, 500, 200)
+    this.resources.init(1, 500, 200)
+    this.spawnTrees()
+    this.spawnStartingUnits()
+    this.createAI()
+
+    this.cameraCtrl.updateMapBounds(mapW, mapH)
+    this.cameraCtrl.distance = 24
+    this.cameraCtrl.setTarget(13, 14)
+
+    this.currentMapSource = { kind: 'procedural' }
+    this.phase.set(Phase.Playing)
+    this.syncSessionOverlays()
   }
 
   /** 完整清理所有单位（模型 + 血条 + GPU 资源）*/
@@ -4170,10 +6706,11 @@ export class Game {
       disposeObject3DDeep(unit.mesh)
     }
     this.units = []
+    this.deadUnitRecords = []
     this.outlineObjects = []
     this.selectionModel.clear()
     this.sel.clearSelectionRings()
-    this._lastCmdKey = ''
+    this._lastCmdKey = '__disposed__'
     this._lastSelKey = ''
   }
 

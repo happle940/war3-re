@@ -1,0 +1,239 @@
+{
+  "pass_id": "public-share-asset-optimization-pass-a1-001",
+  "branch": "codex/asset-public-share",
+  "prepared_at": "2026-04-16",
+  "status": "optimization-pass-applied-runtime-replaced-fallback-proof-passed",
+  "source_proof": "docs/PUBLIC_SHARE_ASSET_OPTIMIZATION_PROOF_A1_001.zh-CN.md",
+  "tool": {
+    "name": "@gltf-transform/cli",
+    "version": "4.3.0",
+    "npm_cache": "/tmp/war3-re-gltf-npm-cache",
+    "note": "Initial parallel npx attempts failed with npm temporary cache corruption; final pass used an isolated cache and sequential commands."
+  },
+  "method": [
+    "prune",
+    "dedup",
+    "weld",
+    "prune"
+  ],
+  "compression": {
+    "draco": false,
+    "meshopt": false,
+    "texture_compression": false,
+    "runtime_decoder_changes_required": false
+  },
+  "artifacts": {
+    "originals": "artifacts/asset-intake/optimized/quaternius-a1-pass-001/originals/",
+    "work": "artifacts/asset-intake/optimized/quaternius-a1-pass-001/work/",
+    "final": "artifacts/asset-intake/optimized/quaternius-a1-pass-001/final/"
+  },
+  "runtime_replaced_files": [
+    {
+      "runtime_key": "barracks",
+      "target": "public/assets/models/vendor/quaternius/ultimate-fantasy-rts/barracks.glb",
+      "original": {
+        "bytes": 486740,
+        "kb": 475.3,
+        "sha256": "b62a47e6cf8cdacc87be9afb6c5201a6becaf3e2616fd5d6797958b00e99ef74",
+        "nodes": 2,
+        "meshes": 1,
+        "primitives": 9,
+        "materials": 9,
+        "accessors": 36,
+        "bufferViews": 36,
+        "vertices": 13546,
+        "triangles": 6900,
+        "textures": 0,
+        "images": 0,
+        "animations": 0
+      },
+      "optimized": {
+        "bytes": 374272,
+        "kb": 365.5,
+        "sha256": "1b6607319c7166daec71e60c0473cd85afa4df96a1d4cd4624d6ca7ab36e7de6",
+        "nodes": 2,
+        "meshes": 1,
+        "primitives": 9,
+        "materials": 9,
+        "accessors": 27,
+        "bufferViews": 10,
+        "vertices": 13546,
+        "triangles": 6900,
+        "textures": 0,
+        "images": 0,
+        "animations": 0
+      },
+      "saved_bytes": 112468,
+      "saved_percent": 23.11,
+      "same_visible_geometry_counts": true
+    },
+    {
+      "runtime_key": "farm",
+      "target": "public/assets/models/vendor/quaternius/ultimate-fantasy-rts/farm.glb",
+      "original": {
+        "bytes": 230864,
+        "kb": 225.5,
+        "sha256": "403cd4f1218f2d45392becbf63e1bec64df527152235f99895342c5dd2b8b2c2",
+        "nodes": 2,
+        "meshes": 1,
+        "primitives": 7,
+        "materials": 7,
+        "accessors": 28,
+        "bufferViews": 28,
+        "vertices": 6142,
+        "triangles": 4162,
+        "textures": 0,
+        "images": 0,
+        "animations": 0
+      },
+      "optimized": {
+        "bytes": 178512,
+        "kb": 174.3,
+        "sha256": "9ba5dfacf8e469b002e41a60e746fb7d5de64feb46903fb674a8e8174fa2a6bd",
+        "nodes": 2,
+        "meshes": 1,
+        "primitives": 7,
+        "materials": 7,
+        "accessors": 21,
+        "bufferViews": 8,
+        "vertices": 6142,
+        "triangles": 4162,
+        "textures": 0,
+        "images": 0,
+        "animations": 0
+      },
+      "saved_bytes": 52352,
+      "saved_percent": 22.68,
+      "same_visible_geometry_counts": true
+    }
+  ],
+  "slice_total": {
+    "before": {
+      "bytes": 1072168,
+      "kb": 1047.0,
+      "nodes": 10,
+      "meshes": 5,
+      "primitives": 28,
+      "materials": 28,
+      "accessors": 112,
+      "bufferViews": 112,
+      "vertices": 29054,
+      "triangles": 17390,
+      "textures": 0,
+      "images": 0,
+      "animations": 0
+    },
+    "after": {
+      "bytes": 907348,
+      "kb": 886.1,
+      "nodes": 10,
+      "meshes": 5,
+      "primitives": 28,
+      "materials": 28,
+      "accessors": 96,
+      "bufferViews": 66,
+      "vertices": 29054,
+      "triangles": 17390,
+      "textures": 0,
+      "images": 0,
+      "animations": 0
+    },
+    "saved_bytes": 164820,
+    "saved_kb": 160.9,
+    "saved_percent": 15.37
+  },
+  "current_runtime_files": [
+    {
+      "runtime_key": "townhall",
+      "target": "public/assets/models/vendor/quaternius/ultimate-fantasy-rts/town-center.glb",
+      "sha256": "fa7d33ff72092a96073b659eba5562ed1eadf5b60a8092d1321769b34e9177a5",
+      "status": "import-trial"
+    },
+    {
+      "runtime_key": "barracks",
+      "target": "public/assets/models/vendor/quaternius/ultimate-fantasy-rts/barracks.glb",
+      "sha256": "1b6607319c7166daec71e60c0473cd85afa4df96a1d4cd4624d6ca7ab36e7de6",
+      "status": "import-trial-optimized"
+    },
+    {
+      "runtime_key": "farm",
+      "target": "public/assets/models/vendor/quaternius/ultimate-fantasy-rts/farm.glb",
+      "sha256": "9ba5dfacf8e469b002e41a60e746fb7d5de64feb46903fb674a8e8174fa2a6bd",
+      "status": "import-trial-optimized"
+    },
+    {
+      "runtime_key": "goldmine",
+      "target": "public/assets/models/vendor/quaternius/ultimate-fantasy-rts/mine.glb",
+      "sha256": "cfbabb663904483aa9704b7ea63e053a58dbe882abbc2935e65f5a0425b21752",
+      "status": "import-trial"
+    },
+    {
+      "runtime_key": "goldmine_accent",
+      "target": "public/assets/models/vendor/quaternius/ultimate-fantasy-rts/resource-gold.glb",
+      "sha256": "a580525d732887e89ab7d538cefd6ce59c2d1657e5fea9f6b3839a484194faa7",
+      "status": "visual-only-composition"
+    },
+    {
+      "runtime_key": "tower",
+      "target": "public/assets/models/vendor/quaternius/ultimate-fantasy-rts/watch-tower.glb",
+      "sha256": "d70f8855cb45003b4f78a093a23eab61717f9246fdcdeca281bf6b341edb442a",
+      "status": "import-trial"
+    }
+  ],
+  "verification": [
+    {
+      "command": "gltf-transform validate artifacts/asset-intake/optimized/quaternius-a1-pass-001/final/barracks.glb",
+      "status": "passed",
+      "errors": 0,
+      "warnings": 0,
+      "infos": 0,
+      "hints": 0
+    },
+    {
+      "command": "gltf-transform validate artifacts/asset-intake/optimized/quaternius-a1-pass-001/final/farm.glb",
+      "status": "passed",
+      "errors": 0,
+      "warnings": 0,
+      "infos": 0,
+      "hints": 0
+    },
+    {
+      "command": "npm run build",
+      "status": "passed",
+      "note": "Vite large chunk warning remains."
+    },
+    {
+      "command": "npx tsc --noEmit -p tsconfig.app.json",
+      "status": "blocked-by-unrelated-wip",
+      "error": "src/game/Game.ts(2050,12): error TS2339: Property 'checkHeroLevelUp' does not exist on type 'Game'.",
+      "touched_by_this_pass": false
+    },
+    {
+      "command": "./scripts/run-runtime-tests.sh tests/asset-pipeline-regression.spec.ts tests/v3-asset-fallback-catalog-proof.spec.ts --reporter=list",
+      "status": "passed",
+      "passed": 11,
+      "failed": 0,
+      "duration": "2.1m"
+    },
+    {
+      "command": "./scripts/run-runtime-tests.sh tests/construction-lifecycle-regression.spec.ts --reporter=list --grep \"stopping an active builder leaves construction resumable\"",
+      "status": "passed",
+      "passed": 1,
+      "failed": 0,
+      "duration": "37.8s"
+    }
+  ],
+  "remaining_blockers": [
+    "No final public asset approval yet.",
+    "Five-building slice still misses the <=750 KB target.",
+    "Total primitives/materials remain 28/28.",
+    "Tree line not imported.",
+    "Help/Credits in-game surface still missing.",
+    "Human unit final asset route still missing."
+  ],
+  "recommended_next": [
+    "Tree line worker obstruction and lumber proof.",
+    "Resource Gold accent plus Goldmine composition proof is complete: docs/PUBLIC_SHARE_ASSET_GOLDMINE_COMPOSITION_PASS_A1_001.zh-CN.md.",
+    "Only consider material/primitive consolidation or geometry compression after loader decoder impact is planned."
+  ]
+}

@@ -1,0 +1,65 @@
+{
+  "proof_id": "public-share-asset-tree-line-worker-readability-a1-001",
+  "branch": "codex/asset-public-share",
+  "prepared_at": "2026-04-16",
+  "status": "tree-line-worker-readability-proof-passed",
+  "decision": "current-procedural-tree-line-kept-future-tree-art-still-unapproved",
+  "test": {
+    "path": "tests/tree-line-worker-readability-proof.spec.ts",
+    "command": "./scripts/run-runtime-tests.sh tests/tree-line-worker-readability-proof.spec.ts --reporter=list",
+    "result": "1 passed",
+    "duration_seconds": 17.6
+  },
+  "artifacts": {
+    "screenshot": "artifacts/asset-intake/preview/tree-line-worker-readability-a1-001.png",
+    "metrics": "artifacts/asset-intake/preview/tree-line-worker-readability-a1-001.json"
+  },
+  "metrics": {
+    "viewport": {
+      "width": 1280,
+      "height": 720
+    },
+    "source": "existing-tree-line",
+    "tree_tile": {
+      "x": 9,
+      "z": 7
+    },
+    "worker_tile": {
+      "x": 9,
+      "z": 8
+    },
+    "worker_south_of_tree": true,
+    "tree_tile_blocked": true,
+    "worker_tile_blocked": false,
+    "selected_count": 1,
+    "selection_ring_count": 1,
+    "worker_screen_bbox_px": {
+      "width": 72.33742056021924,
+      "height": 95.47806155100665
+    },
+    "tree_screen_bbox_px": {
+      "width": 79.17291570803548,
+      "height": 116.9918285110239
+    },
+    "selection_ring_bbox_px": {
+      "width": 68.01791828428861,
+      "height": 55.78218560384141
+    },
+    "worker_tree_overlap_ratio": 0.510610323443587,
+    "worker_center_below_tree_center": true
+  },
+  "product_readout": {
+    "current_tree_line_worker_readable": true,
+    "selection_ring_visible": true,
+    "tree_line_is_current_product_safe_fallback": true,
+    "final_tree_art_approved": false,
+    "quaternius_tree_group_direct_import_allowed": false
+  },
+  "future_tree_asset_requirements": [
+    "Re-run this proof for any new pine_tree GLB candidate.",
+    "Worker at the harvest edge must remain readable.",
+    "Selection ring must remain visible.",
+    "Tree tile must stay blocked while worker tile stays open.",
+    "Tree depletion must release blocker."
+  ]
+}

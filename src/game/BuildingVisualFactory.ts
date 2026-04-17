@@ -19,11 +19,96 @@ export function createBuildingVisual(type: string, team: number): THREE.Group {
   // 优先尝试 glTF
   const gltf = getLoadedModel(type)
   if (gltf) {
-    return applyTeamColorGLTF(gltf, team, type)
+    const visual = type === 'goldmine' ? composeGoldmineVisual(gltf) : gltf
+    return applyTeamColorGLTF(visual, team, type)
   }
 
   // Fallback: 程序几何体
   return createProxyBuilding(type, team)
+}
+
+function composeGoldmineVisual(mine: THREE.Group): THREE.Group {
+  const accent = getLoadedModel('goldmine_accent')
+  if (!accent) return mine
+
+  const root = new THREE.Group()
+  root.add(mine)
+
+  addGoldmineAccent(root, accent, {
+    name: 'goldmine-resource-gold-accent',
+    position: [0.55, 0.02, 0.95],
+    rotationY: -0.25,
+    scale: 1,
+  })
+  addGoldmineAccent(root, accent, {
+    name: 'goldmine-resource-gold-accent-left-vein',
+    position: [-0.62, 0.02, 0.72],
+    rotationY: 0.45,
+    scale: 0.74,
+  })
+  addGoldmineAccent(root, accent, {
+    name: 'goldmine-resource-gold-accent-right-pocket',
+    position: [0.92, 0.02, 0.2],
+    rotationY: -0.95,
+    scale: 0.62,
+  })
+  addGoldmineAccent(root, accent, {
+    name: 'goldmine-resource-gold-accent-back-pocket',
+    position: [-0.72, 0.02, -0.55],
+    rotationY: 2.35,
+    scale: 0.55,
+  })
+
+  root.add(createGoldmineReadabilityCue())
+
+  return root
+}
+
+function addGoldmineAccent(root: THREE.Group, source: THREE.Group, config: {
+  name: string
+  position: [number, number, number]
+  rotationY: number
+  scale: number
+}) {
+  const accent = source.clone(true)
+  accent.name = config.name
+  accent.position.set(...config.position)
+  accent.rotation.y = config.rotationY
+  accent.scale.multiplyScalar(config.scale)
+  root.add(accent)
+}
+
+const GOLDMINE_NUGGET_GEO = new THREE.OctahedronGeometry(0.16, 0)
+const GOLDMINE_NUGGET_MAT = new THREE.MeshStandardMaterial({
+  name: 'goldmine_readability_gold',
+  color: 0xffd24a,
+  emissive: 0x5c3600,
+  roughness: 0.5,
+  metalness: 0.18,
+})
+
+function createGoldmineReadabilityCue(): THREE.Group {
+  const cue = new THREE.Group()
+  cue.name = 'goldmine-gold-readability-cue'
+
+  const nuggets = [
+    { name: 'goldmine-gold-readability-cue-front', position: [-0.08, 0.2, 1.12], scale: [1.35, 0.7, 0.9], rotation: [0.15, 0.25, -0.1] },
+    { name: 'goldmine-gold-readability-cue-left', position: [-0.86, 0.16, 0.38], scale: [0.95, 0.58, 0.8], rotation: [0.2, -0.45, 0.05] },
+    { name: 'goldmine-gold-readability-cue-right', position: [0.96, 0.18, -0.12], scale: [0.82, 0.5, 0.76], rotation: [-0.1, 0.85, 0.2] },
+  ]
+
+  for (const item of nuggets) {
+    const nugget = new THREE.Mesh(GOLDMINE_NUGGET_GEO, GOLDMINE_NUGGET_MAT)
+    nugget.name = item.name
+    nugget.position.set(item.position[0], item.position[1], item.position[2])
+    nugget.scale.set(item.scale[0], item.scale[1], item.scale[2])
+    nugget.rotation.set(item.rotation[0], item.rotation[1], item.rotation[2])
+    nugget.castShadow = true
+    nugget.receiveShadow = true
+    cue.add(nugget)
+  }
+
+  return cue
 }
 
 /**
@@ -35,6 +120,7 @@ const TEAM_COLOR_SLOTS: Record<string, string[]> = {
   barracks: ['team_color', 'TeamColor'],
   farm: ['team_color', 'TeamColor'],
   tower: ['team_color', 'TeamColor'],
+  blacksmith: ['team_color', 'TeamColor'],
 }
 
 export function applyTeamColorGLTF(group: THREE.Group, team: number, type: string): THREE.Group {
@@ -70,6 +156,8 @@ function createProxyBuilding(type: string, team: number): THREE.Group {
     createProxyFarm(group)
   } else if (type === 'tower') {
     createProxyTower(group, color)
+  } else if (type === 'blacksmith') {
+    createProxyBlacksmith(group, color)
   } else if (type === 'goldmine') {
     createProxyGoldmine(group)
   } else {
@@ -347,6 +435,98 @@ function createProxyTower(group: THREE.Group, color: number) {
   )
   towerFlag.position.set(0.15, 3.35, 0)
   group.add(towerFlag)
+}
+
+function createProxyBlacksmith(group: THREE.Group, color: number) {
+  // size=3: industrial forge/smithy — molten metal + anvil identity
+  // Stone foundation
+  const stone = new THREE.Mesh(
+    new THREE.BoxGeometry(2.4, 0.3, 2.0),
+    new THREE.MeshLambertMaterial({ color: 0x606050 }),
+  )
+  stone.position.y = 0.15
+  group.add(stone)
+
+  // Main workshop body — dark timber
+  const body = new THREE.Mesh(
+    new THREE.BoxGeometry(2.0, 1.0, 1.6),
+    new THREE.MeshLambertMaterial({ color: 0x4a3020 }),
+  )
+  body.position.y = 0.8
+  group.add(body)
+
+  // Open forge front — dark recessed opening
+  const forgeOpening = new THREE.Mesh(
+    new THREE.BoxGeometry(0.8, 0.7, 0.08),
+    new THREE.MeshLambertMaterial({ color: 0x1a0a00 }),
+  )
+  forgeOpening.position.set(0, 0.65, 0.82)
+  group.add(forgeOpening)
+
+  // Forge glow — emissive orange interior
+  const forgeGlow = new THREE.Mesh(
+    new THREE.PlaneGeometry(0.6, 0.5),
+    new THREE.MeshLambertMaterial({ color: 0xff6600, emissive: 0x993300 }),
+  )
+  forgeGlow.position.set(0, 0.65, 0.76)
+  group.add(forgeGlow)
+
+  // Chimney — tall stone stack on back
+  const chimney = new THREE.Mesh(
+    new THREE.BoxGeometry(0.5, 1.6, 0.5),
+    new THREE.MeshLambertMaterial({ color: 0x706050 }),
+  )
+  chimney.position.set(0.5, 2.1, -0.3)
+  group.add(chimney)
+
+  // Smoke hint — dark top cap
+  const smokeCap = new THREE.Mesh(
+    new THREE.BoxGeometry(0.6, 0.1, 0.6),
+    new THREE.MeshLambertMaterial({ color: 0x333333 }),
+  )
+  smokeCap.position.set(0.5, 2.95, -0.3)
+  group.add(smokeCap)
+
+  // Anvil outside forge — iconic smith identity
+  const anvilBase = new THREE.Mesh(
+    new THREE.BoxGeometry(0.35, 0.3, 0.25),
+    new THREE.MeshLambertMaterial({ color: 0x444444 }),
+  )
+  anvilBase.position.set(-0.7, 0.15, 0.95)
+  group.add(anvilBase)
+  const anvilTop = new THREE.Mesh(
+    new THREE.BoxGeometry(0.50, 0.12, 0.30),
+    new THREE.MeshLambertMaterial({ color: 0x555555 }),
+  )
+  anvilTop.position.set(-0.7, 0.36, 0.95)
+  group.add(anvilTop)
+
+  // Roof — flat industrial style
+  const roof = new THREE.Mesh(
+    new THREE.BoxGeometry(2.2, 0.12, 1.8),
+    new THREE.MeshLambertMaterial({ color: 0x5c3a1e }),
+  )
+  roof.position.y = 1.36
+  group.add(roof)
+
+  // Team color banner on chimney
+  const bannerPole = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.03, 0.03, 0.9, 4),
+    new THREE.MeshLambertMaterial({ color: 0x888888 }),
+  )
+  bannerPole.position.set(-0.92, 1.45, 0.5)
+  group.add(bannerPole)
+  const banner = new THREE.Mesh(
+    new THREE.PlaneGeometry(0.4, 0.28),
+    new THREE.MeshLambertMaterial({ color, side: THREE.DoubleSide }),
+  )
+  banner.position.set(-0.92, 1.82, 0.5)
+  group.add(banner)
+
+  // Point light — warm forge glow
+  const forgeLight = new THREE.PointLight(0xff8833, 1.5, 6)
+  forgeLight.position.set(0, 0.8, 1.0)
+  group.add(forgeLight)
 }
 
 /**

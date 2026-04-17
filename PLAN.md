@@ -1,6 +1,6 @@
 # War3 RE - Project Control Plan
 
-> Last updated: 2026-04-12
+> Last updated: 2026-04-14
 > Live demo: [https://happle940.github.io/war3-re/](https://happle940.github.io/war3-re/)
 > This is the top-level project control document. It is not a feature wishlist.
 
@@ -18,39 +18,85 @@ Read these in order before starting any significant work:
 8. `/Users/zhaocong/Documents/war3-re/docs/WAR3_SYSTEM_ALIGNMENT_01.md`
 9. `/Users/zhaocong/Documents/war3-re/docs/WAR3_RULE_SYSTEM_ROADMAP.zh-CN.md`
 10. `/Users/zhaocong/Documents/war3-re/docs/WAR3_BENCHMARK_RESEARCH_01.md`
-11. `/Users/zhaocong/Documents/war3-re/docs/CODEX_HANDOFF_2026_04_11.md`
+11. `/Users/zhaocong/Documents/war3-re/docs/WAR3_ENDSTATE_GAP_ATLAS.zh-CN.md`
+12. `/Users/zhaocong/Documents/war3-re/docs/HUMAN_RACE_PARITY_AND_NUMERIC_SYSTEM.zh-CN.md`
+13. `/Users/zhaocong/Documents/war3-re/docs/V5_TO_V6_CURRENT_HANDOFF.zh-CN.md`
+14. `/Users/zhaocong/Documents/war3-re/docs/V6_NUMERIC_SYSTEM_TASK_SEED.zh-CN.md`
+15. `/Users/zhaocong/Documents/war3-re/docs/CODEX_HANDOFF_2026_04_11.md`
 
 Execution docs under `docs/OVERNIGHT_*.md` are historical task records or scoped work packets. They do not override this plan or the experience contract.
 
-## 1. North Star
+## 1. Goal Hierarchy
 
-Build a browser RTS prototype that a Warcraft III player can take seriously within the first five minutes.
+This plan now uses a layered goal model. The old sentence:
 
-The target is not a literal asset clone. The target is a legally safe, Warcraft III-like RTS slice where:
+> "Build a browser RTS prototype that a Warcraft III player can take seriously within the first five minutes."
 
-1. Player command ownership is trustworthy.
-2. The first five minutes produce a real playable loop.
-3. The battlefield is readable at normal RTS zoom.
-4. The live browser build is stable enough for repeated playtests.
+is still valid, but it is no longer treated as the entire project north star. It is the **current-stage north star**, not the full endstate.
+
+### 1.1 Long-horizon vision
+
+Build a legally safe, browser-native, Warcraft III-like RTS that is worth serious play beyond the opening minutes.
+
+That means the project must eventually have:
+
+1. trustworthy RTS command ownership
+2. readable battlefield language
+3. a real match loop, not just opening verbs
+4. enough strategic/system depth that it feels like a War3-like RTS rather than a thin web prototype
+5. stable external-playtest packaging when the core game is ready
+
+The long-horizon gap map for that endstate lives here:
+
+- `/Users/zhaocong/Documents/war3-re/docs/WAR3_ENDSTATE_GAP_ATLAS.zh-CN.md`
+
+### 1.2 Current-stage north star
+
+Current stage:
+
+**V6 War3 identity alpha**
+
+The first-five-minutes trust loop is no longer enough as the active north star. V2-V5 already established the page-product entry, battlefield clarity, short-match loop, strategy backbone, and the first visible Human tech branch.
+
+The current stage now asks whether the project is starting to look like a War3-like game system, not just a credible web RTS slice. V6 starts with the Human numeric foundation:
+
+1. units, buildings, research, and abilities move toward one numeric schema
+2. attack type, armor type, and research effects become reusable data
+3. player-visible numbers and disabled reasons come from real data
+4. AI uses the same rules instead of direct spawning or prerequisite bypass
+5. identity systems such as Militia, Defend, heroes, spells, items, or faction differences only proceed after the numeric foundation is not missing
+
+### 1.3 What this change means
+
+Do not over-read current progress.
+
+- Progress against the **current-stage north star** may be moderate-to-strong even while the project is still far from the full War3-like endstate.
+- `M2`-`M7` remain execution milestones, not the final mountain.
+- A milestone can be objectively green while the long-horizon War3 gap is still large.
 
 ## 2. Current Stage
 
 Current stage:
 
-**M2 live-reality closeout + M3 objective scale baseline complete**
+**V6 War3 identity alpha; current work starts with the Human numeric foundation**
 
 What this means:
 
 - The project is no longer an empty prototype.
 - Core RTS systems exist: selection, commands, resources, build, train, combat, AI, map loading, GitHub Pages.
-- Several earlier fake-green validations have been replaced with real runtime assertions.
-- Worker and key-building readability have stronger proxy implementations, but still require human approval on the live build.
+- V5 strategy backbone is engineering-closed: economy/production, build order, basic composition, and `Blacksmith -> Rifleman -> Long Rifles -> AI composition` have focused proof.
+- V6 must not start by randomly adding more units. It starts with `NUM-A` through `NUM-F` from `/Users/zhaocong/Documents/war3-re/docs/V6_NUMERIC_SYSTEM_TASK_SEED.zh-CN.md`.
 - The project passed the first user playability gate as `pass with visual debt`, but it is still not a convincing Warcraft III-like slice.
 - M2 objective packs completed so far: construction lifecycle, static defense combat, command-card disabled reasons, unit presence baseline, and combat-control contract.
 - M2 has a consolidated regression entrypoint: `npm run test:m2`.
 - M3 objective scale ratios are now guarded by `tests/m3-scale-measurement.spec.ts`; this is numeric proof, not human visual approval.
 - Latest user live feedback has been converted into M4 live-like runtime contracts: construction resume/cancel, tower attack reality, supply-block feedback, and unit body presence are covered by `tests/m4-player-reported-issues.spec.ts`.
-- Active GLM task: M4 War3 Command Surface Matrix, broadening those fixes into selected-unit + target + command-card contracts so future War3-alignment gaps are caught as system failures rather than isolated bugs.
+- M7 hardening now has accepted extraction slices for selection and placement boundaries, plus a focused HUD command-card cache transition proof.
+- The current playable scope is still extremely narrow compared with a true War3-like endstate: one Human-like data family, two units, five buildings/resources, no heroes, no spells, no upgrades, no second race, and no full strategy layer.
+- Current planning work must therefore distinguish:
+  - "current-stage RTS trust"
+  - "War3-like battlefield language"
+  - "full long-horizon War3-like depth"
 
 ## 3. Solved vs Not Solved
 
@@ -160,62 +206,86 @@ Codex and GLM should complete the objective task bundle before each milestone, t
 
 ## 7. Current Priority Stack
 
-### P0 - War3 Core Systems Alignment
+### P0 - V6 Human Numeric Foundation
 
 Status: active.
 
-The next goal is not another broad visual pass. The next goal is to make the existing verbs obey Warcraft-like RTS rules.
+This is the first layer of the V6 north star. The objective is to stop Human content from growing as scattered hard-coded values.
 
 Reference:
 
-- `/Users/zhaocong/Documents/war3-re/docs/WAR3_SYSTEM_ALIGNMENT_01.md`
+- `/Users/zhaocong/Documents/war3-re/docs/HUMAN_RACE_PARITY_AND_NUMERIC_SYSTEM.zh-CN.md`
+- `/Users/zhaocong/Documents/war3-re/docs/V6_NUMERIC_SYSTEM_TASK_SEED.zh-CN.md`
+- `/Users/zhaocong/Documents/war3-re/docs/V6_IDENTITY_SYSTEMS_REMAINING_GATES.zh-CN.md`
 
-Priority sub-systems:
+Current focus:
 
-1. Construction lifecycle: resume, interrupt, cancel, refund, cleanup. `completed`
-2. Static defense combat: arrow tower weapon stats and target acquisition. `completed`
-3. Command-card disabled reasons: supply/resource feedback. `completed`
-4. Unit collision and local avoidance baseline. `completed as baseline`
-5. Combat-control contract: manual move/stop/hold/attack-move during auto-aggro. `in progress`
+1. NUM-A Human numeric schema inventory
+2. NUM-B Human unit/building numeric ledger
+3. NUM-C attack type / armor type model
+4. NUM-D research effect data model
+5. NUM-E player-visible numeric hints
+6. NUM-F numeric proof plan
 
-### P1 - Visual Debt
+### P1 - War3 Battlefield Language
 
-Status: accepted debt from M1.
+Status: not passed.
 
-M1 passed with visual debt. Do not ignore it, but do not let it displace missing system rules.
+This is the next real mountain after the trust loop. The project must stop looking like a generic web RTS prototype and start reading like a War3-like battlefield.
 
-Visual debt includes:
+Reference:
 
-- final worker/building readability
-- terrain/base grammar
-- Warcraft-like scale and camera feel
-- legal asset/style direction
+- `/Users/zhaocong/Documents/war3-re/docs/WAR3_BENCHMARK_RESEARCH_01.md`
+- `/Users/zhaocong/Documents/war3-re/docs/WAR3_ENDSTATE_GAP_ATLAS.zh-CN.md`
 
-### P2 - First Five Minutes Playable Truth
+Includes:
 
-Status: passed at M1.
+- Human-like base grammar
+- TH / mine / tree-line / exit spatial relationships
+- worker / footman / building readability at default camera
+- camera / HUD / scale / footprint harmony
 
-The user confirmed:
+This remains human-judgment heavy even when numeric/runtime guards exist.
 
-- units/buildings can be seen enough to play
-- controls are broadly obedient
-- gather/build/train/combat is possible
-- AI applies pressure
-- base layout is basically playable
+### P2 - Match Loop Credibility
 
-### P3 - Terrain / Base Grammar
+Status: not passed.
 
-Status: planned after M2 core systems alignment.
+After battlefield language, the next gate is whether one full human-vs-AI short match actually makes sense.
 
-The battlefield still needs spatial grammar:
+Includes:
 
-- base area
-- mine area
-- tree front
-- exit path
-- combat approach
+- beginning -> pressure -> resolution or understandable stall
+- AI does not collapse into low-grade failure
+- player can defend, recover, and counter
+- win/loss state is understandable
 
-This requires human visual confirmation.
+### P3 - Long-Horizon War3-Like System Depth
+
+Status: mostly future work.
+
+This is where the project stops being a narrow RTS alpha and starts moving toward a true War3-like endstate.
+
+Includes:
+
+- richer Human tech/production depth
+- upgrades, prerequisites, broader roster, repair, rally semantics
+- stronger weapon/target/armor/damage models
+- better pathing, body blocking, and formation truth
+- later, heroes / creeps / items / race asymmetry if they remain in scope
+
+Do not confuse progress here with current-stage readiness; this is later mountain work.
+
+### P4 - Product Direction And External Packaging
+
+Status: future, and explicitly downstream of the core game.
+
+Includes:
+
+- visual identity decision
+- release/share boundary
+- README / Known Issues / playtest packet quality
+- whether the project is ready for private playtest or public share
 
 ## 8. Task Selection Rules
 

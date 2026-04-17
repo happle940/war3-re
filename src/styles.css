@@ -4,14 +4,40 @@
   box-sizing: border-box;
 }
 
-html, body {
+:root {
+  --ui-coal: rgba(5, 8, 6, 0.96);
+  --ui-iron: rgba(12, 16, 13, 0.94);
+  --ui-iron-light: rgba(24, 29, 24, 0.92);
+  --ui-line: rgba(168, 144, 72, 0.62);
+  --ui-line-soft: rgba(168, 144, 72, 0.22);
+  --ui-gold: #d8b95f;
+  --ui-gold-bright: #f1dc8d;
+  --ui-text: #eee1b5;
+  --ui-muted: #a9ad8d;
+  --ui-dim: #6f765f;
+  --ui-green: #46c653;
+  --ui-green-dark: #16712a;
+  --ui-blue: #5ca4d6;
+  --ui-red: #d05345;
+  --ui-shadow: rgba(0, 0, 0, 0.72);
+  --ui-radius: 6px;
+  --hud-bottom-height: 232px;
+}
+
+html,
+body {
   width: 100%;
   height: 100%;
   overflow: hidden;
-  background: #000;
-  font-family: 'Georgia', 'Times New Roman', serif;
-  color: #d4a846;
+  background: #020403;
+  font-family: "Palatino Linotype", Georgia, "Times New Roman", serif;
+  color: var(--ui-text);
   user-select: none;
+}
+
+button,
+label {
+  font-family: inherit;
 }
 
 #game-canvas {
@@ -20,268 +46,392 @@ html, body {
   display: block;
 }
 
-/* ===== HUD 布局 ===== */
+/* ===== HUD ===== */
 
 #hud {
   position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  pointer-events: none;
+  inset: 0;
   z-index: 10;
+  pointer-events: none;
 }
 
 #hud > * {
   pointer-events: auto;
 }
 
-/* ===== 顶部资源栏 ===== */
+#hud::before,
+#hud::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  pointer-events: none;
+}
+
+#hud::before {
+  top: 0;
+  height: 88px;
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.48), transparent);
+}
+
+#hud::after {
+  bottom: 0;
+  height: 240px;
+  background: linear-gradient(0deg, rgba(0, 0, 0, 0.42), transparent);
+}
+
+.hud-section-label {
+  height: 16px;
+  color: var(--ui-dim);
+  font-size: 10px;
+  line-height: 16px;
+  text-transform: none;
+  letter-spacing: 0;
+  white-space: nowrap;
+}
+
+/* ===== Top Bar ===== */
+
 #hud-top {
   position: absolute;
-  top: 0;
+  top: 8px;
   left: 50%;
-  transform: translateX(-50%);
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 24px;
-  padding: 9px 32px;
-  background: linear-gradient(180deg, rgba(10,8,3,0.97) 0%, rgba(20,16,6,0.85) 75%, transparent 100%);
-  border-bottom: 2px solid rgba(150, 125, 45, 0.5);
-  border-radius: 0 0 6px 6px;
-  min-width: 360px;
-  box-shadow: 0 3px 14px rgba(0,0,0,0.7);
+  gap: 18px;
+  min-width: 420px;
+  height: 38px;
+  padding: 0 28px;
+  transform: translateX(-50%);
+  border: 1px solid var(--ui-line-soft);
+  border-top: 0;
+  border-radius: 0 0 var(--ui-radius) var(--ui-radius);
+  background:
+    linear-gradient(180deg, rgba(20, 24, 18, 0.98), rgba(8, 11, 8, 0.92)),
+    linear-gradient(90deg, transparent, rgba(216, 185, 95, 0.1), transparent);
+  box-shadow:
+    0 12px 32px rgba(0, 0, 0, 0.46),
+    inset 0 -1px 0 rgba(241, 220, 141, 0.16);
+}
+
+#hud-top::before,
+#hud-top::after {
+  content: "";
+  position: absolute;
+  bottom: -1px;
+  width: 52px;
+  height: 1px;
+  background: var(--ui-line);
+}
+
+#hud-top::before {
+  left: 18px;
+}
+
+#hud-top::after {
+  right: 18px;
 }
 
 #resources {
   display: flex;
-  gap: 28px;
+  align-items: center;
+  gap: 10px;
 }
 
 .resource {
-  font-size: 17px;
-  font-weight: bold;
-  letter-spacing: 1.2px;
-  text-shadow: 1px 1px 3px rgba(0,0,0,0.9);
-  display: flex;
+  display: grid;
+  grid-template-columns: auto auto auto;
   align-items: center;
-  gap: 7px;
+  gap: 5px;
+  min-width: 78px;
+  height: 24px;
+  padding: 0 8px;
+  border: 1px solid rgba(168, 144, 72, 0.2);
+  border-radius: 4px;
+  background: rgba(3, 5, 4, 0.42);
+  color: var(--ui-gold-bright);
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1;
+  text-shadow: 0 2px 3px var(--ui-shadow);
+}
+
+.resource-label {
+  color: var(--ui-muted);
+  font-size: 11px;
+  font-weight: 400;
 }
 
 .resource .icon {
-  font-size: 15px;
-  filter: brightness(1.3);
+  font-size: 13px;
+  line-height: 1;
 }
 
-.resource .gold-icon { color: #ffdd44; }
-.resource .wood-icon { color: #88cc55; }
-.resource .food-icon { color: #ff9944; }
+.gold-icon {
+  color: #f4d86c;
+}
+
+.wood-icon {
+  color: #7dd363;
+}
+
+.food-icon {
+  color: #e6a560;
+}
 
 #game-time {
+  min-width: 68px;
+  padding-left: 16px;
+  border-left: 1px solid rgba(168, 144, 72, 0.24);
+  color: #b7b89d;
+  font-family: "Menlo", "Consolas", monospace;
   font-size: 14px;
-  color: #8a8a78;
-  font-family: monospace;
-  letter-spacing: 2px;
-  text-shadow: 1px 1px 2px rgba(0,0,0,0.8);
-  border-left: 1px solid rgba(100, 82, 30, 0.35);
-  padding-left: 24px;
+  line-height: 1;
+  text-align: right;
+  letter-spacing: 0;
+  text-shadow: 0 2px 3px var(--ui-shadow);
 }
 
-/* ===== 底部面板 ===== */
+/* ===== Bottom Command Console ===== */
+
 #hud-bottom {
   position: absolute;
-  bottom: 0;
   left: 0;
   right: 0;
-  display: flex;
-  align-items: stretch;
-  gap: 0;
-  height: 162px;
-  background: linear-gradient(0deg,
-    rgba(10, 8, 4, 0.98) 0%,
-    rgba(16, 13, 5, 0.97) 55%,
-    rgba(28, 22, 8, 0.5) 88%,
-    transparent 100%);
-  border-top: 2px solid rgba(140, 115, 40, 0.6);
-  box-shadow: 0 -3px 18px rgba(0,0,0,0.6);
+  bottom: 0;
+  z-index: 2;
+  display: grid;
+  grid-template-columns: minmax(280px, 330px) minmax(420px, 1fr) 168px 198px;
+  gap: 12px;
+  height: var(--hud-bottom-height);
+  padding: 12px 12px 10px;
+  overflow: hidden;
+  border-top: 1px solid rgba(216, 185, 95, 0.54);
+  background:
+    linear-gradient(0deg, rgba(3, 5, 4, 0.99) 0%, rgba(7, 10, 8, 0.98) 72%, rgba(7, 10, 8, 0.38) 100%);
+  box-shadow:
+    0 -18px 50px rgba(0, 0, 0, 0.5),
+    inset 0 1px 0 rgba(241, 220, 141, 0.1);
 }
 
-/* ===== 单位信息面板（左侧）===== */
+#unit-info,
+#command-zone,
+#train-zone,
+#minimap {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  border: 1px solid rgba(168, 144, 72, 0.24);
+  border-radius: var(--ui-radius);
+  background:
+    linear-gradient(180deg, rgba(22, 27, 22, 0.88), rgba(7, 10, 8, 0.92)),
+    radial-gradient(circle at 30% 0%, rgba(216, 185, 95, 0.09), transparent 45%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.045),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.72),
+    0 10px 26px rgba(0, 0, 0, 0.26);
+}
+
+#unit-info::before,
+#command-zone::before,
+#train-zone::before,
+#minimap::before {
+  content: "";
+  position: absolute;
+  top: 5px;
+  left: 8px;
+  right: 8px;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(216, 185, 95, 0.34), transparent);
+}
+
+/* ===== Selection Panel ===== */
+
 #unit-info {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 10px 14px;
-  width: 270px;
-  min-width: 270px;
-  border-right: 2px solid rgba(110, 90, 35, 0.55);
-  background: rgba(5, 4, 2, 0.55);
-  position: relative;
+  padding: 16px 14px 12px;
 }
 
-/* 左面板顶部内边线装饰 */
-#unit-info::before {
-  content: '';
-  position: absolute;
-  top: 6px;
-  right: 6px;
-  left: 6px;
-  height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(160, 130, 50, 0.25), transparent);
-}
-
-/* 单选容器 */
 #single-select {
-  display: flex;
+  display: grid;
+  grid-template-columns: 88px minmax(0, 1fr);
   align-items: center;
-  gap: 10px;
+  gap: 12px;
   width: 100%;
 }
 
 #unit-portrait {
-  width: 80px;
-  height: 80px;
-  border: 2px solid #6a5e2a;
-  background: rgba(12, 10, 4, 0.95);
-  box-shadow: inset 0 0 16px rgba(0,0,0,0.8), 0 0 3px rgba(140, 115, 40, 0.2);
-  flex-shrink: 0;
-  border-radius: 1px;
   position: relative;
+  width: 86px;
+  height: 86px;
   overflow: hidden;
+  border: 1px solid rgba(216, 185, 95, 0.54);
+  border-radius: 5px;
+  background:
+    radial-gradient(circle at 50% 40%, rgba(92, 164, 214, 0.12), transparent 54%),
+    linear-gradient(180deg, rgba(15, 20, 15, 0.95), rgba(3, 5, 4, 0.96));
+  box-shadow:
+    inset 0 0 20px rgba(0, 0, 0, 0.72),
+    0 0 0 1px rgba(0, 0, 0, 0.7);
+}
+
+#unit-portrait::after {
+  content: "";
+  position: absolute;
+  inset: 6px;
+  border: 1px solid rgba(216, 185, 95, 0.12);
+  border-radius: 4px;
+  pointer-events: none;
 }
 
 #portrait-canvas {
   display: block;
-  width: 76px;
-  height: 76px;
-  margin: 2px 0 0 0;
+  width: 82px;
+  height: 82px;
+  margin: 2px;
 }
 
-/* 类型标签（portrait 底部） */
 #unit-type-badge {
   display: none;
   position: absolute;
-  bottom: 2px;
   left: 50%;
+  bottom: 4px;
+  max-width: 74px;
+  padding: 2px 6px;
   transform: translateX(-50%);
-  padding: 1px 6px;
-  background: rgba(10, 8, 4, 0.9);
-  border: 1px solid #5a4e22;
-  color: #c8a840;
+  border: 1px solid rgba(216, 185, 95, 0.34);
+  border-radius: 4px;
+  background: rgba(3, 5, 4, 0.86);
+  color: var(--ui-gold-bright);
   font-size: 9px;
-  letter-spacing: 0.5px;
-  text-shadow: 1px 1px 1px rgba(0,0,0,0.8);
+  line-height: 1;
   white-space: nowrap;
-  border-radius: 1px;
+  text-overflow: ellipsis;
+  overflow: hidden;
 }
 
 #unit-details {
-  flex: 1;
   min-width: 0;
 }
 
 #unit-name {
-  font-size: 15px;
-  margin-bottom: 6px;
-  color: #f0dca0;
-  text-shadow: 1px 1px 3px rgba(0,0,0,0.9);
+  margin-bottom: 7px;
+  color: var(--ui-text);
+  font-size: 17px;
+  line-height: 1.1;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  letter-spacing: 0.3px;
+  text-shadow: 0 2px 3px var(--ui-shadow);
+}
+
+#unit-hp-bar,
+#multi-hp-bar {
+  position: relative;
+  overflow: hidden;
+  width: 100%;
+  border: 1px solid rgba(168, 144, 72, 0.34);
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.74);
+  box-shadow: inset 0 2px 7px rgba(0, 0, 0, 0.68);
 }
 
 #unit-hp-bar {
-  width: 100%;
-  height: 14px;
-  background: #0a0804;
-  border: 1px solid #5a4e22;
-  box-shadow: inset 0 1px 5px rgba(0,0,0,0.6);
-  position: relative;
+  height: 16px;
 }
 
-#unit-hp-fill {
+#multi-hp-bar {
+  height: 12px;
+}
+
+#unit-hp-fill,
+#multi-hp-fill {
   height: 100%;
   width: 100%;
-  background: linear-gradient(180deg, #30b830 0%, #1a7a1a 100%);
-  transition: width 0.3s;
-  box-shadow: inset 0 1px 0 rgba(255,255,255,0.15);
+  border-radius: 3px;
+  background: linear-gradient(180deg, var(--ui-green), var(--ui-green-dark));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.22);
+  transition: width 0.22s ease;
 }
 
 #unit-hp-text {
   position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
+  inset: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 9px;
-  font-weight: bold;
-  color: #fff;
-  text-shadow: 1px 1px 2px rgba(0,0,0,0.9);
-  font-family: monospace;
-  letter-spacing: 0.5px;
+  color: #fff5d8;
+  font-family: "Menlo", "Consolas", monospace;
+  font-size: 10px;
+  line-height: 1;
+  text-shadow: 0 2px 3px rgba(0, 0, 0, 0.9);
   pointer-events: none;
 }
 
 #unit-state {
-  font-size: 11px;
-  color: #a89856;
-  margin-top: 3px;
-  text-shadow: 1px 1px 2px rgba(0,0,0,0.6);
-  letter-spacing: 0.3px;
+  min-height: 16px;
+  margin-top: 5px;
+  color: var(--ui-muted);
+  font-size: 12px;
+  line-height: 1.25;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-/* 属性行 */
 #unit-stats {
   display: flex;
-  gap: 8px;
-  margin-top: 4px;
   flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 6px;
 }
 
 #unit-stats .stat {
-  font-size: 10px;
-  color: #908868;
-  text-shadow: 1px 1px 1px rgba(0,0,0,0.6);
-  letter-spacing: 0.2px;
+  min-height: 18px;
+  padding: 2px 6px;
+  border: 1px solid rgba(168, 144, 72, 0.18);
+  border-radius: 4px;
+  background: rgba(3, 5, 4, 0.42);
+  color: #c9cba7;
+  font-size: 11px;
+  line-height: 13px;
   white-space: nowrap;
 }
 
-/* ===== 多选面板 ===== */
+/* ===== Multi Select ===== */
+
 #multi-select {
   display: flex;
   flex-direction: column;
-  gap: 5px;
+  gap: 7px;
   width: 100%;
-  padding: 2px 0;
 }
 
 #multi-count {
-  font-size: 16px;
-  font-weight: bold;
-  color: #f0dca0;
-  text-shadow: 1px 1px 3px rgba(0,0,0,0.9);
-  text-align: center;
-  letter-spacing: 0.5px;
+  color: var(--ui-text);
+  font-size: 17px;
+  line-height: 1.15;
+  text-align: left;
 }
 
 #multi-breakdown {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
+  display: grid;
+  gap: 3px;
 }
 
 #multi-breakdown .breakdown-row {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 5px;
+  min-height: 20px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  color: #c9cba7;
   font-size: 12px;
-  color: #c0a850;
-  text-shadow: 1px 1px 2px rgba(0,0,0,0.7);
+  line-height: 1.2;
 }
 
 #multi-breakdown .breakdown-icon {
@@ -290,293 +440,637 @@ html, body {
   flex-shrink: 0;
 }
 
-/* 当前活跃子组（primary type）高亮 */
 #multi-breakdown .breakdown-primary {
-  color: #f0dca0;
-  background: rgba(180, 150, 50, 0.12);
-  border-left: 2px solid #b09530;
-  padding-left: 4px;
-  margin-left: -6px;
-}
-
-#multi-hp-bar {
-  width: 100%;
-  height: 10px;
-  background: #0a0804;
-  border: 1px solid #5a4e22;
-  box-shadow: inset 0 1px 3px rgba(0,0,0,0.5);
-  margin-top: 2px;
-}
-
-#multi-hp-fill {
-  height: 100%;
-  width: 100%;
-  background: linear-gradient(180deg, #30b830 0%, #1a7a1a 100%);
-  transition: width 0.3s;
-  box-shadow: inset 0 1px 0 rgba(255,255,255,0.15);
+  border: 1px solid rgba(216, 185, 95, 0.34);
+  background: rgba(216, 185, 95, 0.1);
+  color: var(--ui-gold-bright);
 }
 
 #multi-hp-text {
-  font-size: 10px;
-  color: #908868;
-  text-align: center;
-  font-family: monospace;
-  letter-spacing: 0.3px;
+  color: var(--ui-muted);
+  font-family: "Menlo", "Consolas", monospace;
+  font-size: 11px;
+  line-height: 1;
+  text-align: left;
 }
 
-/* ===== 命令卡面板（中间）===== */
+/* ===== Command Card ===== */
+
+#command-zone {
+  display: grid;
+  grid-template-rows: 18px 1fr;
+  padding: 10px 16px 12px;
+}
+
 #command-card {
   display: grid;
-  grid-template-columns: repeat(4, 66px);
-  grid-template-rows: repeat(2, 66px);
-  gap: 5px;
-  padding: 10px 18px;
-  flex: 1;
+  grid-template-columns: repeat(4, minmax(126px, 1fr));
+  grid-template-rows: repeat(4, 36px);
+  gap: 6px;
   justify-content: center;
   align-content: center;
-  background: rgba(3, 2, 1, 0.3);
-  position: relative;
+  justify-self: center;
+  width: min(100%, 1080px);
+  min-height: 0;
+  padding: 0;
 }
 
-/* 命令卡顶部装饰线 */
-#command-card::before {
-  content: '';
-  position: absolute;
-  top: 4px;
-  left: 12px;
-  right: 12px;
-  height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(160, 130, 50, 0.15), transparent);
+#command-card .cmd-slot,
+#command-card button {
+  width: 100%;
+  min-width: 0;
+  height: 36px;
+  border-radius: 5px;
 }
 
-/* 命令卡插槽（空位占位） */
 #command-card .cmd-slot {
-  width: 66px;
-  height: 66px;
-  border: 1px solid rgba(58, 48, 18, 0.4);
-  background: rgba(10, 8, 4, 0.5);
-  border-radius: 3px;
-  box-shadow: inset 0 1px 4px rgba(0,0,0,0.4);
+  border: 1px solid rgba(168, 144, 72, 0.1);
+  background:
+    linear-gradient(135deg, rgba(216, 185, 95, 0.035), transparent 42%),
+    rgba(0, 0, 0, 0.22);
+  opacity: 0.62;
+  box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.34);
 }
 
 #command-card button {
-  width: 66px;
-  height: 66px;
-  border: 2px solid #5a4e22;
-  background: linear-gradient(180deg, rgba(32,26,10,0.97) 0%, rgba(20,16,6,0.97) 100%);
-  color: #d4a846;
-  font-size: 10px;
-  cursor: pointer;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 1px;
-  line-height: 1.1;
-  box-shadow:
-    inset 0 1px 0 rgba(255,255,255,0.07),
-    inset 0 -1px 0 rgba(0,0,0,0.5),
-    0 1px 5px rgba(0,0,0,0.6);
-  border-radius: 3px;
-  transition: border-color 0.12s, background 0.12s, box-shadow 0.15s;
   position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: auto auto auto;
+  align-content: center;
+  row-gap: 2px;
+  padding: 4px 10px 4px 9px;
+  border: 1px solid rgba(168, 144, 72, 0.58);
+  background:
+    linear-gradient(90deg, rgba(216, 185, 95, 0.16), transparent 4px),
+    linear-gradient(180deg, rgba(31, 39, 31, 0.98), rgba(9, 13, 10, 0.98));
+  color: var(--ui-text);
+  cursor: pointer;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 2px 8px rgba(0, 0, 0, 0.34);
+  transition: transform 0.08s ease, border-color 0.12s ease, background 0.12s ease, box-shadow 0.12s ease;
 }
 
 #command-card button:hover {
-  background: linear-gradient(180deg, rgba(65,52,18,0.97) 0%, rgba(42,34,12,0.97) 100%);
-  border-color: #b09530;
+  border-color: rgba(241, 220, 141, 0.84);
+  background: linear-gradient(180deg, rgba(42, 51, 39, 0.98), rgba(16, 21, 15, 0.98));
   box-shadow:
-    inset 0 1px 0 rgba(255,255,255,0.12),
-    inset 0 -1px 0 rgba(0,0,0,0.3),
-    0 0 12px rgba(180, 150, 50, 0.2);
+    inset 0 1px 0 rgba(255, 255, 255, 0.12),
+    0 0 16px rgba(216, 185, 95, 0.2);
 }
 
 #command-card button:active {
-  background: linear-gradient(180deg, rgba(16,12,5,0.97) 0%, rgba(32,26,10,0.97) 100%);
-  border-color: #7a6825;
-  box-shadow: inset 0 2px 8px rgba(0,0,0,0.6);
-  transform: scale(0.97);
+  transform: translateY(1px);
 }
 
-/* 热键角标 */
+#command-card button:focus-visible,
+.page-shell-action-button:focus-visible,
+.map-load-btn:focus-visible {
+  outline: 2px solid var(--ui-blue);
+  outline-offset: 2px;
+}
+
+#command-card button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+  filter: grayscale(0.45);
+}
+
+#command-card button.cmd-disabled:hover {
+  border-color: rgba(168, 144, 72, 0.24);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
 #command-card button .btn-hotkey {
   position: absolute;
   top: 2px;
-  right: 3px;
-  font-size: 9px;
-  font-weight: bold;
-  font-family: monospace;
-  color: #807848;
-  text-shadow: 1px 1px 1px rgba(0,0,0,0.9);
+  right: 4px;
+  color: var(--ui-dim);
+  font-family: "Menlo", "Consolas", monospace;
+  font-size: 8px;
   line-height: 1;
 }
 
 #command-card button .btn-icon {
-  font-size: 20px;
+  color: var(--ui-gold);
+  font-size: 17px;
+  line-height: 1;
+  text-align: center;
 }
 
 #command-card button .btn-label {
-  font-size: 9px;
+  min-width: 0;
+  color: var(--ui-text);
+  font-size: 12px;
+  line-height: 1.05;
   white-space: nowrap;
-  text-shadow: 1px 1px 2px rgba(0,0,0,0.9);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+#command-card button .btn-cost,
+#command-card button .btn-reason {
+  min-width: 0;
+  font-size: 9px;
+  line-height: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 #command-card button .btn-cost {
-  font-size: 8px;
-  color: #8a7a48;
+  color: var(--ui-muted);
 }
 
 #command-card button .btn-reason {
-  font-size: 8px;
-  color: #d66;
-  text-shadow: 1px 1px 2px rgba(0,0,0,0.9);
+  color: #f19686;
 }
 
-#command-card button:disabled {
-  opacity: 0.55;
-  cursor: not-allowed;
-  filter: grayscale(0.45);
-  border-color: #42371a;
+/* ===== Training Queue ===== */
+
+#train-zone {
+  display: grid;
+  grid-template-rows: 18px 1fr;
+  padding: 8px 10px 10px;
 }
 
-#command-card button.cmd-disabled:hover {
-  background: linear-gradient(180deg, rgba(32,26,10,0.97) 0%, rgba(20,16,6,0.97) 100%);
-  border-color: #42371a;
-  box-shadow:
-    inset 0 1px 0 rgba(255,255,255,0.04),
-    inset 0 -1px 0 rgba(0,0,0,0.5),
-    0 1px 5px rgba(0,0,0,0.6);
-}
-
-/* ===== 训练队列 ===== */
 #train-queue {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  width: 152px;
-  min-width: 152px;
-  padding: 10px 12px;
-  justify-content: center;
-  border-left: 2px solid rgba(110, 90, 35, 0.55);
-  border-right: 2px solid rgba(110, 90, 35, 0.55);
-  background: rgba(5, 4, 2, 0.4);
+  display: grid;
+  align-content: center;
+  gap: 5px;
+  min-height: 0;
 }
 
 .train-item {
-  display: flex;
-  align-items: center;
-  gap: 6px;
+  display: grid;
+  grid-template-columns: minmax(42px, 1fr);
+  gap: 4px;
+  color: #c9cba7;
   font-size: 11px;
-  color: #bbb;
-  text-shadow: 1px 1px 1px rgba(0,0,0,0.5);
+  line-height: 1.15;
+  text-shadow: 0 2px 2px rgba(0, 0, 0, 0.72);
 }
 
 .train-item .train-bar {
-  flex: 1;
-  height: 12px;
-  background: #0a0804;
-  border: 1px solid #3a3018;
-  box-shadow: inset 0 1px 3px rgba(0,0,0,0.5);
+  width: 100%;
+  height: 9px;
+  overflow: hidden;
+  border: 1px solid rgba(168, 144, 72, 0.24);
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.68);
 }
 
 .train-item .train-fill {
   height: 100%;
-  background: linear-gradient(180deg, #4a8acc 0%, #2a5a8a 100%);
-  transition: width 0.1s;
-  box-shadow: inset 0 1px 0 rgba(255,255,255,0.15);
+  border-radius: 3px;
+  background: linear-gradient(180deg, #65b8e6, #2a6f9b);
+  transition: width 0.1s linear;
 }
 
-/* ===== 小地图面板（右侧）===== */
+/* ===== Minimap ===== */
+
 #minimap {
-  width: 172px;
-  height: 162px;
-  padding: 8px;
-  background: rgba(6, 5, 2, 0.97);
-  display: flex;
+  display: grid;
+  grid-template-rows: 18px 1fr;
   align-items: center;
-  justify-content: center;
-  box-shadow: inset 0 0 14px rgba(0,0,0,0.6);
+  justify-items: center;
+  padding: 8px 10px 10px;
 }
 
 #minimap-canvas {
   display: block;
-  border: 2px solid #4a3e1a;
-  box-shadow: 0 0 10px rgba(0,0,0,0.6), inset 0 0 4px rgba(0,0,0,0.3);
+  width: 166px;
+  height: 166px;
+  max-width: 100%;
+  border: 1px solid rgba(216, 185, 95, 0.58);
+  border-radius: 5px;
+  background: #060905;
+  box-shadow:
+    inset 0 0 16px rgba(0, 0, 0, 0.65),
+    0 0 0 1px rgba(0, 0, 0, 0.7);
 }
 
-/* ===== 调试信息（低存在感）===== */
+/* ===== Debug / Selection / Hints ===== */
+
 #debug-info {
   position: fixed;
-  top: 42px;
-  left: 6px;
-  font-size: 10px;
-  color: rgba(120, 110, 80, 0.25);
+  top: 48px;
+  left: 8px;
   z-index: 20;
-  font-family: monospace;
+  color: rgba(180, 190, 160, 0.26);
+  font-family: "Menlo", "Consolas", monospace;
+  font-size: 10px;
+  line-height: 1;
   pointer-events: none;
 }
 
-/* ===== 框选矩形 ===== */
 #selection-box {
   position: fixed;
-  border: 1px solid #00ee44;
-  background: rgba(0, 230, 68, 0.08);
-  pointer-events: none;
   z-index: 15;
   display: none;
-  box-shadow: 0 0 8px rgba(0, 200, 60, 0.15);
+  border: 1px solid #4dff7e;
+  background: rgba(77, 255, 126, 0.08);
+  box-shadow: 0 0 14px rgba(77, 255, 126, 0.22);
+  pointer-events: none;
 }
 
-/* ===== 模式提示文字 ===== */
 #mode-hint {
   position: fixed;
-  bottom: 172px;
   left: 50%;
-  transform: translateX(-50%);
-  padding: 7px 22px;
-  background: rgba(10, 8, 4, 0.93);
-  border: 1px solid rgba(160, 130, 50, 0.5);
-  border-radius: 3px;
-  color: #f0d880;
-  font-size: 13px;
-  letter-spacing: 0.5px;
-  text-shadow: 1px 1px 3px rgba(0,0,0,0.9);
+  bottom: calc(var(--hud-bottom-height) + 14px);
   z-index: 20;
-  pointer-events: none;
-  box-shadow: 0 2px 10px rgba(0,0,0,0.5);
+  max-width: min(720px, calc(100vw - 32px));
+  padding: 8px 18px;
+  transform: translateX(-50%);
+  border: 1px solid rgba(216, 185, 95, 0.54);
+  border-radius: var(--ui-radius);
+  background: rgba(5, 8, 6, 0.92);
+  color: var(--ui-gold-bright);
+  font-size: 14px;
+  line-height: 1.2;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.42);
+  pointer-events: none;
 }
 
-/* ===== 地图加载器 ===== */
+/* ===== Page Shells ===== */
+
+.page-shell {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 28px;
+  background:
+    radial-gradient(circle at 50% 35%, rgba(62, 82, 54, 0.16), transparent 40%),
+    rgba(0, 0, 0, 0.68);
+  pointer-events: none;
+}
+
+.page-shell[hidden] {
+  display: none;
+}
+
+.page-shell-panel {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: min(820px, 100%);
+  max-height: min(760px, 100%);
+  padding: 22px;
+  overflow: hidden;
+  border: 1px solid rgba(216, 185, 95, 0.46);
+  border-radius: var(--ui-radius);
+  background:
+    linear-gradient(180deg, rgba(17, 22, 17, 0.98), rgba(5, 8, 6, 0.98)),
+    radial-gradient(circle at 0% 0%, rgba(216, 185, 95, 0.12), transparent 34%);
+  box-shadow:
+    0 28px 70px rgba(0, 0, 0, 0.72),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  pointer-events: auto;
+}
+
+.page-shell-panel::before {
+  content: "";
+  position: absolute;
+  inset: 8px;
+  border: 1px solid rgba(216, 185, 95, 0.12);
+  border-radius: 4px;
+  pointer-events: none;
+}
+
+.page-shell-header {
+  padding-bottom: 12px;
+  border-bottom: 1px solid rgba(216, 185, 95, 0.22);
+}
+
+.page-shell-title {
+  color: var(--ui-text);
+  font-size: 26px;
+  line-height: 1.1;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-shadow: 0 3px 4px var(--ui-shadow);
+}
+
+.page-shell-body {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+
+#menu-shell .page-shell-panel {
+  width: min(920px, 100%);
+  min-height: min(560px, 100%);
+}
+
+#menu-shell .page-shell-body,
+#setup-shell .page-shell-body,
+#pause-shell .page-shell-body,
+#results-shell .page-shell-body,
+#help-shell .page-shell-body,
+#settings-shell .page-shell-body,
+#mode-select-shell .page-shell-body,
+#briefing-shell .page-shell-body {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 14px;
+}
+
+#pause-shell .page-shell-panel {
+  width: min(460px, 100%);
+}
+
+#results-shell .page-shell-panel,
+#setup-shell .page-shell-panel {
+  width: min(720px, 100%);
+}
+
+.page-shell-action-button {
+  min-height: 40px;
+  padding: 9px 16px;
+  border: 1px solid rgba(216, 185, 95, 0.46);
+  border-radius: var(--ui-radius);
+  background: linear-gradient(180deg, rgba(32, 40, 31, 0.98), rgba(8, 12, 9, 0.98));
+  color: var(--ui-text);
+  font-size: 14px;
+  line-height: 1.15;
+  cursor: pointer;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.07);
+}
+
+.page-shell-action-button:hover {
+  border-color: rgba(241, 220, 141, 0.86);
+  background: linear-gradient(180deg, rgba(45, 55, 41, 0.98), rgba(12, 17, 12, 0.98));
+}
+
+.page-shell-action-button:active {
+  transform: translateY(1px);
+}
+
+.page-shell-action-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+  transform: none;
+}
+
+.page-shell-map-source-label,
+.page-shell-mode-label,
+.page-shell-session-summary {
+  color: var(--ui-muted);
+  font-family: "Menlo", "Consolas", monospace;
+  font-size: 13px;
+  line-height: 1.3;
+  letter-spacing: 0;
+}
+
+.page-shell-mode-label {
+  color: var(--ui-gold);
+}
+
+.page-shell-scope-notice {
+  width: 100%;
+  margin-top: 4px;
+  padding: 12px 14px;
+  border: 1px solid rgba(216, 185, 95, 0.2);
+  border-radius: var(--ui-radius);
+  background: rgba(0, 0, 0, 0.24);
+}
+
+.page-shell-scope-notice p,
+.page-shell-help-content p,
+.page-shell-briefing-controls-hint p,
+.page-shell-settings-note,
+.page-shell-summary {
+  color: #c7cba6;
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.page-shell-session-summary {
+  width: 100%;
+  padding-top: 10px;
+  border-top: 1px solid rgba(216, 185, 95, 0.2);
+}
+
+.page-shell-help-content,
+.page-shell-briefing-controls-hint {
+  display: grid;
+  gap: 4px;
+}
+
+.page-shell-message {
+  color: var(--ui-text);
+  font-size: 19px;
+  line-height: 1.35;
+}
+
+.page-shell-summary {
+  white-space: pre-line;
+}
+
+/* ===== Game Over ===== */
+
+#game-over-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.65);
+  pointer-events: none;
+}
+
+#game-over-text {
+  color: var(--ui-text);
+  font-size: 44px;
+  line-height: 1.1;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-shadow: 0 5px 18px rgba(0, 0, 0, 0.9);
+}
+
+#game-over-overlay.victory #game-over-text {
+  color: #f4d86c;
+}
+
+#game-over-overlay.defeat #game-over-text {
+  color: var(--ui-red);
+}
+
+#game-over-overlay.stall #game-over-text {
+  color: #d7d9b7;
+}
+
+/* ===== Map Loader ===== */
+
 #map-loader {
   position: fixed;
-  top: 6px;
-  right: 6px;
+  top: 8px;
+  right: 10px;
   z-index: 20;
   display: flex;
   align-items: center;
   gap: 8px;
+  max-width: min(420px, calc(100vw - 24px));
 }
 
 .map-load-btn {
-  padding: 5px 16px;
-  background: rgba(18, 14, 5, 0.94);
-  border: 1px solid #3a3214;
-  color: #d4a846;
+  min-height: 32px;
+  padding: 7px 14px;
+  border: 1px solid rgba(216, 185, 95, 0.38);
+  border-radius: 5px;
+  background: rgba(5, 8, 6, 0.86);
+  color: var(--ui-gold-bright);
   font-size: 12px;
-  font-family: 'Georgia', serif;
+  line-height: 1;
   cursor: pointer;
-  border-radius: 2px;
-  transition: border-color 0.1s, background 0.1s;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.32);
 }
 
 .map-load-btn:hover {
-  background: rgba(40, 32, 10, 0.94);
-  border-color: #8b7332;
+  border-color: rgba(241, 220, 141, 0.82);
+  background: rgba(18, 24, 18, 0.92);
 }
 
 #map-status {
+  min-width: 0;
+  color: rgba(194, 202, 167, 0.5);
+  font-family: "Menlo", "Consolas", monospace;
   font-size: 11px;
-  color: #5a4e32;
-  font-family: monospace;
+  line-height: 1.25;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+@media (max-width: 980px) {
+  :root {
+    --hud-bottom-height: 236px;
+  }
+
+  #hud-top {
+    left: 10px;
+    min-width: 0;
+    transform: none;
+  }
+
+  #hud-bottom {
+    grid-template-columns: minmax(250px, 1fr) minmax(288px, 1fr) 170px;
+    grid-template-rows: minmax(0, 1fr) 68px;
+  }
+
+  #train-zone {
+    grid-column: 1 / 3;
+  }
+
+  #minimap {
+    grid-row: 1 / 3;
+    grid-column: 3;
+  }
+}
+
+@media (max-width: 720px) {
+  :root {
+    --hud-bottom-height: 340px;
+  }
+
+  #hud-top {
+    right: 10px;
+    justify-content: flex-start;
+    height: auto;
+    padding: 8px 10px;
+  }
+
+  #resources {
+    flex-wrap: wrap;
+  }
+
+  .resource {
+    min-width: 70px;
+  }
+
+  #game-time {
+    padding-left: 10px;
+  }
+
+  #map-loader {
+    top: 92px;
+    left: 10px;
+    right: auto;
+    max-width: calc(100vw - 20px);
+  }
+
+  #hud-bottom {
+    grid-template-columns: 1fr 128px;
+    grid-template-rows: 104px 168px 36px;
+    gap: 8px;
+    padding: 8px;
+  }
+
+  #unit-info {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  #command-zone {
+    grid-column: 1 / 3;
+    grid-row: 2;
+    padding: 6px 8px 7px;
+  }
+
+  #train-zone {
+    grid-column: 1 / 3;
+    grid-row: 3;
+  }
+
+  #minimap {
+    grid-column: 2;
+    grid-row: 1;
+  }
+
+  #command-card {
+    grid-template-columns: repeat(4, minmax(74px, 1fr));
+    gap: 5px;
+  }
+
+  #command-card .cmd-slot,
+  #command-card button {
+    width: 100%;
+    height: 29px;
+  }
+
+  #command-card button {
+    padding: 3px 5px;
+  }
+
+  #command-card button .btn-label {
+    font-size: 10px;
+  }
+
+  #minimap-canvas {
+    width: 68px;
+    height: 68px;
+  }
+
+  #single-select {
+    grid-template-columns: 70px minmax(0, 1fr);
+  }
+
+  #unit-portrait {
+    width: 68px;
+    height: 68px;
+  }
+
+  #portrait-canvas {
+    width: 64px;
+    height: 64px;
+  }
 }

@@ -1,0 +1,125 @@
+{
+  "checklist_id": "public-share-asset-import-checklist-a1-first-slice-2026-04-16",
+  "branch": "codex/asset-public-share",
+  "prepared_at": "2026-04-16",
+  "status": "executed-for-first-trial-slice",
+  "approved_for_import": [],
+  "approved_for_import_trial": [
+    "townhall",
+    "barracks",
+    "farm",
+    "goldmine",
+    "tower"
+  ],
+  "first_trial_slice": [
+    "townhall",
+    "barracks",
+    "farm",
+    "goldmine",
+    "tower"
+  ],
+  "blocked_from_first_trial_slice": [
+    "tree_line",
+    "goldmine_accent",
+    "any unlisted third-party asset",
+    "any AI-generated asset"
+  ],
+  "preconditions": [
+    {
+      "gate": "Quaternius sub-candidates are approved-for-intake only",
+      "status": "satisfied"
+    },
+    {
+      "gate": "Import review packet exists",
+      "status": "satisfied",
+      "file": "docs/PUBLIC_SHARE_ASSET_IMPORT_REVIEW_PACKET_A1_001.zh-CN.md"
+    },
+    {
+      "gate": "THIRD_PARTY_NOTICES template exists",
+      "status": "satisfied",
+      "file": "public/assets/THIRD_PARTY_NOTICES.md"
+    },
+    {
+      "gate": "Owner explicitly authorizes first trial slice",
+      "status": "satisfied"
+    },
+    {
+      "gate": "Post-import split verification exists",
+      "status": "satisfied",
+      "file": "docs/PUBLIC_SHARE_ASSET_IMPORT_TRIAL_A1_001.zh-CN.md"
+    }
+  ],
+  "allowed_file_copies": [
+    {
+      "runtime_key": "townhall",
+      "source": "artifacts/asset-intake/downloads/poly-pizza/quaternius-ultimate-fantasy-rts/CoERW5nFdE-town-center.glb",
+      "target": "public/assets/models/vendor/quaternius/ultimate-fantasy-rts/town-center.glb"
+    },
+    {
+      "runtime_key": "barracks",
+      "source": "artifacts/asset-intake/downloads/poly-pizza/quaternius-ultimate-fantasy-rts/dvlksXgxWc-barracks.glb",
+      "target": "public/assets/models/vendor/quaternius/ultimate-fantasy-rts/barracks.glb"
+    },
+    {
+      "runtime_key": "farm",
+      "source": "artifacts/asset-intake/downloads/poly-pizza/quaternius-ultimate-fantasy-rts/91wMLb9kKo-farm.glb",
+      "target": "public/assets/models/vendor/quaternius/ultimate-fantasy-rts/farm.glb"
+    },
+    {
+      "runtime_key": "goldmine",
+      "source": "artifacts/asset-intake/downloads/poly-pizza/quaternius-ultimate-fantasy-rts/wOJ61Fa0Lt-mine.glb",
+      "target": "public/assets/models/vendor/quaternius/ultimate-fantasy-rts/mine.glb"
+    },
+    {
+      "runtime_key": "tower",
+      "source": "artifacts/asset-intake/downloads/poly-pizza/quaternius-ultimate-fantasy-rts/f2J0aSLVi4-watch-tower.glb",
+      "target": "public/assets/models/vendor/quaternius/ultimate-fantasy-rts/watch-tower.glb"
+    }
+  ],
+  "allowed_catalog_changes": [
+    {
+      "file": "src/game/AssetCatalog.ts",
+      "key": "townhall",
+      "path": "assets/models/vendor/quaternius/ultimate-fantasy-rts/town-center.glb",
+      "scale": 2.5299
+    },
+    {
+      "file": "src/game/AssetCatalog.ts",
+      "key": "barracks",
+      "path": "assets/models/vendor/quaternius/ultimate-fantasy-rts/barracks.glb",
+      "scale": 1.4369
+    },
+    {
+      "file": "src/game/AssetCatalog.ts",
+      "key": "farm",
+      "path": "assets/models/vendor/quaternius/ultimate-fantasy-rts/farm.glb",
+      "scale": 0.8123
+    },
+    {
+      "file": "src/game/AssetCatalog.ts",
+      "key": "goldmine",
+      "path": "assets/models/vendor/quaternius/ultimate-fantasy-rts/mine.glb",
+      "scale": 1.796
+    },
+    {
+      "file": "src/game/AssetCatalog.ts",
+      "key": "tower",
+      "path": "assets/models/vendor/quaternius/ultimate-fantasy-rts/watch-tower.glb",
+      "scale": 1.8461
+    }
+  ],
+  "required_post_import_commands": [
+    "./scripts/run-runtime-tests.sh tests/asset-pipeline-regression.spec.ts tests/v3-asset-fallback-catalog-proof.spec.ts --reporter=list",
+    "./scripts/run-runtime-tests.sh tests/mining-saturation-regression.spec.ts tests/static-defense-regression.spec.ts tests/construction-lifecycle-regression.spec.ts tests/building-agency-regression.spec.ts --reporter=list"
+  ],
+  "required_new_record_after_trial": "docs/PUBLIC_SHARE_ASSET_IMPORT_TRIAL_A1_001.zh-CN.md",
+  "hard_stop_failures": [
+    "severe console error on startup",
+    "blank, transparent, or unselectable building model",
+    "goldmine gatherer cap or return path regression",
+    "tower targeting, range, projectile, or ally-filter regression",
+    "construction cancel breaks HUD, selection rings, or command surface",
+    "model occludes selection ring, healthbar, or state feedback",
+    "tree line or resource gold accent imported during first slice"
+  ]
+}

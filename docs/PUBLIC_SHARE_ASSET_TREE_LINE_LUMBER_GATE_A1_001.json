@@ -1,0 +1,65 @@
+{
+  "gate_id": "public-share-asset-tree-line-lumber-gate-a1-001",
+  "branch": "codex/asset-public-share",
+  "prepared_at": "2026-04-16",
+  "status": "tree-line-lumber-gate-proof-passed",
+  "decision": "keep-procedural-tree-line-and-do-not-directly-import-quaternius-tree-group",
+  "runtime_scope": {
+    "manager": "src/game/TreeManager.ts",
+    "pathing": "src/game/PathingGrid.ts",
+    "resource_target": "resourceTarget: { type: \"tree\", entry }",
+    "visual_factory": "Game.createSingleTree()",
+    "depletion_entrypoint": "Game.depleteTree()"
+  },
+  "verification": {
+    "command": "./scripts/run-runtime-tests.sh tests/tree-line-lumber-gate-regression.spec.ts --reporter=list",
+    "result": "2 passed",
+    "duration_seconds": 21.6,
+    "tests": [
+      {
+        "name": "spawned tree line stays visible, registered, and path-blocking",
+        "status": "passed",
+        "assertions": [
+          "default map has more than 50 tree entries",
+          "sample tree has visible mesh children",
+          "sample tree has userData.isTree=true",
+          "sample tree tile is registered in TreeManager",
+          "sample tree tile is blocked by PathingGrid",
+          "nearest tree query resolves the sample tree"
+        ]
+      },
+      {
+        "name": "lumber depletion removes a tree and releases its pathing blocker",
+        "status": "passed",
+        "assertions": [
+          "an open tile becomes blocked after registering a tree",
+          "worker gathers 10 lumber from a 10-lumber tree",
+          "depleted tree is removed from TreeManager",
+          "depleted tree tile is no longer a tree tile",
+          "depleted tile is no longer blocked"
+        ]
+      }
+    ]
+  },
+  "product_readout": {
+    "tree_line_is_decorative_only": false,
+    "tree_line_blocks_pathing": true,
+    "tree_line_supports_lumber_target": true,
+    "tree_depletion_releases_blocker": true,
+    "final_tree_art_approved": false
+  },
+  "remaining_before_tree_art_import": [
+    "Prepare a single-tree or small-cluster GLB candidate instead of using Resource_Tree_Group directly.",
+    "Re-run lumber gate, worker readability proof, fallback proof, and default camera readability proof.",
+    "Decide whether non-harvestable tree-line clusters are needed as decoration."
+  ],
+  "completed_related_proofs": [
+    {
+      "proof_id": "public-share-asset-tree-line-worker-readability-a1-001",
+      "path": "docs/PUBLIC_SHARE_ASSET_TREE_LINE_WORKER_READABILITY_A1_001.zh-CN.md",
+      "test": "tests/tree-line-worker-readability-proof.spec.ts",
+      "result": "1 passed",
+      "artifact": "artifacts/asset-intake/preview/tree-line-worker-readability-a1-001.png"
+    }
+  ]
+}

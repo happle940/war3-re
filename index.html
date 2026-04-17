@@ -12,11 +12,11 @@
 
   <!-- HUD叠加层 -->
   <div id="hud">
-    <div id="hud-top">
+    <div id="hud-top" aria-label="资源与时间">
       <div id="resources">
-        <span class="resource"><span class="icon gold-icon">◈</span> <span id="gold">0</span></span>
-        <span class="resource"><span class="icon wood-icon">⊞</span> <span id="lumber">0</span></span>
-        <span class="resource"><span class="icon food-icon">⊕</span> <span id="supply">0/0</span></span>
+        <span class="resource resource-gold"><span class="icon gold-icon">◈</span><span class="resource-label">金</span><span id="gold">0</span></span>
+        <span class="resource resource-wood"><span class="icon wood-icon">⊞</span><span class="resource-label">木</span><span id="lumber">0</span></span>
+        <span class="resource resource-food"><span class="icon food-icon">⊕</span><span class="resource-label">人口</span><span id="supply">0/0</span></span>
       </div>
       <div id="game-time">00:00</div>
     </div>
@@ -50,13 +50,19 @@
         </div>
       </div>
 
-      <!-- 命令卡：建造/训练按钮 -->
-      <div id="command-card"></div>
+      <div id="command-zone">
+        <div class="hud-section-label">命令</div>
+        <div id="command-card"></div>
+      </div>
 
       <!-- 训练队列进度条 -->
-      <div id="train-queue"></div>
+      <div id="train-zone">
+        <div class="hud-section-label">队列</div>
+        <div id="train-queue"></div>
+      </div>
 
       <div id="minimap">
+        <div class="hud-section-label">战场</div>
         <canvas id="minimap-canvas" width="160" height="160"></canvas>
       </div>
     </div>
@@ -64,6 +70,141 @@
 
   <!-- 框选矩形 -->
   <div id="selection-box"></div>
+
+  <!-- 页面壳层：菜单 / 设置 / 暂停 / 结果 -->
+  <div id="menu-shell" class="page-shell" hidden aria-hidden="true">
+    <section class="page-shell-panel page-shell-panel--menu" aria-labelledby="menu-shell-title">
+      <header class="page-shell-header">
+        <h1 id="menu-shell-title" class="page-shell-title">主菜单</h1>
+      </header>
+      <div class="page-shell-body">
+        <div id="menu-mode-label" class="page-shell-mode-label">模式：遭遇战</div>
+        <div id="menu-map-source-label" class="page-shell-map-source-label">当前：程序化地图</div>
+        <button id="menu-mode-select-button" type="button" class="page-shell-action-button">选择模式</button>
+        <label for="menu-map-file-input" class="page-shell-action-button">加载W3X地图</label>
+        <input type="file" id="menu-map-file-input" accept=".w3x,.w3m" style="display:none" />
+        <button id="menu-reset-map-button" type="button" class="page-shell-action-button" disabled>重置为默认地图</button>
+        <button id="menu-help-button" type="button" class="page-shell-action-button">操作说明</button>
+        <button id="menu-settings-button" type="button" class="page-shell-action-button">设置</button>
+        <button id="menu-start-button" type="button" class="page-shell-action-button">开始当前地图</button>
+        <div id="menu-scope-notice" class="page-shell-scope-notice">
+          <p><strong>当前可玩：</strong>人族 vs AI 的短局切片；采集、建造、训练、基础战斗、暂停、返回、重开</p>
+          <p><strong>尚未实现：</strong>完整人族、完整科技树、英雄、商店、野怪、战役、多人、天梯、回放</p>
+          <p><strong>反馈重点：</strong>能否打开、能否开始、开局是否看得懂、控制是否可信、AI 是否像对手、返回/重开是否清楚</p>
+          <p><strong>反馈方式：</strong>在项目仓库提交 Issue，或把试玩版本、浏览器、复现步骤和 1-3 个阻断点发给维护者</p>
+          <p><strong>边界：</strong>这不是完整 War3，也不是公开发布或最终美术版本</p>
+        </div>
+        <div id="menu-last-session-summary" class="page-shell-session-summary" style="display:none"></div>
+      </div>
+    </section>
+  </div>
+
+  <div id="help-shell" class="page-shell" hidden aria-hidden="true">
+    <section class="page-shell-panel page-shell-panel--help" aria-labelledby="help-shell-title">
+      <header class="page-shell-header">
+        <h1 id="help-shell-title" class="page-shell-title">操作说明</h1>
+      </header>
+      <div class="page-shell-body">
+        <div class="page-shell-help-content">
+          <p>左键点击：选择单位</p>
+          <p>左键拖拽：框选多个单位</p>
+          <p>右键点击：移动 / 攻击 / 采集</p>
+          <p>ESC：取消当前操作</p>
+          <p>P：暂停/继续</p>
+          <p>WASD / 方向键：移动摄像机</p>
+          <p>鼠标滚轮：缩放</p>
+          <p>中键拖拽：旋转摄像机</p>
+        </div>
+        <button id="help-close-button" type="button" class="page-shell-action-button">返回</button>
+      </div>
+    </section>
+  </div>
+
+  <div id="settings-shell" class="page-shell" hidden aria-hidden="true">
+    <section class="page-shell-panel page-shell-panel--settings" aria-labelledby="settings-shell-title">
+      <header class="page-shell-header">
+        <h1 id="settings-shell-title" class="page-shell-title">设置</h1>
+      </header>
+      <div class="page-shell-body">
+        <div class="page-shell-settings-note">当前版本无额外可配置项</div>
+        <button id="settings-close-button" type="button" class="page-shell-action-button">返回</button>
+      </div>
+    </section>
+  </div>
+
+  <div id="mode-select-shell" class="page-shell" hidden aria-hidden="true">
+    <section class="page-shell-panel page-shell-panel--mode-select" aria-labelledby="mode-select-shell-title">
+      <header class="page-shell-header">
+        <h1 id="mode-select-shell-title" class="page-shell-title">选择模式</h1>
+      </header>
+      <div class="page-shell-body">
+        <button id="mode-select-skirmish-button" type="button" class="page-shell-action-button">遭遇战（已实现）</button>
+        <button id="mode-select-campaign-button" type="button" class="page-shell-action-button" disabled>战役（未实现）</button>
+        <button id="mode-select-back-button" type="button" class="page-shell-action-button">返回</button>
+      </div>
+    </section>
+  </div>
+
+  <div id="briefing-shell" class="page-shell" hidden aria-hidden="true">
+    <section class="page-shell-panel page-shell-panel--briefing" aria-labelledby="briefing-shell-title">
+      <header class="page-shell-header">
+        <h1 id="briefing-shell-title" class="page-shell-title">准备就绪</h1>
+      </header>
+      <div class="page-shell-body">
+        <div id="briefing-map-source" class="page-shell-map-source-label">当前：程序化地图</div>
+        <div id="briefing-mode" class="page-shell-mode-label">模式：遭遇战</div>
+        <div class="page-shell-briefing-controls-hint">
+          <p>操作：左键选择，右键指令，P暂停，ESC取消</p>
+        </div>
+        <button id="briefing-start-button" type="button" class="page-shell-action-button">开始战斗</button>
+      </div>
+    </section>
+  </div>
+
+  <div id="setup-shell" class="page-shell" hidden aria-hidden="true">
+    <section class="page-shell-panel page-shell-panel--setup" aria-labelledby="setup-shell-title">
+      <header class="page-shell-header">
+        <h1 id="setup-shell-title" class="page-shell-title">游戏设置</h1>
+      </header>
+      <div class="page-shell-body">
+        <button id="setup-return-button" type="button" class="page-shell-action-button">返回</button>
+        <button id="setup-start-button" type="button" class="page-shell-action-button">开始当前地图</button>
+      </div>
+    </section>
+  </div>
+
+  <div id="pause-shell" class="page-shell" hidden aria-hidden="true">
+    <section class="page-shell-panel page-shell-panel--pause" aria-labelledby="pause-shell-title">
+      <header class="page-shell-header">
+        <h1 id="pause-shell-title" class="page-shell-title">已暂停</h1>
+      </header>
+      <div class="page-shell-body">
+        <button id="pause-resume-button" type="button" class="page-shell-action-button">继续</button>
+        <button id="pause-setup-button" type="button" class="page-shell-action-button">设置</button>
+        <button id="pause-reload-button" type="button" class="page-shell-action-button">重新加载当前地图</button>
+        <button id="pause-return-menu-button" type="button" class="page-shell-action-button">返回主菜单</button>
+      </div>
+    </section>
+  </div>
+
+  <div id="results-shell" class="page-shell" hidden aria-hidden="true">
+    <section class="page-shell-panel page-shell-panel--results" aria-labelledby="results-shell-title">
+      <header class="page-shell-header">
+        <h1 id="results-shell-title" class="page-shell-title">战斗结果</h1>
+      </header>
+      <div class="page-shell-body">
+        <div id="results-shell-message" class="page-shell-message"></div>
+        <div id="results-shell-summary" class="page-shell-summary"></div>
+        <button id="results-reload-button" type="button" class="page-shell-action-button">重新加载当前地图</button>
+        <button id="results-return-menu-button" type="button" class="page-shell-action-button">返回主菜单</button>
+      </div>
+    </section>
+  </div>
+
+  <!-- 游戏结束遮罩 -->
+  <div id="game-over-overlay" style="display:none">
+    <div id="game-over-text"></div>
+  </div>
 
   <!-- 模式提示（建造/攻击移动/集结点等） -->
   <div id="mode-hint" style="display:none"></div>

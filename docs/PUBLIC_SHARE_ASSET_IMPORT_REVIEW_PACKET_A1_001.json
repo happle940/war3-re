@@ -1,0 +1,119 @@
+{
+  "packet_id": "public-share-asset-import-review-packet-a1-001",
+  "branch": "codex/asset-public-share",
+  "prepared_at": "2026-04-16",
+  "status": "review-ready-not-approved-for-import",
+  "source": {
+    "candidate_id": "pub-a1-quaternius-ultimate-fantasy-rts-001",
+    "name": "Quaternius Ultimate Fantasy RTS",
+    "source_url": "https://quaternius.com/packs/ultimatefantasyrts.html",
+    "poly_pizza_bundle_url": "https://poly.pizza/bundle/Ultimate-Fantasy-RTS-nSDjmACoSU",
+    "source_class": "S1",
+    "license_summary": "CC0 candidate; source page lists glTF format and personal/commercial use."
+  },
+  "approved_for_import": [],
+  "runtime_asset_changes": false,
+  "completed_evidence": [
+    "docs/A1_CORE_BUILDING_ASSET_PREVIEW_SWEEP_002.zh-CN.md",
+    "docs/A1_CORE_BUILDING_FALLBACK_COMPARISON_001.zh-CN.md",
+    "docs/A1_CORE_BUILDING_TEAM_MARKER_CONCEPTS_001.zh-CN.md",
+    "docs/A1_CORE_BUILDING_RULE_FIT_PROOF_001.zh-CN.md",
+    "docs/A1_CORE_BUILDING_LOAD_FAILURE_FALLBACK_PROOF_001.zh-CN.md",
+    "docs/A1_CORE_BUILDING_GAMEPLAY_SMOKE_BASELINE_001.zh-CN.md"
+  ],
+  "review_scope": [
+    {
+      "runtime_key": "townhall",
+      "sub_candidate_id": "a1-quaternius-town-center-001",
+      "source_file": "artifacts/asset-intake/downloads/poly-pizza/quaternius-ultimate-fantasy-rts/CoERW5nFdE-town-center.glb",
+      "sha256": "fa7d33ff72092a96073b659eba5562ed1eadf5b60a8092d1321769b34e9177a5",
+      "recommended_trial_path": "public/assets/models/vendor/quaternius/ultimate-fantasy-rts/town-center.glb",
+      "proof_scale": 2.5299,
+      "trial_slice": "slice-1-buildings"
+    },
+    {
+      "runtime_key": "barracks",
+      "sub_candidate_id": "a1-quaternius-barracks-001",
+      "source_file": "artifacts/asset-intake/downloads/poly-pizza/quaternius-ultimate-fantasy-rts/dvlksXgxWc-barracks.glb",
+      "sha256": "b62a47e6cf8cdacc87be9afb6c5201a6becaf3e2616fd5d6797958b00e99ef74",
+      "recommended_trial_path": "public/assets/models/vendor/quaternius/ultimate-fantasy-rts/barracks.glb",
+      "proof_scale": 1.4369,
+      "trial_slice": "slice-1-buildings"
+    },
+    {
+      "runtime_key": "farm",
+      "sub_candidate_id": "a1-quaternius-farm-001",
+      "source_file": "artifacts/asset-intake/downloads/poly-pizza/quaternius-ultimate-fantasy-rts/91wMLb9kKo-farm.glb",
+      "sha256": "403cd4f1218f2d45392becbf63e1bec64df527152235f99895342c5dd2b8b2c2",
+      "recommended_trial_path": "public/assets/models/vendor/quaternius/ultimate-fantasy-rts/farm.glb",
+      "proof_scale": 0.8123,
+      "trial_slice": "slice-1-buildings"
+    },
+    {
+      "runtime_key": "goldmine",
+      "sub_candidate_id": "a1-quaternius-mine-001",
+      "source_file": "artifacts/asset-intake/downloads/poly-pizza/quaternius-ultimate-fantasy-rts/wOJ61Fa0Lt-mine.glb",
+      "sha256": "cfbabb663904483aa9704b7ea63e053a58dbe882abbc2935e65f5a0425b21752",
+      "recommended_trial_path": "public/assets/models/vendor/quaternius/ultimate-fantasy-rts/mine.glb",
+      "proof_scale": 1.796,
+      "trial_slice": "slice-1-buildings"
+    },
+    {
+      "runtime_key": "tower",
+      "sub_candidate_id": "a1-quaternius-watch-tower-001",
+      "source_file": "artifacts/asset-intake/downloads/poly-pizza/quaternius-ultimate-fantasy-rts/f2J0aSLVi4-watch-tower.glb",
+      "sha256": "d70f8855cb45003b4f78a093a23eab61717f9246fdcdeca281bf6b341edb442a",
+      "recommended_trial_path": "public/assets/models/vendor/quaternius/ultimate-fantasy-rts/watch-tower.glb",
+      "proof_scale": 1.8461,
+      "trial_slice": "slice-1-buildings"
+    },
+    {
+      "runtime_key": "tree_line",
+      "sub_candidate_id": "a1-quaternius-tree-line-001",
+      "source_file": "artifacts/asset-intake/downloads/poly-pizza/quaternius-ultimate-fantasy-rts/jUzojhHoYR-trees.glb",
+      "sha256": "a61c2378b7a103276c8deb8ddbeda0d5b21d7cc638bca48500b97baabdf651d5",
+      "recommended_trial_path": "public/assets/models/vendor/quaternius/ultimate-fantasy-rts/trees.glb",
+      "proof_scale": 1.0,
+      "trial_slice": "slice-2-tree-line",
+      "blocked_until": "worker chopping, occlusion, and tree-line boundary proof"
+    },
+    {
+      "runtime_key": "goldmine_accent",
+      "sub_candidate_id": "a1-quaternius-resource-gold-accent-001",
+      "source_file": "artifacts/asset-intake/downloads/poly-pizza/quaternius-ultimate-fantasy-rts/jkqD4dMoz1-resource-gold.glb",
+      "sha256": "014be202047295172158f524d11ecc0a172eef544b4d11fd0fe55b48e55be1f3",
+      "recommended_trial_path": "public/assets/models/vendor/quaternius/ultimate-fantasy-rts/resource-gold.glb",
+      "proof_scale": 1.0,
+      "trial_slice": "slice-3-goldmine-composition",
+      "blocked_until": "goldmine composition renderer and no-standalone-resource proof"
+    }
+  ],
+  "first_trial_slice": {
+    "id": "slice-1-buildings",
+    "runtime_keys": [
+      "townhall",
+      "barracks",
+      "farm",
+      "goldmine",
+      "tower"
+    ],
+    "recommendation": "Use vendor candidate paths instead of overwriting existing S0/project-proxy files."
+  },
+  "required_post_trial_commands": [
+    "./scripts/run-runtime-tests.sh tests/asset-pipeline-regression.spec.ts tests/v3-asset-fallback-catalog-proof.spec.ts --reporter=list",
+    "./scripts/run-runtime-tests.sh tests/mining-saturation-regression.spec.ts tests/static-defense-regression.spec.ts tests/construction-lifecycle-regression.spec.ts tests/building-agency-regression.spec.ts --reporter=list"
+  ],
+  "red_lines": [
+    "Do not copy the whole Quaternius bundle into public/assets.",
+    "Do not overwrite current S0/project-proxy assets in the first trial.",
+    "Do not remove fallback manifest or procedural fallback code paths.",
+    "Do not treat resource-gold as a standalone goldmine.",
+    "Do not claim final art completion in public-facing copy.",
+    "Do not add any unlisted third-party or AI-generated asset to this packet."
+  ],
+  "owner_decisions_required": [
+    "Whether to allow the five-building first trial slice.",
+    "Whether to require a third-party notices file before any import trial.",
+    "Whether tree-line and gold accent remain deferred until dedicated proofs exist."
+  ]
+}

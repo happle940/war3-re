@@ -1,0 +1,74 @@
+{
+  "pass_id": "public-share-asset-goldmine-readability-pass-a1-002",
+  "branch": "codex/asset-public-share",
+  "prepared_at": "2026-04-16",
+  "trigger": "User feedback: goldmine does not look gold enough.",
+  "status": "goldmine-gold-readability-boost-applied-proof-passed",
+  "gameplay_changed": false,
+  "remaining_gold_changed": false,
+  "pathing_changed": false,
+  "runtime_file_changed": "src/game/BuildingVisualFactory.ts",
+  "visual_changes": {
+    "resource_gold_accent_roots": [
+      "goldmine-resource-gold-accent",
+      "goldmine-resource-gold-accent-left-vein",
+      "goldmine-resource-gold-accent-right-pocket",
+      "goldmine-resource-gold-accent-back-pocket"
+    ],
+    "gold_readability_cue_root": "goldmine-gold-readability-cue",
+    "gold_readability_cue_meshes": [
+      "goldmine-gold-readability-cue-front",
+      "goldmine-gold-readability-cue-left",
+      "goldmine-gold-readability-cue-right"
+    ],
+    "new_external_files": false,
+    "new_textures": false,
+    "new_decoder_requirements": false
+  },
+  "artifacts": {
+    "screenshot": "artifacts/asset-intake/preview/goldmine-gold-readability-a1-002.png",
+    "metrics": "artifacts/asset-intake/preview/goldmine-gold-readability-a1-002.json"
+  },
+  "metrics": {
+    "viewport": {
+      "width": 1280,
+      "height": 720
+    },
+    "goldmine_screen_bbox_px": {
+      "width": 144.44397457046773,
+      "height": 188.54326746869958
+    },
+    "visible_mesh_count": 16,
+    "accent_root_count": 4,
+    "readability_cue_mesh_count": 3,
+    "remaining_gold": 2000,
+    "open_adjacent_tiles": 2
+  },
+  "verification": [
+    {
+      "command": "npm run build",
+      "status": "passed",
+      "note": "Vite large chunk warning remains."
+    },
+    {
+      "command": "./scripts/run-runtime-tests.sh tests/goldmine-accent-composition-regression.spec.ts tests/goldmine-gold-readability-proof.spec.ts --reporter=list",
+      "status": "passed",
+      "passed": 2,
+      "failed": 0,
+      "duration": "41.8s"
+    },
+    {
+      "command": "./scripts/run-runtime-tests.sh tests/mining-saturation-regression.spec.ts --reporter=list",
+      "status": "passed",
+      "passed": 2,
+      "failed": 0,
+      "duration": "1.7m"
+    }
+  ],
+  "product_readout": {
+    "goldmine_more_gold_readable": true,
+    "goldmine_final_art_approved": false,
+    "resource_gold_is_standalone_resource": false,
+    "economy_number_tuning_done": false
+  }
+}

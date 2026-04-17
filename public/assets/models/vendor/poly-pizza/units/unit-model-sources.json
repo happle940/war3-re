@@ -1,0 +1,47 @@
+{
+  "worker": {
+    "title": "Farmer",
+    "id": "7pn3R6hPvE",
+    "url": "https://static.poly.pizza/81f2f0cf-6f53-4b57-92ea-dba0928620f2.glb"
+  },
+  "footman": {
+    "title": "Warrior",
+    "id": "Z6ZUtm6kc1",
+    "url": "https://static.poly.pizza/06763472-0463-4335-8daa-58a2e541303d.glb"
+  },
+  "rifleman": {
+    "title": "Adventurer",
+    "id": "5EGWBMpuXq",
+    "url": "https://static.poly.pizza/bbe369ee-a686-42c7-adad-14356f5f2f15.glb"
+  },
+  "mortar_team": {
+    "title": "Cannon",
+    "id": "J15vlPVvKK",
+    "url": "https://static.poly.pizza/6d76c733-c77c-46f5-9d4f-af847d4052b3.glb"
+  },
+  "priest": {
+    "title": "Eye Cleric",
+    "id": "dxU3EpOrtj",
+    "url": "https://static.poly.pizza/7d0c39b4-7b76-471f-b3f9-16b2d224e3ae.glb"
+  },
+  "militia": {
+    "title": "Worker",
+    "id": "Yg2bQZO6Hj",
+    "url": "https://static.poly.pizza/3a5f3056-ffe6-42eb-bd52-122afcbd22b2.glb"
+  },
+  "sorceress": {
+    "title": "Witch",
+    "id": "vWI9PHfjcy",
+    "url": "https://static.poly.pizza/cb9e05e7-1e8f-4c55-bed3-f9d60306785c.glb"
+  },
+  "knight": {
+    "title": "Warrior",
+    "id": "RaWl2GJ0NZ",
+    "url": "https://static.poly.pizza/3cdfd81b-a016-4500-9eb2-6f3f23ffa5a1.glb"
+  },
+  "paladin": {
+    "title": "King",
+    "id": "I1gTjmuK2m",
+    "url": "https://static.poly.pizza/29a3436b-3b06-4dbf-a236-bcec18f3351a.glb"
+  }
+}

@@ -1,5 +1,5 @@
 import * as THREE from 'three'
-import { UnitState, BUILDINGS, UNITS } from './GameData'
+import { UnitState, BUILDINGS, UNITS, RESEARCHES, HERO_ABILITY_LEVELS } from './GameData'
 import type { Unit, ResourceTarget } from './Game'
 import { issueCommand } from './GameCommand'
 import type { TeamResources } from './TeamResources'
@@ -18,7 +18,10 @@ export interface AIContext {
   spawnUnit(type: string, team: number, x: number, z: number): Unit
   spawnBuilding(type: string, team: number, x: number, z: number): Unit
   getWorldHeight(wx: number, wz: number): number
-  planPath(unit: Unit, target: THREE.Vector3): void
+  planPath(unit: Unit, target: THREE.Vector3): boolean
+  castHolyLight(caster: Unit, target: Unit): boolean
+  castDivineShield(caster: Unit): boolean
+  castResurrection(caster: Unit): boolean
 }
 
 /** AI build order profile — 轻量倾向配置 */
@@ -89,6 +92,8 @@ export class SimpleAI {
   private targetGoldWorkers: number
   private maxWorkers: number
   private barracksBuilt = false   // 是否已造兵营
+  private altarScheduled = false  // 是否已安排建 Altar（建造中或已完成）
+  private paladinSummoned = false // 是否已召唤 Paladin（唯一性）
   private waveCount = 0           // 已发起的进攻波次
   private tickCount = 0           // 内部 tick 计数器（≈ game seconds）
 
@@ -115,6 +120,8 @@ export class SimpleAI {
     this.attackWaveSent = false
     this.attackWaveSentTick = -999
     this.barracksBuilt = false
+    this.altarScheduled = false
+    this.paladinSummoned = false
     this.waveCount = 0
     this.attackWaveSize = this.profile.initialWaveSize
   }
@@ -136,8 +143,8 @@ export class SimpleAI {
     )
 
     const townhall = units.find(
-      (u) => u.team === team && u.type === 'townhall' && u.isBuilding && u.hp > 0
-        && u.buildProgress >= 1,
+      (u) => u.team === team && (u.type === 'townhall' || u.type === 'keep' || u.type === 'castle')
+        && u.isBuilding && u.hp > 0 && u.buildProgress >= 1,
     )
 
     if (!townhall) return  // 没有主基地就放弃
@@ -156,10 +163,12 @@ export class SimpleAI {
 
     // 计算训练队列中的 supply 占用（防止超额训练）
     let queuedSupply = 0
+    let queuedWorkers = 0
     for (const u of units) {
       if (u.team !== team || !u.isBuilding) continue
       for (const item of u.trainingQueue) {
         queuedSupply += UNITS[item.type]?.supply ?? 0
+        if (item.type === 'worker') queuedWorkers++
       }
     }
     const effectiveUsed = supply.used + queuedSupply
@@ -186,12 +195,271 @@ export class SimpleAI {
       }
     }
 
+    // ===== 2b. 有兵营但没铁匠铺 → 建铁匠铺（解锁 Rifleman）=====
+    const hasBlacksmith = units.some(
+      (u) => u.team === team && u.type === 'blacksmith' && u.hp > 0
+        && u.buildProgress >= 1,
+    )
+    const blacksmithInProgress = units.some(
+      (u) => u.team === team && u.type === 'blacksmith' && u.hp > 0
+        && u.buildProgress < 1,
+    )
+    const openingFootmanReserveGold = (UNITS['footman']?.cost.gold ?? 0) * this.attackWaveSize
+    if (hasBarracks && !hasBlacksmith && !blacksmithInProgress) {
+      const bsDef = BUILDINGS['blacksmith']
+      const canAffordOpeningTech = bsDef && (
+        this.waveCount > 0
+        || resources.get(team).gold >= bsDef.cost.gold + openingFootmanReserveGold
+      )
+      if (bsDef && canAffordOpeningTech && resources.canAfford(team, bsDef.cost)) {
+        this.tryBuildBuilding('blacksmith', townhall, myIdleWorkers())
+      }
+    }
+
+    // ===== 2ab. Build Altar of Kings (hero entry) =====
+    // Only after barracks is established, economy allows, and no Altar exists or is in progress.
+    const hasAltar = units.some(
+      (u) => u.team === team && u.type === 'altar_of_kings' && u.hp > 0
+        && u.buildProgress >= 1,
+    )
+    const altarInProgress = units.some(
+      (u) => u.team === team && u.type === 'altar_of_kings' && u.hp > 0
+        && u.buildProgress < 1,
+    )
+    if (!this.altarScheduled) {
+      if (hasAltar || altarInProgress) {
+        this.altarScheduled = true
+      } else if (hasBarracks) {
+        const altarDef = BUILDINGS['altar_of_kings']
+        if (altarDef && resources.canAfford(team, altarDef.cost)) {
+          this.tryBuildBuilding('altar_of_kings', townhall, myIdleWorkers())
+        }
+      }
+    }
+
+    // ===== 2ac. Summon Paladin from Altar (uniqueness) =====
+    if (!this.paladinSummoned && hasAltar) {
+      const existingPaladin = units.some(
+        (u) => u.team === team && u.type === 'paladin' && u.hp > 0,
+      )
+      const paladinInTraining = units.some(
+        (u) => u.team === team && u.type === 'altar_of_kings' && u.isBuilding
+          && u.hp > 0 && u.buildProgress >= 1
+          && u.trainingQueue.some((item: { type: string }) => item.type === 'paladin'),
+      )
+      if (existingPaladin || paladinInTraining) {
+        this.paladinSummoned = true
+      } else {
+        const altar = units.find(
+          (u) => u.team === team && u.type === 'altar_of_kings' && u.isBuilding
+            && u.hp > 0 && u.buildProgress >= 1,
+        )
+        if (altar && altar.trainingQueue.length === 0) {
+          const pDef = UNITS['paladin']
+          if (pDef && resources.canAfford(team, pDef.cost)
+            && effectiveUsed + pDef.supply <= supply.total) {
+            resources.spend(team, pDef.cost)
+            issueCommand([], { type: 'train', building: altar, unitType: 'paladin', trainTime: pDef.trainTime })
+            this.paladinSummoned = true
+          }
+        }
+      }
+    }
+
+    // ===== 2ad. AI Paladin skill-learning priority =====
+    // Priority: Holy Light → Divine Shield → Devotion Aura → Resurrection
+    // Only learns when: alive, has skill points, meets hero level gate.
+    {
+      const paladin = units.find(
+        (u) => u.team === team && u.type === 'paladin' && u.hp > 0 && !u.isDead,
+      )
+      if (paladin && (paladin.heroSkillPoints ?? 0) > 0) {
+        const heroLevel = paladin.heroLevel ?? 1
+        if (!paladin.abilityLevels) paladin.abilityLevels = {}
+        const al = paladin.abilityLevels
+
+        const skillOrder = ['holy_light', 'divine_shield', 'devotion_aura', 'resurrection']
+        for (const skillKey of skillOrder) {
+          const currentLevel = al[skillKey] ?? 0
+          const def = HERO_ABILITY_LEVELS[skillKey]
+          if (!def || currentLevel >= def.maxLevel) continue
+          const nextData = def.levels[currentLevel]
+          if (!nextData) continue
+          if (heroLevel < nextData.requiredHeroLevel) continue
+          al[skillKey] = currentLevel + 1
+          paladin.heroSkillPoints = (paladin.heroSkillPoints ?? 1) - 1
+          break // one skill per tick
+        }
+      }
+    }
+
+    // ===== 2ae. AI Paladin defensive Holy Light =====
+    // Target selection stays simple; the Game.ts cast path owns mana, cooldown,
+    // range, learned-level and healing math.
+    {
+      const paladin = units.find(
+        (u) => u.team === team && u.type === 'paladin' && u.hp > 0 && !u.isDead
+          && (u.abilityLevels?.holy_light ?? 0) > 0,
+      )
+      if (paladin) {
+        const injuredFriendlies = units
+          .filter((u) => u.team === team && u !== paladin && !u.isBuilding && u.hp > 0 && u.hp < u.maxHp)
+          .sort((a, b) => (a.hp / a.maxHp) - (b.hp / b.maxHp))
+
+        for (const target of injuredFriendlies) {
+          if (this.ctx.castHolyLight(paladin, target)) break
+        }
+      }
+    }
+
+    // ===== 2af. AI Paladin Divine Shield self-preservation =====
+    // Low-HP trigger only. The Game.ts cast path owns mana, cooldown,
+    // duration, learned-level and invulnerability state.
+    {
+      const paladin = units.find(
+        (u) => u.team === team && u.type === 'paladin' && u.hp > 0 && !u.isDead
+          && (u.abilityLevels?.divine_shield ?? 0) > 0,
+      )
+      const hpRatio = paladin && paladin.maxHp > 0 ? paladin.hp / paladin.maxHp : 1
+      if (paladin && hpRatio <= 0.4) {
+        this.ctx.castDivineShield(paladin)
+      }
+    }
+
+    // ===== 2ag. AI Paladin Resurrection =====
+    // The Game.ts cast path owns mana, cooldown, learned-level,
+    // dead-record filtering, range, area, max-target and revive math.
+    {
+      const paladin = units.find(
+        (u) => u.team === team && u.type === 'paladin' && u.hp > 0 && !u.isDead
+          && (u.abilityLevels?.resurrection ?? 0) > 0,
+      )
+      if (paladin) {
+        this.ctx.castResurrection(paladin)
+      }
+    }
+
+    // Keep early pressure intact: V7 defense/siege tech starts after the
+    // opening wave contract is already proven in live play.
+    const canStartV7Expansion = this.waveCount >= 2
+
+    // ===== 2f. Town Hall -> Keep upgrade =====
+    // Only when opening pressure is established, base economy is stable,
+    // and resources are sufficient with production reserve.
+    if (canStartV7Expansion && townhall.type === 'townhall' && !townhall.upgradeQueue) {
+      const thDef = BUILDINGS['townhall']
+      const keepDef = BUILDINGS['keep']
+      if (thDef?.upgradeTo === 'keep' && keepDef) {
+        // Reserve enough for continued production: at least 2 footmen worth of gold
+        const productionReserveGold = (UNITS['footman']?.cost.gold ?? 0) * 2
+        const canAffordUpgrade = resources.canAfford(team, keepDef.cost)
+          && resources.get(team).gold >= keepDef.cost.gold + productionReserveGold
+        if (canAffordUpgrade && hasBarracks && hasBlacksmith) {
+          resources.spend(team, keepDef.cost)
+          issueCommand([], {
+            type: 'upgradeBuilding',
+            building: townhall,
+            targetKey: 'keep',
+            upgradeTime: keepDef.buildTime,
+          })
+        }
+      }
+    }
+
+    if (canStartV7Expansion) {
+      // ===== 2b-V7. 有铁匠铺 → 建伐木场（解锁箭塔）=====
+      const hasLumberMill = units.some(
+        (u) => u.team === team && u.type === 'lumber_mill' && u.hp > 0
+          && u.buildProgress >= 1,
+      )
+      const lumberMillInProgress = units.some(
+        (u) => u.team === team && u.type === 'lumber_mill' && u.hp > 0
+          && u.buildProgress < 1,
+      )
+      if (hasBlacksmith && !hasLumberMill && !lumberMillInProgress) {
+        const lmDef = BUILDINGS['lumber_mill']
+        if (lmDef && resources.canAfford(team, lmDef.cost)) {
+          this.tryBuildBuilding('lumber_mill', townhall, myIdleWorkers())
+        }
+      }
+
+      // ===== 2c-V7. 有伐木场 → 建箭塔（防御）=====
+      const towerCount = units.filter(
+        (u) => u.team === team && u.type === 'tower' && u.hp > 0 && u.buildProgress >= 1,
+      ).length
+      const towerInProgress = units.some(
+        (u) => u.team === team && u.type === 'tower' && u.hp > 0
+          && u.buildProgress < 1,
+      )
+      // 最多造2座箭塔
+      if (hasLumberMill && towerCount < 2 && !towerInProgress) {
+        const towerDef = BUILDINGS['tower']
+        if (towerDef && resources.canAfford(team, towerDef.cost)) {
+          this.tryBuildBuilding('tower', townhall, myIdleWorkers())
+        }
+      }
+
+      // ===== 2d-V7. 有铁匠铺 → 建车间（解锁迫击炮小队）=====
+      const hasWorkshop = units.some(
+        (u) => u.team === team && u.type === 'workshop' && u.hp > 0
+          && u.buildProgress >= 1,
+      )
+      const workshopInProgress = units.some(
+        (u) => u.team === team && u.type === 'workshop' && u.hp > 0
+          && u.buildProgress < 1,
+      )
+      if (hasBlacksmith && !hasWorkshop && !workshopInProgress) {
+        const wsDef = BUILDINGS['workshop']
+        if (wsDef && resources.canAfford(team, wsDef.cost)) {
+          this.tryBuildBuilding('workshop', townhall, myIdleWorkers())
+        }
+      }
+
+      // ===== 2e-V7. 建奥秘圣殿（解锁牧师，需 Keep）=====
+      const hasArcaneSanctum = units.some(
+        (u) => u.team === team && u.type === 'arcane_sanctum' && u.hp > 0
+          && u.buildProgress >= 1,
+      )
+      const arcaneSanctumInProgress = units.some(
+        (u) => u.team === team && u.type === 'arcane_sanctum' && u.hp > 0
+          && u.buildProgress < 1,
+      )
+      if (!hasArcaneSanctum && !arcaneSanctumInProgress) {
+        const asDef = BUILDINGS['arcane_sanctum']
+        if (asDef && resources.canAfford(team, asDef.cost)) {
+          this.tryBuildBuilding('arcane_sanctum', townhall, myIdleWorkers())
+        }
+      }
+    }
+
+    // ===== 2e. 有铁匠铺 → 研究 Long Rifles（一次性）=====
+    if (hasBlacksmith) {
+      const blacksmith = units.find(
+        (u) => u.team === team && u.type === 'blacksmith' && u.isBuilding && u.hp > 0
+          && u.buildProgress >= 1,
+      )
+      if (blacksmith && !blacksmith.completedResearches.includes('long_rifles')
+        && blacksmith.researchQueue.length === 0) {
+        const lrDef = RESEARCHES['long_rifles']
+        const canAffordOpeningResearch = lrDef && (
+          this.waveCount > 0
+          || resources.get(team).gold >= lrDef.cost.gold + openingFootmanReserveGold
+        )
+        if (lrDef && canAffordOpeningResearch && resources.canAfford(team, lrDef.cost)) {
+          resources.spend(team, lrDef.cost)
+          blacksmith.researchQueue.push({ key: 'long_rifles', remaining: lrDef.researchTime })
+        }
+      }
+    }
+
     // ===== 3. 空闲农民分配（在建造需求之后）=====
     // 建造已用掉部分空闲农民，剩余的分配到采集
     this.assignIdleWorkers(myIdleWorkers(), townhall)
 
     // ===== 4. 训练农民（检查 supply 含训练队列）=====
-    if (workerCount < this.maxWorkers) {
+    // Do not let opening worker production consume the first pressure wave.
+    const workerCap = this.waveCount === 0 ? Math.min(this.maxWorkers, 6) : this.maxWorkers
+    if (workerCount + queuedWorkers < workerCap) {
       const wDef = UNITS['worker']
       if (wDef && townhall.trainingQueue.length < 2) {
         const wSupplyCost = wDef.supply
@@ -201,48 +469,211 @@ export class SimpleAI {
           resources.spend(team, wDef.cost)
           issueCommand([], { type: 'train', building: townhall, unitType: 'worker', trainTime: wDef.trainTime })
           queuedSupply += wSupplyCost  // 更新队列 supply 计数
+          queuedWorkers++
         }
       }
     }
 
-    // ===== 5. 有兵营 → 训练步兵（检查 supply 含训练队列）=====
+    // ===== 5. 有兵营 → 训练军事单位（检查 supply 含训练队列）=====
     const barracks = units.find(
       (u) => u.team === team && u.type === 'barracks' && u.isBuilding && u.hp > 0
         && u.buildProgress >= 1,
     )
     if (barracks) {
       this.barracksBuilt = true
-      const fDef = UNITS['footman']
-      if (fDef && resources.canAfford(team, fDef.cost) && barracks.trainingQueue.length < 2) {
-        const fSupplyCost = fDef.supply
-        if (effectiveUsed + fSupplyCost <= supply.total) {
-          resources.spend(team, fDef.cost)
-          issueCommand([], { type: 'train', building: barracks, unitType: 'footman', trainTime: fDef.trainTime })
+
+      // Count existing military to decide composition ratio
+      const existingFootmen = myUnits('footman').filter((u) => !u.isBuilding).length
+      const existingRiflemen = myUnits('rifleman').filter((u) => !u.isBuilding).length
+
+      // Decide what to train: prefer rifleman if blacksmith is up and ratio allows
+      let unitType: string | null = null
+      let unitDef = null
+      if (hasBlacksmith && existingRiflemen < existingFootmen + 1) {
+        // Train rifleman (cap at footmen+1 to maintain a healthy mix)
+        const rDef = UNITS['rifleman']
+        if (rDef && resources.canAfford(team, rDef.cost)) {
+          unitType = 'rifleman'
+          unitDef = rDef
+        }
+      }
+      if (!unitType) {
+        // Default to footman
+        const fDef = UNITS['footman']
+        if (fDef && resources.canAfford(team, fDef.cost)) {
+          unitType = 'footman'
+          unitDef = fDef
+        }
+      }
+
+      if (unitType && unitDef && barracks.trainingQueue.length < 2) {
+        const uSupplyCost = unitDef.supply
+        if (effectiveUsed + uSupplyCost <= supply.total) {
+          resources.spend(team, unitDef.cost)
+          issueCommand([], { type: 'train', building: barracks, unitType, trainTime: unitDef.trainTime })
         }
       }
     }
 
-    // ===== 6. 步兵积累到阈值 → 进攻 =====
-    const idleFootmen = units.filter(
-      (u) => u.team === team && u.type === 'footman' && !u.isBuilding && u.hp > 0
-        && (u.state === UnitState.Idle || u.state === UnitState.Moving),
+    // ===== 5b-V7. 有车间 → 训练迫击炮小队（检查 supply 含训练队列）=====
+    const workshop = units.find(
+      (u) => u.team === team && u.type === 'workshop' && u.isBuilding && u.hp > 0
+        && u.buildProgress >= 1,
     )
-    const waveReadyFootmen = units.filter(
-      (u) => u.team === team && u.type === 'footman' && !u.isBuilding && u.hp > 0
-        && (u.state === UnitState.Idle || u.state === UnitState.Moving || u.state === UnitState.AttackMove),
+    if (workshop) {
+      const existingMortars = myUnits('mortar_team').filter((u) => !u.isBuilding).length
+      // 最多训练2个迫击炮小队
+      if (existingMortars < 2 && workshop.trainingQueue.length < 2) {
+        const mDef = UNITS['mortar_team']
+        if (mDef && resources.canAfford(team, mDef.cost)
+          && effectiveUsed + mDef.supply <= supply.total) {
+          resources.spend(team, mDef.cost)
+          issueCommand([], { type: 'train', building: workshop, unitType: 'mortar_team', trainTime: mDef.trainTime })
+          queuedSupply += mDef.supply
+        }
+      }
+    }
+
+    // ===== 5c. 有奥秘圣殿 → 训练牧师（检查 supply 含训练队列）=====
+    const sanctum = units.find(
+      (u) => u.team === team && u.type === 'arcane_sanctum' && u.isBuilding && u.hp > 0
+        && u.buildProgress >= 1,
     )
-    const allFootmen = units.filter(
-      (u) => u.team === team && u.type === 'footman' && !u.isBuilding && u.hp > 0,
+    if (sanctum) {
+      const existingPriests = myUnits('priest').filter((u) => !u.isBuilding).length
+      if (existingPriests < 2 && sanctum.trainingQueue.length < 2) {
+        const pDef = UNITS['priest']
+        if (pDef && resources.canAfford(team, pDef.cost)
+          && effectiveUsed + pDef.supply <= supply.total) {
+          resources.spend(team, pDef.cost)
+          issueCommand([], { type: 'train', building: sanctum, unitType: 'priest', trainTime: pDef.trainTime })
+          queuedSupply += pDef.supply
+        }
+      }
+    }
+
+    // ===== 5d-AWT. Animal War Training research (one-shot, Castle-era) =====
+    // Strategy contract: docs/V9_HN7_ANIMAL_WAR_TRAINING_AI_STRATEGY_CONTRACT.zh-CN.md
+    if (townhall.type === BUILDINGS.castle.key && barracks) {
+      const awtDef = RESEARCHES.animal_war_training
+      const awtKey = awtDef?.key
+      const awtHasLumberMill = units.some(
+        (u) => u.team === team && u.type === BUILDINGS.lumber_mill.key && u.hp > 0 && u.buildProgress >= 1,
+      )
+      if (awtDef && awtKey && !barracks.completedResearches.includes(awtKey)
+        && barracks.researchQueue.length === 0
+        && hasBlacksmith && awtHasLumberMill
+        && (myUnits(UNITS.knight.key).length > 0
+          || barracks.trainingQueue.some((i: { type: string }) => i.type === UNITS.knight.key))) {
+        const wCost = UNITS.worker?.cost ?? { gold: 0, lumber: 0 }
+        const fCost = UNITS.footman?.cost ?? { gold: 0, lumber: 0 }
+        if (resources.canAfford(team, awtDef.cost)
+          && resources.get(team).gold >= awtDef.cost.gold + wCost.gold + fCost.gold) {
+          resources.spend(team, awtDef.cost)
+          barracks.researchQueue.push({ key: awtKey, remaining: awtDef.researchTime })
+        }
+      }
+    }
+
+    // ===== 5e. Blacksmith upgrade chains (melee / plating / ranged) =====
+    // Strategy contract: docs/V9_HN7_BLACKSMITH_UPGRADE_AI_STRATEGY_CONTRACT.zh-CN.md
+    if (hasBlacksmith && this.waveCount >= 1) {
+      const blacksmith = units.find(
+        (u) => u.team === team && u.type === 'blacksmith' && u.isBuilding && u.hp > 0
+          && u.buildProgress >= 1,
+      )
+      if (blacksmith && blacksmith.researchQueue.length === 0) {
+        const completed = new Set(blacksmith.completedResearches)
+        const hasMeleeUnit = myUnits(UNITS.footman.key).length > 0 || myUnits(UNITS.knight.key).length > 0
+        const hasRangedUnit = myUnits(UNITS.rifleman.key).length > 0
+          || myUnits(UNITS.mortar_team.key).length > 0
+        const hasLongRifles = completed.has(RESEARCHES.long_rifles.key)
+        const wCost = UNITS.worker?.cost ?? { gold: 0, lumber: 0 }
+        const fCost = UNITS.footman?.cost ?? { gold: 0, lumber: 0 }
+
+        // Ordered upgrade candidates: melee L1, plating L1, ranged L1, then L2s, then L3s
+        const upgradeOrder = [
+          RESEARCHES.iron_forged_swords,   // melee L1
+          RESEARCHES.iron_plating,          // plating L1
+          RESEARCHES.black_gunpowder,       // ranged L1
+          RESEARCHES.steel_forged_swords,   // melee L2
+          RESEARCHES.steel_plating,         // plating L2
+          RESEARCHES.refined_gunpowder,     // ranged L2
+          RESEARCHES.mithril_forged_swords, // melee L3
+          RESEARCHES.mithril_plating,       // plating L3
+          RESEARCHES.imbued_gunpowder,      // ranged L3
+        ]
+
+        for (const def of upgradeOrder) {
+          if (!def) continue
+          if (completed.has(def.key)) continue
+
+          // Data-driven tier gate: def.requiresBuilding must match townhall tier
+          const reqBuilding = def.requiresBuilding
+          let tierOk = true
+          if (reqBuilding && reqBuilding !== BUILDINGS.blacksmith.key) {
+            if (reqBuilding === BUILDINGS.castle.key) {
+              tierOk = townhall.type === BUILDINGS.castle.key
+            } else if (reqBuilding === BUILDINGS.keep.key) {
+              tierOk = townhall.type === BUILDINGS.keep.key || townhall.type === BUILDINGS.castle.key
+            }
+          }
+          if (!tierOk) continue
+
+          // Data-driven prerequisite gate
+          if (def.prerequisiteResearch && !completed.has(def.prerequisiteResearch)) continue
+
+          // Unit presence gate: determine from effects which unit types are affected
+          const targetTypes = (def.effects ?? []).map(e => e.targetUnitType)
+          const affectsRanged = targetTypes.some(t => t === 'rifleman' || t === 'mortar_team')
+          const affectsMelee = targetTypes.some(t => t === 'footman' || t === 'militia' || t === 'knight')
+
+          if (affectsRanged && !affectsMelee) {
+            // Ranged-only upgrade: need ranged units + Long Rifles done (for L1+)
+            if (!hasRangedUnit) continue
+            if (!hasLongRifles) continue
+          } else if (affectsMelee) {
+            if (!hasMeleeUnit) continue
+          }
+
+          if (resources.canAfford(team, def.cost)
+            && resources.get(team).gold >= def.cost.gold + wCost.gold + fCost.gold) {
+            resources.spend(team, def.cost)
+            blacksmith.researchQueue.push({ key: def.key, remaining: def.researchTime })
+            break // one upgrade per tick
+          }
+        }
+      }
+    }
+
+    // ===== 6. 军事单位积累到阈值 → 进攻 =====
+    const isIdleOrMoving = (u: Unit) =>
+      u.state === UnitState.Idle || u.state === UnitState.Moving
+    const isReadyForWave = (u: Unit) =>
+      u.state === UnitState.Idle || u.state === UnitState.Moving || u.state === UnitState.AttackMove
+
+    // V7: mortar_team 也算军事单位；Priest 的随军支援留给独立编队任务。
+    const isMilitaryType = (u: Unit) =>
+      u.type === 'footman' || u.type === 'rifleman' || u.type === 'mortar_team'
+
+    const idleMilitary = units.filter(
+      (u) => u.team === team && !u.isBuilding && u.hp > 0
+        && isMilitaryType(u) && isIdleOrMoving(u),
+    )
+    const waveReadyMilitary = units.filter(
+      (u) => u.team === team && !u.isBuilding && u.hp > 0
+        && isMilitaryType(u) && isReadyForWave(u),
+    )
+    const allMilitary = units.filter(
+      (u) => u.team === team && !u.isBuilding && u.hp > 0
+        && isMilitaryType(u),
     )
 
-    if (waveReadyFootmen.length >= this.attackWaveSize && !this.attackWaveSent) {
-      // 选择攻击目标：优先级 敌方单位 > 敌方建筑 > 敌方主基地
+    if (waveReadyMilitary.length >= this.attackWaveSize && !this.attackWaveSent) {
       const target = this.selectAttackTarget(team)
       if (target) {
-        // 使用 attackMove 到目标位置，而不是直接 attack 目标单位
-        // 这样部队会沿途交战，更自然
-        issueCommand(waveReadyFootmen, { type: 'attackMove', target: target.mesh.position.clone() })
-        for (const f of waveReadyFootmen) {
+        issueCommand(waveReadyMilitary, { type: 'attackMove', target: target.mesh.position.clone() })
+        for (const f of waveReadyMilitary) {
           this.ctx.planPath(f, target.mesh.position)
         }
         this.attackWaveSent = true
@@ -254,21 +685,17 @@ export class SimpleAI {
     // 进攻波次恢复：全灭或剩余少量且积累足够新兵 → 允许下一波
     if (this.attackWaveSent) {
       const ticksSinceWave = this.tickCount - this.attackWaveSentTick
-      // 全灭 → 立即重置
-      if (allFootmen.length === 0) {
+      if (allMilitary.length === 0) {
         this.attackWaveSent = false
       }
-      // 残存少且新兵积累够了 → 也允许下一波（避免单个幸存者卡死进攻）
-      else if (allFootmen.length <= 2 && idleFootmen.length >= this.attackWaveSize) {
+      else if (allMilitary.length <= 2 && idleMilitary.length >= this.attackWaveSize) {
         this.attackWaveSent = false
       }
-      // 超时重置：波次发出超过 60s（≈ 60 ticks）且有新步兵空闲 → 允许下一波
-      // 解决所有步兵都在 AttackMove 状态而无法触发重置的死锁
-      else if (ticksSinceWave >= 60 && waveReadyFootmen.length >= this.attackWaveSize) {
+      else if (ticksSinceWave >= 60 && waveReadyMilitary.length >= this.attackWaveSize) {
         this.attackWaveSent = false
       }
       // aggressive profile：只要新兵够就继续发波
-      else if (this.profile.aggressivePressure && waveReadyFootmen.length >= this.attackWaveSize + 2) {
+      else if (this.profile.aggressivePressure && waveReadyMilitary.length >= this.attackWaveSize + 2) {
         this.attackWaveSent = false
       }
     }
@@ -318,7 +745,7 @@ export class SimpleAI {
     if (enemies.length === 0) return null
 
     // 找敌方主基地作为 fallback
-    const enemyHall = enemies.find(u => u.type === 'townhall')
+    const enemyHall = enemies.find(u => u.type === 'townhall' || u.type === 'keep' || u.type === 'castle')
 
     // 优先攻击敌方 worker（经济骚扰）
     const enemyWorkers = enemies.filter(
@@ -415,10 +842,18 @@ export class SimpleAI {
    * 如果没有空闲农民，跳过。
    */
   private tryBuildBuilding(buildingKey: string, townhall: Unit, idleWorkers: Unit[]) {
-    const { team, resources, placement } = this.ctx
+    const { team, resources, placement, units } = this.ctx
     const bDef = BUILDINGS[buildingKey]
     if (!bDef) return
     if (!resources.canAfford(team, bDef.cost)) return
+
+    // V7: 检查建筑前置科技（如箭塔需要伐木场）
+    if (bDef.techPrereq) {
+      const hasPrereq = units.some(
+        (u) => u.team === team && u.type === bDef.techPrereq && u.hp > 0 && u.buildProgress >= 1,
+      )
+      if (!hasPrereq) return
+    }
 
     // 找 builder（优先空闲农民，其次采矿农民）
     let builder = idleWorkers[0]
@@ -442,6 +877,7 @@ export class SimpleAI {
       if (result.ok) {
         const building = this.ctx.spawnBuilding(buildingKey, team, bx, bz)
         building.buildProgress = 0
+        building.builder = builder
         building.mesh.scale.setScalar(0.3)
         const bMesh = building.mesh.children[0] as THREE.Mesh | undefined
         const bMat = bMesh?.material as THREE.MeshLambertMaterial | undefined
@@ -449,7 +885,16 @@ export class SimpleAI {
 
         resources.spend(team, bDef.cost)
         issueCommand([builder], { type: 'build', target: building })
-        this.ctx.planPath(builder, building.mesh.position)
+        // Match the player-side contract: if pathing says the worker is
+        // already at the best reachable build position beside a blocked
+        // footprint, begin Building immediately instead of leaving a
+        // zero-progress shell waiting on an unreachable center point.
+        const hasPath = this.ctx.planPath(builder, building.mesh.position)
+        if (!hasPath) {
+          builder.waypoints = []
+          builder.moveTarget = null
+          builder.state = UnitState.Building
+        }
         return  // 成功放置，退出
       }
     }

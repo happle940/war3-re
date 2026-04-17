@@ -1,0 +1,174 @@
+{
+  "sweep_id": "human-unit-asset-preview-sweep-001",
+  "branch": "codex/asset-public-share",
+  "prepared_at": "2026-04-16",
+  "batch": "A-Human unit readability",
+  "runtime_asset_changes": false,
+  "approved_for_import": [],
+  "approved_for_intake": [
+    "human-kaykit-knight-footman-body-001",
+    "human-kaykit-mage-caster-body-001",
+    "human-kaykit-rig-medium-animation-core-001"
+  ],
+  "artifacts": {
+    "downloads": [
+      "artifacts/asset-intake/downloads/kaykit-browser/KayKit_Adventurers_2.0_FREE.zip",
+      "artifacts/asset-intake/downloads/kaykit-browser/KayKit_Character_Animations_1.1.zip"
+    ],
+    "source_pages": [
+      "artifacts/asset-intake/source-pages/kaykit-adventurers.html",
+      "artifacts/asset-intake/source-pages/kaykit-character-animations.html"
+    ],
+    "browser_evidence": [
+      "artifacts/asset-intake/preview/kaykit-browser/kaykit-adventurers-purchase.png",
+      "artifacts/asset-intake/preview/kaykit-browser/kaykit-adventurers-download-page.png",
+      "artifacts/asset-intake/preview/kaykit-browser/kaykit-character-animations-purchase.png",
+      "artifacts/asset-intake/preview/kaykit-browser/kaykit-character-animations-download-page.png"
+    ],
+    "manifests": [
+      "artifacts/asset-intake/manifests/kaykit_adventurers_free_2.0.files.txt",
+      "artifacts/asset-intake/manifests/kaykit_adventurers_glb_inventory.json",
+      "artifacts/asset-intake/manifests/kaykit_character_animations_1.1.files.txt",
+      "artifacts/asset-intake/manifests/kaykit_character_animations_glb_inventory.json"
+    ],
+    "preview": "artifacts/asset-intake/preview/kaykit-human-units-rts-preview.png",
+    "preview_metrics": "artifacts/asset-intake/preview/kaykit-human-units-preview.metrics.json",
+    "retarget_spike": {
+      "docs": [
+        "docs/HUMAN_UNIT_ANIMATION_RETARGET_SPIKE_001.zh-CN.md",
+        "docs/HUMAN_UNIT_ANIMATION_RETARGET_SPIKE_001.json"
+      ],
+      "preview": "artifacts/asset-intake/preview/kaykit-animation-retarget-spike.png",
+      "metrics": "artifacts/asset-intake/preview/kaykit-animation-retarget-spike.metrics.json"
+    }
+  },
+  "sources": [
+    {
+      "source_name": "KayKit Adventurers",
+      "source_url": "https://kaylousberg.itch.io/kaykit-adventurers",
+      "acquisition_method": "Official itch name-your-own-price free flow; direct_download_btn then Free 2.0 download.",
+      "free_file": "KayKit_Adventurers_2.0_FREE.zip",
+      "sha256": "abe48f4763fba0896bab486ee9e6d08ca6b5b3884b9601f235c8847ae94dc479",
+      "license": "CC0",
+      "license_file": "KayKit_Adventurers_2.0_FREE/License.txt",
+      "zip_entries": 266
+    },
+    {
+      "source_name": "KayKit Character Animations",
+      "source_url": "https://kaylousberg.itch.io/kaykit-character-animations",
+      "acquisition_method": "Official itch name-your-own-price free flow; direct_download_btn then Free 1.1 download.",
+      "free_file": "KayKit_Character_Animations_1.1.zip",
+      "sha256": "65882f31f905ad2e953819648a59287cdeab8f623908d5ef701971d3758be20f",
+      "license": "CC0",
+      "license_file": "KayKit_Character_Animations_1.1/License.txt",
+      "zip_entries": 48
+    }
+  ],
+  "sub_candidates": [
+    {
+      "sub_candidate_id": "human-kaykit-knight-footman-body-001",
+      "parent_candidate_id": "pub-ah-kaykit-adventurers-001",
+      "source_files": [
+        "KayKit_Adventurers_2.0_FREE/Characters/gltf/Knight.glb"
+      ],
+      "target_runtime_keys": [
+        "footman"
+      ],
+      "status": "approved-for-intake",
+      "readability": "pass-with-tuning",
+      "decision": "Clear armored infantry silhouette from RTS camera; useful for Footman intake. Not mounted and not a Knight cavalry solution."
+    },
+    {
+      "sub_candidate_id": "human-kaykit-mage-caster-body-001",
+      "parent_candidate_id": "pub-ah-kaykit-adventurers-001",
+      "source_files": [
+        "KayKit_Adventurers_2.0_FREE/Characters/gltf/Mage.glb"
+      ],
+      "target_runtime_keys": [
+        "sorceress",
+        "priest"
+      ],
+      "status": "approved-for-intake",
+      "readability": "pass-with-tuning",
+      "decision": "Strong caster silhouette; needs color, staff/wand, spell VFX, and role split before import."
+    },
+    {
+      "sub_candidate_id": "human-kaykit-rig-medium-animation-core-001",
+      "parent_candidate_id": "pub-ah-kaykit-character-animations-001",
+      "source_files": [
+        "KayKit_Character_Animations_1.1/Animations/gltf/Rig_Medium/Rig_Medium_MovementBasic.glb",
+        "KayKit_Character_Animations_1.1/Animations/gltf/Rig_Medium/Rig_Medium_General.glb",
+        "KayKit_Character_Animations_1.1/Animations/gltf/Rig_Medium/Rig_Medium_CombatMelee.glb",
+        "KayKit_Character_Animations_1.1/Animations/gltf/Rig_Medium/Rig_Medium_CombatRanged.glb",
+        "KayKit_Character_Animations_1.1/Animations/gltf/Rig_Medium/Rig_Medium_Tools.glb"
+      ],
+      "target_runtime_keys": [
+        "footman",
+        "rifleman_proxy",
+        "sorceress",
+        "priest",
+        "worker_proxy"
+      ],
+      "status": "approved-for-intake",
+      "readability": "not-visual-body",
+      "decision": "Good CC0 humanoid animation pool; must pass retarget and runtime mixer validation before import."
+    },
+    {
+      "sub_candidate_id": "human-kaykit-ranger-ranged-proxy-001",
+      "parent_candidate_id": "pub-ah-kaykit-adventurers-001",
+      "source_files": [
+        "KayKit_Adventurers_2.0_FREE/Characters/gltf/Ranger.glb",
+        "KayKit_Adventurers_2.0_FREE/Assets/gltf/crossbow_2handed.gltf"
+      ],
+      "target_runtime_keys": [
+        "rifleman_proxy"
+      ],
+      "status": "candidate",
+      "readability": "pass-as-ranged-not-rifleman",
+      "decision": "Readable ranged unit but bow/crossbow semantics do not solve Rifleman."
+    },
+    {
+      "sub_candidate_id": "human-kaykit-mounted-knight-gap-001",
+      "parent_candidate_id": "pub-ah-kaykit-adventurers-001",
+      "source_files": [],
+      "target_runtime_keys": [
+        "knight"
+      ],
+      "status": "blocked-gap",
+      "readability": "missing",
+      "decision": "No horse, mounted rig, or cavalry body in the free package."
+    },
+    {
+      "sub_candidate_id": "human-kaykit-worker-gap-001",
+      "parent_candidate_id": "pub-ah-kaykit-adventurers-001",
+      "source_files": [],
+      "target_runtime_keys": [
+        "worker"
+      ],
+      "status": "blocked-gap",
+      "readability": "missing",
+      "decision": "A sample engineer image exists, but no engineer GLB is present in the free package."
+    }
+  ],
+  "blocked_for_import_reasons": [
+    "No target runtime file plan accepted yet.",
+    "No scale, pivot, selection ring, or footprint plan yet.",
+    "No team-color or role-color plan yet.",
+    "No retarget spike for KayKit character GLBs and Rig_Medium animation GLBs yet.",
+    "No true Rifleman firearm silhouette yet.",
+    "No mounted Knight solution yet.",
+    "No Worker model solution yet.",
+    "No Asset Approval Handoff Packet yet.",
+    "No fallback regression expectations yet."
+  ],
+  "animation_retarget_spike_summary": {
+    "status": "sampled-bind-pass-intake-only",
+    "sampled_pairs": [
+      "Knight.glb + Rig_Medium_CombatMelee.glb / Melee_1H_Attack_Slice_Horizontal",
+      "Ranger.glb + Rig_Medium_CombatRanged.glb / Ranged_2H_Shoot",
+      "Mage.glb + Rig_Medium_General.glb / Idle_A"
+    ],
+    "missing_track_targets": 0,
+    "runtime_import_approved": false
+  }
+}

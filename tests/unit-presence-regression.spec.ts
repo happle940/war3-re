@@ -88,7 +88,9 @@ test.describe('Unit Presence Regression', () => {
     expect(result.ok).toBe(true)
     expect(result.workerCount).toBeGreaterThanOrEqual(5)
     expect(result.blockedCount).toBe(0)
-    expect(result.minDist).toBeGreaterThan(0.5)
+    // Workers auto-gather gold after V3-OPEN1, so they converge near the mine.
+    // 0.1 still catches exact stacking while allowing natural gather convergence.
+    expect(result.minDist).toBeGreaterThan(0.1)
     expect(severeConsoleErrors(page)).toHaveLength(0)
   })
 

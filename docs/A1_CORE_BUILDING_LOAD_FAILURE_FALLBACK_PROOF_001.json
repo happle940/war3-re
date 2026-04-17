@@ -1,0 +1,55 @@
+{
+  "proof_id": "a1-core-building-load-failure-fallback-proof-001",
+  "branch": "codex/asset-public-share",
+  "prepared_at": "2026-04-16",
+  "runtime_asset_changes": false,
+  "approved_for_import": [],
+  "command": "./scripts/run-runtime-tests.sh tests/asset-pipeline-regression.spec.ts tests/v3-asset-fallback-catalog-proof.spec.ts --reporter=list",
+  "result": {
+    "status": "passed",
+    "total_tests": 11,
+    "failed_tests": 0,
+    "duration": "1.4m"
+  },
+  "coverage_summary": [
+    "browser-side fake asset clone/material/team-color/refresh contract passed",
+    "missing asset paths still create visible fallback visuals for worker, footman, townhall, barracks, farm, tower, and goldmine",
+    "explicit refresh preserves live entity position and rotation",
+    "startup and refresh produce no severe console errors",
+    "manifest status audit has no unapproved imports and no external asset URLs",
+    "worker uses forced RTS proxy with team color",
+    "tree line uses procedural fallback",
+    "nine A1 target keys map to fallback routes",
+    "comprehensive V3-AV1 fallback audit passes"
+  ],
+  "important_runtime_observations": {
+    "manifest_status_audit_type_checks": [
+      "townhall",
+      "goldmine",
+      "barracks",
+      "worker",
+      "blacksmith",
+      "farm",
+      "footman",
+      "tower"
+    ],
+    "manifest_status_audit_all_meshes_valid": true,
+    "manifest_status_audit_trees_valid": true,
+    "manifest_status_audit_tree_count": 187,
+    "manifest_status_audit_pathing_grid_exists": true,
+    "manifest_status_audit_no_external_imports": true,
+    "closeout_audit_no_console_errors": true,
+    "closeout_audit_terrain_aid_manifest_only": true
+  },
+  "product_verdict": {
+    "overall": "fallback-safety-net-passed-for-pre-import-stage",
+    "summary": "The current S0/project-proxy fallback system is stable enough to protect a later Quaternius import attempt, provided the import keeps deterministic fallback paths and does not remove S0 proxies."
+  },
+  "remaining_blockers_for_import": [
+    "This test did not import Quaternius GLBs; it proves the current fallback safety net only.",
+    "Goldmine real gather loop with Mine + Resource Gold composition still needs a smoke proof.",
+    "Tower projectile spawn and target/range proof with candidate height still needs a smoke proof.",
+    "Town Hall/Barracks/Farm construction, selection, training, and rally behavior with candidate scales still needs proof.",
+    "No approved-for-import packet exists."
+  ]
+}

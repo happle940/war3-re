@@ -168,6 +168,43 @@ test.describe('Construction Lifecycle Contracts', () => {
     expect(severeConsoleErrors(page)).toHaveLength(0)
   })
 
+  test('worker at building edge enters Building without reaching blocked center', async ({ page }) => {
+    await waitForGame(page)
+
+    const result = await page.evaluate(() => {
+      const g = (window as any).__war3Game
+      if (!g) return { ok: false, reason: 'no game' }
+
+      const worker = g.spawnUnit('worker', 0, 40, 40)
+      const farm = g.spawnBuilding('farm', 0, 42, 40)
+      farm.buildProgress = 0.2
+      farm.builder = worker
+
+      worker.mesh.position.set(farm.mesh.position.x + 1.4, worker.mesh.position.y, farm.mesh.position.z)
+      worker.state = 5 // MovingToBuild
+      worker.buildTarget = farm
+      worker.moveTarget = farm.mesh.position.clone()
+      worker.waypoints = []
+
+      g.updateUnitState(worker, 0.016)
+      g.updateBuildProgress(farm, 1)
+
+      return {
+        ok: true,
+        workerState: worker.state,
+        moveTargetCleared: worker.moveTarget === null,
+        progressAfterTick: farm.buildProgress,
+      }
+    })
+
+    if (!result.ok) await diagnose(page, 'build-edge-interaction')
+    expect(result.ok).toBe(true)
+    expect(result.workerState).toBe(S.Building)
+    expect(result.moveTargetCleared).toBe(true)
+    expect(result.progressAfterTick).toBeGreaterThan(0.2)
+    expect(severeConsoleErrors(page)).toHaveLength(0)
+  })
+
   test('canceling under-construction building removes it and releases occupancy', async ({ page }) => {
     await waitForGame(page)
 
@@ -301,7 +338,7 @@ test.describe('Construction Lifecycle Contracts', () => {
     expect(result.farmStillInUnits).toBe(false)
     expect(result.selectedCount).toBe(0)
     expect(result.ringCount).toBe(0)
-    expect(result.commandChildren).toBe(8)
+    expect(result.commandChildren).toBe(16)
     expect(result.unitName).toBe('未选择单位')
     expect(severeConsoleErrors(page)).toHaveLength(0)
   })

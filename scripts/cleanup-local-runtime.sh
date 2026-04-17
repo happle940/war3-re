@@ -57,6 +57,10 @@ fi
 
 # Stop local dev/preview servers and Playwright runs launched from this repo.
 pkill -f "$ROOT_DIR/node_modules/.bin/vite" 2>/dev/null || true
+if [[ "${FORCE_RUNTIME_CLEANUP:-0}" == "1" ]]; then
+  pkill -f "bash ./scripts/run-runtime-tests.sh" 2>/dev/null || true
+  pkill -f "$ROOT_DIR/scripts/run-runtime-tests.sh" 2>/dev/null || true
+fi
 if [[ "$KILL_PLAYWRIGHT_PROCS" == "1" ]]; then
   pkill -f "$ROOT_DIR/node_modules/playwright" 2>/dev/null || true
   pkill -f "playwright test" 2>/dev/null || true
@@ -84,6 +88,14 @@ tell application "Google Chrome"
   end repeat
 end tell
 APPLESCRIPT
+fi
+
+if [[ "${FORCE_RUNTIME_CLEANUP:-0}" == "1" && -d "$LOCK_DIR" ]]; then
+  holder_pid="$(cat "$LOCK_DIR/pid" 2>/dev/null || true)"
+  if [[ -z "$holder_pid" ]] || ! kill -0 "$holder_pid" 2>/dev/null; then
+    echo "Removing stale runtime test lock."
+    rm -rf "$LOCK_DIR"
+  fi
 fi
 
 echo "Local runtime cleanup complete."
