@@ -840,6 +840,10 @@ export class Game {
 
     switch (unit.state) {
       case UnitState.MovingToGather: {
+        if (!this.validateResourceTarget(unit)) {
+          this.startGatherNearest(unit)
+          break
+        }
         const reachedGatherInteraction = this.hasReachedGatherInteraction(unit)
         if (unit.moveTarget && !reachedGatherInteraction) return
         if (unit.moveTarget) {
