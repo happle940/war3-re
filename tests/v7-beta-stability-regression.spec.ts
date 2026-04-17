@@ -66,7 +66,7 @@ test.describe('V7 Beta Stability Regression', () => {
     expect(PEASANT_BUILD_MENU).toContain('workshop')
 
     expect(BUILDINGS.tower.techPrereq).toBe('lumber_mill')
-    expect(BUILDINGS.arcane_sanctum.techPrereq).toBe('barracks')
+    expect(BUILDINGS.arcane_sanctum.techPrereq).toBe('keep')
     expect(BUILDINGS.arcane_sanctum.trains).toContain('priest')
     expect(BUILDINGS.workshop.trains).toContain('mortar_team')
 
