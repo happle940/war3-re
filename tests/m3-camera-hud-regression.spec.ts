@@ -85,6 +85,40 @@ async function selectFirstWorker(page: Page): Promise<void> {
 test.describe('M3 Camera/HUD Readability', () => {
   test.setTimeout(60000)
 
+  test('keyboard camera pan keeps WASD free for unit commands', async ({ page }) => {
+    await waitForGame(page)
+
+    const result = await page.evaluate(() => {
+      const g = (window as any).__war3Game
+      if (!g?.cameraCtrl) return { ok: false, reason: 'no camera controller' }
+
+      const before = g.cameraCtrl.getTarget()
+      for (const key of ['w', 'a', 's', 'd']) {
+        window.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true }))
+      }
+      for (let i = 0; i < 45; i++) g.cameraCtrl.update(1 / 60)
+      for (const key of ['w', 'a', 's', 'd']) {
+        window.dispatchEvent(new KeyboardEvent('keyup', { key, bubbles: true }))
+      }
+      const afterWasd = g.cameraCtrl.getTarget()
+
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }))
+      for (let i = 0; i < 20; i++) g.cameraCtrl.update(1 / 60)
+      window.dispatchEvent(new KeyboardEvent('keyup', { key: 'ArrowRight', bubbles: true }))
+      const afterArrow = g.cameraCtrl.getTarget()
+
+      return {
+        ok: true,
+        wasdDelta: before.distanceTo(afterWasd),
+        arrowDelta: afterWasd.distanceTo(afterArrow),
+      }
+    })
+
+    expect(result.ok, result.reason ?? 'camera controller missing').toBe(true)
+    expect(result.wasdDelta, 'W/A/S/D should not move the camera because those keys are unit commands').toBeLessThan(0.001)
+    expect(result.arrowDelta, 'Arrow keys should remain available for camera panning').toBeGreaterThan(0.1)
+  })
+
   test('TH, worker, and goldmine all project into default viewport', async ({ page }) => {
     await waitForGame(page)
 
@@ -272,5 +306,91 @@ test.describe('M3 Camera/HUD Readability', () => {
     expect(result.ringScreenInfo.distToWorker, 'selection ring must be near worker').toBeLessThan(1.0)
     expect(result.hasHealthBar, 'worker must have a health bar entry').toBe(true)
     expect(result.healthBarVisible, 'health bar must be visible').toBe(true)
+  })
+
+  test('unit info panel contains long names, states, and stats without overlap', async ({ page }) => {
+    await waitForGame(page)
+
+    const result = await page.evaluate(() => {
+      const g = (window as any).__war3Game
+      if (!g) return { ok: false, reason: 'no game' }
+
+      const unit = g.spawnUnit('paladin', 0, 12, 10)
+      unit.heroLevel = 10
+      unit.heroXP = 1200
+      unit.heroSkillPoints = 3
+      unit.abilityLevels = {
+        holy_light: 3,
+        divine_shield: 3,
+        devotion_aura: 3,
+        resurrection: 1,
+      }
+      unit.maxMana = 300
+      unit.mana = 286
+      unit.divineShieldUntil = g.gameTime + 9
+      unit.devotionAuraBonus = 3
+      unit.resurrectionCooldownUntil = g.gameTime + 120
+      unit.resurrectionLastRevivedCount = 6
+      unit.resurrectionFeedbackUntil = g.gameTime + 12
+
+      g.selectionModel.setSelection([unit])
+      g.clearSelectionRings()
+      g.createSelectionRing(unit)
+      g._lastSelKey = ''
+      g.updateSelectionHUD()
+
+      const unitInfo = document.getElementById('unit-info')!
+      const details = document.getElementById('unit-details')!
+      const name = document.getElementById('unit-name')!
+      const hp = document.getElementById('unit-hp-bar')!
+      const state = document.getElementById('unit-state')!
+      const stats = document.getElementById('unit-stats')!
+
+      name.textContent = '白银之手远征军圣骑士指挥官'
+      state.textContent = '正在执行很长的单位状态文本：集结号令、技能冷却、队列与移动命令同时存在'
+
+      const rectOf = (el: Element) => {
+        const r = el.getBoundingClientRect()
+        return { top: r.top, bottom: r.bottom, left: r.left, right: r.right, width: r.width, height: r.height }
+      }
+      const overlaps = (a: ReturnType<typeof rectOf>, b: ReturnType<typeof rectOf>) =>
+        a.left < b.right - 1 && a.right > b.left + 1 && a.top < b.bottom - 1 && a.bottom > b.top + 1
+
+      const infoRect = rectOf(unitInfo)
+      const detailsRect = rectOf(details)
+      const nameRect = rectOf(name)
+      const hpRect = rectOf(hp)
+      const stateRect = rectOf(state)
+      const statsRect = rectOf(stats)
+
+      const childrenWithinInfo = [detailsRect, nameRect, hpRect, stateRect, statsRect].every((r) =>
+        r.left >= infoRect.left - 1 &&
+        r.right <= infoRect.right + 1 &&
+        r.top >= infoRect.top - 1 &&
+        r.bottom <= infoRect.bottom + 1,
+      )
+
+      return {
+        ok: true,
+        childrenWithinInfo,
+        nameHpOverlap: overlaps(nameRect, hpRect),
+        hpStateOverlap: overlaps(hpRect, stateRect),
+        stateStatsOverlap: overlaps(stateRect, statsRect),
+        statsHasStableViewport: stats.clientHeight > 0 && stats.scrollHeight >= stats.clientHeight,
+        detailsHeight: detailsRect.height,
+        statsClientHeight: stats.clientHeight,
+        statsScrollHeight: stats.scrollHeight,
+      }
+    })
+
+    expect(result.ok, result.reason ?? 'unit info setup failed').toBe(true)
+    expect(result.childrenWithinInfo, 'unit text should stay inside the unit info panel').toBe(true)
+    expect(result.nameHpOverlap, 'unit name should not overlap the HP bar').toBe(false)
+    expect(result.hpStateOverlap, 'HP bar should not overlap unit state text').toBe(false)
+    expect(result.stateStatsOverlap, 'unit state should not overlap stat chips').toBe(false)
+    expect(
+      result.statsHasStableViewport,
+      `stats viewport should be real and scrollable when needed: client=${result.statsClientHeight}, scroll=${result.statsScrollHeight}, details=${result.detailsHeight}`,
+    ).toBe(true)
   })
 })

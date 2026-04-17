@@ -210,7 +210,7 @@ const FORMATION_SPACING = 0.7        // formation offset spacing
  * 操作：
  * - 左键选择/框选，右键移动/采集/攻击
  * - 命令卡：建造建筑、训练单位
- * - WASD移动视角，滚轮缩放
+ * - 方向键/屏幕边缘移动视角，滚轮缩放
  */
 export class Game {
   static readonly STALL_VERDICT_SECONDS = 12 * 60
@@ -842,7 +842,7 @@ export class Game {
             const hall = this.findNearest(unit, 'townhall', unit.team)
             if (hall) {
               unit.state = UnitState.MovingToReturn
-              this.planPath(unit, hall.mesh.position)
+              this.planPathToBuildingInteraction(unit, hall)
             } else {
               unit.state = UnitState.Idle
               unit.carryAmount = 0
@@ -960,7 +960,7 @@ export class Game {
             spawned.gatherType = 'gold'
             spawned.resourceTarget = { type: 'goldmine', mine: unit.rallyTarget }
             spawned.state = UnitState.MovingToGather
-            this.planPath(spawned, unit.rallyTarget.mesh.position)
+            this.planPathToBuildingInteraction(spawned, unit.rallyTarget)
           } else {
             // 普通位置集结 → 移动到集结点
             dispatchGameCommand([spawned], { type: 'move', target: unit.rallyPoint })
@@ -2374,10 +2374,30 @@ export class Game {
     return false
   }
 
-  /** 建筑的交互半径按 footprint 边界计算，不要求走到中心点。 */
-  private getBuildingInteractionRadius(target: Unit): number {
-    const size = BUILDINGS[target.type]?.size ?? 1
-    return Math.max(GATHER_RANGE, size * 0.5)
+  /** 建筑 footprint 使用 tile 占用矩形，而不是 mesh 锚点。 */
+  private getBuildingFootprint(target: Unit) {
+    const size = Math.ceil(BUILDINGS[target.type]?.size ?? 1)
+    const tx = Math.round(target.mesh.position.x - 0.5)
+    const tz = Math.round(target.mesh.position.z - 0.5)
+    return {
+      tx,
+      tz,
+      size,
+      minX: tx,
+      minZ: tz,
+      maxX: tx + size,
+      maxZ: tz + size,
+    }
+  }
+
+  /** 点到建筑 footprint 边界的 2D 距离。位于占用矩形内时为 0。 */
+  private distanceToBuildingFootprint(unit: Unit, target: Unit): number {
+    const fp = this.getBuildingFootprint(target)
+    const x = unit.mesh.position.x
+    const z = unit.mesh.position.z
+    const dx = x < fp.minX ? fp.minX - x : x > fp.maxX ? x - fp.maxX : 0
+    const dz = z < fp.minZ ? fp.minZ - z : z > fp.maxZ ? z - fp.maxZ : 0
+    return Math.sqrt(dx * dx + dz * dz)
   }
 
   /** 采集型交互使用资源节点边界，而不是精确 path target。 */
@@ -2388,7 +2408,7 @@ export class Game {
       return unit.mesh.position.distanceTo(rt.entry.mesh.position) <= GATHER_RANGE
     }
     if (rt.type === 'goldmine') {
-      return unit.mesh.position.distanceTo(rt.mine.mesh.position) <= this.getBuildingInteractionRadius(rt.mine)
+      return this.distanceToBuildingFootprint(unit, rt.mine) <= GATHER_RANGE
     }
     return false
   }
@@ -2396,14 +2416,50 @@ export class Game {
   /** 回本同样按 Town Hall 边界判定，避免多工人卡在中心点/编队落点。 */
   private hasReachedDropoffHall(unit: Unit, hall: Unit | null): boolean {
     if (!hall) return false
-    return unit.mesh.position.distanceTo(hall.mesh.position) <= this.getBuildingInteractionRadius(hall)
+    return this.distanceToBuildingFootprint(unit, hall) <= GATHER_RANGE
   }
 
   /** 建造同样按建筑边界交互，不要求工人走到占用中的中心点。 */
   private hasReachedBuildInteraction(unit: Unit, target: Unit): boolean {
-    const size = BUILDINGS[target.type]?.size ?? 1
-    const radius = Math.max(BUILD_RANGE, size * 0.5)
-    return unit.mesh.position.distanceTo(target.mesh.position) <= radius
+    return this.distanceToBuildingFootprint(unit, target) <= BUILD_RANGE
+  }
+
+  /** 建筑外圈可站立格，供采矿/回本/建造路径使用。 */
+  private getBuildingApproachCandidates(target: Unit, maxRing = 3): THREE.Vector3[] {
+    const fp = this.getBuildingFootprint(target)
+    const candidates: THREE.Vector3[] = []
+    const seen = new Set<string>()
+
+    for (let ring = 1; ring <= maxRing; ring++) {
+      const minTx = fp.tx - ring
+      const maxTx = fp.tx + fp.size - 1 + ring
+      const minTz = fp.tz - ring
+      const maxTz = fp.tz + fp.size - 1 + ring
+
+      for (let tz = minTz; tz <= maxTz; tz++) {
+        for (let tx = minTx; tx <= maxTx; tx++) {
+          const onRing = tx === minTx || tx === maxTx || tz === minTz || tz === maxTz
+          if (!onRing) continue
+
+          const insideFootprint = tx >= fp.tx && tx < fp.tx + fp.size
+            && tz >= fp.tz && tz < fp.tz + fp.size
+          if (insideFootprint) continue
+          if (!this.pathingGrid.isInside(tx, tz) || this.pathingGrid.isBlocked(tx, tz)) continue
+
+          const key = `${tx}:${tz}`
+          if (seen.has(key)) continue
+          seen.add(key)
+
+          const wx = tx + 0.5
+          const wz = tz + 0.5
+          candidates.push(new THREE.Vector3(wx, this.getWorldHeight(wx - 0.5, wz - 0.5), wz))
+        }
+      }
+
+      if (candidates.length > 0) return candidates
+    }
+
+    return candidates
   }
 
   /** 金矿采集槽位：同一座金矿最多 5 个农民同时真正采集。 */
@@ -2465,7 +2521,7 @@ export class Game {
       if (mine && mine.remainingGold > 0) {
         unit.state = UnitState.MovingToGather
         unit.resourceTarget = { type: 'goldmine', mine }
-        this.planPath(unit, mine.mesh.position)
+        this.planPathToBuildingInteraction(unit, mine)
         return
       }
     }
@@ -2617,7 +2673,7 @@ export class Game {
 
     building.builder = worker
     dispatchGameCommand([worker], { type: 'build', target: building })
-    const hasPath = this.planPath(worker, building.mesh.position)
+    const hasPath = this.planPathToBuildingInteraction(worker, building)
     if (!hasPath) {
       worker.waypoints = []
       worker.moveTarget = null
@@ -3002,6 +3058,38 @@ export class Game {
     }
   }
 
+  private chooseBuildingApproachPoint(unit: Unit, target: Unit, reserved?: Set<string>): THREE.Vector3 {
+    const candidates = this.getBuildingApproachCandidates(target)
+    if (candidates.length === 0) return target.mesh.position.clone()
+
+    const scored = candidates
+      .map(point => {
+        const dx = unit.mesh.position.x - point.x
+        const dz = unit.mesh.position.z - point.z
+        const key = `${Math.floor(point.x)}:${Math.floor(point.z)}`
+        const reservedPenalty = reserved?.has(key) ? 1000 : 0
+        return { point, key, score: dx * dx + dz * dz + reservedPenalty }
+      })
+      .sort((a, b) => a.score - b.score)
+
+    const best = scored[0]
+    if (reserved) reserved.add(best.key)
+    return best.point.clone()
+  }
+
+  /** 路径目标落在建筑外圈可站立点，避免单位挤向建筑占用格中心。 */
+  private planPathToBuildingInteraction(unit: Unit, target: Unit, reserved?: Set<string>): boolean {
+    const approach = this.chooseBuildingApproachPoint(unit, target, reserved)
+    return this.planPath(unit, approach)
+  }
+
+  private planPathForUnitsToBuildingInteraction(units: Unit[], target: Unit) {
+    const reserved = new Set<string>()
+    for (const u of units) {
+      if (!u.isBuilding) this.planPathToBuildingInteraction(u, target, reserved)
+    }
+  }
+
   /** 为一组单位批量计算路径（含编队偏移） */
   private planPathForUnits(units: Unit[], target: THREE.Vector3) {
     if (units.length <= 1) {
@@ -3142,12 +3230,12 @@ export class Game {
           for (const u of workers) {
             u.resourceTarget = { type: 'goldmine', mine: target }
           }
-          this.planPathForUnits(workers, target.mesh.position)
+          this.planPathForUnitsToBuildingInteraction(workers, target)
           // 非 worker 单位走到金矿旁（移动命令）
           const nonWorkers = controllable.filter((u) => !UNITS[u.type]?.canGather)
           if (nonWorkers.length > 0) {
             dispatchGameCommand(nonWorkers, { type: 'move', target: target.mesh.position })
-            this.planPathForUnits(nonWorkers, target.mesh.position)
+            this.planPathForUnitsToBuildingInteraction(nonWorkers, target)
             this.suppressAggroFor(nonWorkers)
           }
           this.feedback.showMoveIndicator(target.mesh.position.x, target.mesh.position.z)
@@ -3176,7 +3264,7 @@ export class Game {
 
         // 右键己方建筑 → 移动到建筑旁
         dispatchGameCommand(controllable, { type: 'move', target: target.mesh.position })
-        this.planPathForUnits(controllable, target.mesh.position)
+        this.planPathForUnitsToBuildingInteraction(controllable, target)
         this.suppressAggroFor(controllable)
         this.feedback.showMoveIndicator(target.mesh.position.x, target.mesh.position.z)
         return
@@ -3944,7 +4032,7 @@ export class Game {
       for (const u of playerWorkers) {
         u.resourceTarget = { type: 'goldmine', mine: playerMine }
       }
-      this.planPathForUnits(playerWorkers, playerMine.mesh.position)
+      this.planPathForUnitsToBuildingInteraction(playerWorkers, playerMine)
     }
 
     // ===== AI 基地区（地图右上角，镜像布局）=====
@@ -4397,6 +4485,7 @@ export class Game {
       spawnBuilding: (type, team, x, z) => this.spawnBuilding(type, team, x, z),
       getWorldHeight: (wx, wz) => this.getWorldHeight(wx, wz),
       planPath: (unit, target) => this.planPath(unit, target),
+      planPathToBuildingInteraction: (unit, target) => this.planPathToBuildingInteraction(unit, target),
       castHolyLight: (caster, target) => this.aiCastHolyLight(caster, target),
       castDivineShield: (caster) => this.aiCastDivineShield(caster),
       castResurrection: (caster) => this.aiCastResurrection(caster),

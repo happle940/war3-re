@@ -19,6 +19,7 @@ export interface AIContext {
   spawnBuilding(type: string, team: number, x: number, z: number): Unit
   getWorldHeight(wx: number, wz: number): number
   planPath(unit: Unit, target: THREE.Vector3): boolean
+  planPathToBuildingInteraction(unit: Unit, target: Unit): boolean
   castHolyLight(caster: Unit, target: Unit): boolean
   castDivineShield(caster: Unit): boolean
   castResurrection(caster: Unit): boolean
@@ -809,7 +810,7 @@ export class SimpleAI {
         if (mine && mine.remainingGold > 0) {
           issueCommand([w], { type: 'gather', resourceType: 'gold', target: mine.mesh.position })
           w.resourceTarget = { type: 'goldmine', mine }
-          this.ctx.planPath(w, mine.mesh.position)
+          this.ctx.planPathToBuildingInteraction(w, mine)
           goldCount++  // 递增计数，防止整批都去采金
           continue
         }
@@ -830,7 +831,7 @@ export class SimpleAI {
       if (mine && mine.remainingGold > 0) {
         issueCommand([w], { type: 'gather', resourceType: 'gold', target: mine.mesh.position })
         w.resourceTarget = { type: 'goldmine', mine }
-        this.ctx.planPath(w, mine.mesh.position)
+        this.ctx.planPathToBuildingInteraction(w, mine)
         goldCount++
       }
     }
@@ -889,7 +890,7 @@ export class SimpleAI {
         // already at the best reachable build position beside a blocked
         // footprint, begin Building immediately instead of leaving a
         // zero-progress shell waiting on an unreachable center point.
-        const hasPath = this.ctx.planPath(builder, building.mesh.position)
+        const hasPath = this.ctx.planPathToBuildingInteraction(builder, building)
         if (!hasPath) {
           builder.waypoints = []
           builder.moveTarget = null

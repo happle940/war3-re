@@ -136,7 +136,7 @@ async function measureGoldScenario(page: Page, activeCount: number) {
       for (const worker of activeWorkers) {
         worker.resourceTarget = { type: 'goldmine', mine }
       }
-      g.planPathForUnits(activeWorkers, minePos.clone())
+      g.planPathForUnitsToBuildingInteraction(activeWorkers, mine)
     }
 
     for (let t = 0; t < 60; t += 0.016) {
@@ -320,5 +320,107 @@ test.describe('Mining Saturation Regression', () => {
       gain56,
       `6th worker should be near saturation, not open a fresh linear income step. curve=${JSON.stringify(scenarios)}`,
     ).toBeLessThanOrEqual(Math.max(20, Math.floor(gain45 * 0.5)))
+  })
+
+  test('default opening workers path to standable mine edges and keep producing gold', async ({ page }) => {
+    await waitForGame(page)
+
+    const result = await page.evaluate(() => {
+      const g = (window as any).__war3Game
+      if (!g) return { ok: false, reason: 'no game' }
+
+      if (g.ai) {
+        if (typeof g.ai.reset === 'function') g.ai.reset()
+        g.ai.update = () => {}
+      }
+
+      const teamStore = g.resources.teams?.get?.(0)
+      const mine = g.units.find((u: any) => u.type === 'goldmine' && u.hp > 0 && u.remainingGold > 0)
+      if (!teamStore || !mine) return { ok: false, reason: 'missing team resources or mine' }
+
+      const workers: any[] = g.units
+        .filter((u: any) => u.team === 0 && u.type === 'worker' && u.hp > 0)
+        .slice(0, 5)
+      if (workers.length < 5) return { ok: false, reason: 'missing starting workers' }
+
+      const resetWorker = (worker: any, idx: number) => {
+        const x = 10.5 + idx
+        const z = 11.5
+        worker.mesh.position.set(x, g.getWorldHeight(x - 0.5, z - 0.5), z)
+        worker.moveTarget = null
+        worker.waypoints = []
+        worker.moveQueue = []
+        worker.attackTarget = null
+        worker.attackMoveTarget = null
+        worker.buildTarget = null
+        worker.carryAmount = 0
+        worker.gatherTimer = 0
+        worker.state = 0
+        worker.gatherType = null
+        worker.resourceTarget = null
+      }
+
+      teamStore.gold = 0
+      mine.remainingGold = 100000
+
+      workers.forEach(resetWorker)
+      g.issueCommand(workers, {
+        type: 'gather',
+        resourceType: 'gold',
+        target: mine.mesh.position.clone(),
+      })
+      for (const worker of workers) {
+        worker.resourceTarget = { type: 'goldmine', mine }
+      }
+      g.planPathForUnitsToBuildingInteraction(workers, mine)
+
+      const plannedBlockedTargets: any[] = []
+      for (const worker of workers) {
+        const points = [
+          worker.moveTarget,
+          ...(Array.isArray(worker.waypoints) ? worker.waypoints : []),
+        ].filter(Boolean)
+        for (const point of points) {
+          const tx = Math.floor(point.x)
+          const tz = Math.floor(point.z)
+          if (g.pathingGrid?.isBlocked(tx, tz)) plannedBlockedTargets.push({ tx, tz })
+        }
+      }
+
+      for (let t = 0; t < 90; t += 0.05) {
+        g.update(0.05)
+      }
+
+      const stuckFarWorkers = workers.filter((worker) => {
+        if (worker.resourceTarget?.type !== 'goldmine' || worker.resourceTarget.mine !== mine) return false
+        if (worker.state !== 2 || worker.moveTarget) return false
+
+        const size = 3
+        const tx = Math.round(mine.mesh.position.x - 0.5)
+        const tz = Math.round(mine.mesh.position.z - 0.5)
+        const minX = tx
+        const minZ = tz
+        const maxX = tx + size
+        const maxZ = tz + size
+        const x = worker.mesh.position.x
+        const z = worker.mesh.position.z
+        const dx = x < minX ? minX - x : x > maxX ? x - maxX : 0
+        const dz = z < minZ ? minZ - z : z > maxZ ? z - maxZ : 0
+        return Math.sqrt(dx * dx + dz * dz) > 1.5
+      }).length
+
+      return {
+        ok: true,
+        earnedGold: teamStore.gold,
+        plannedBlockedTargets,
+        stuckFarWorkers,
+        states: workers.map((worker) => worker.state),
+      }
+    })
+
+    expect(result.ok, result.reason ?? 'opening mining setup failed').toBe(true)
+    expect(result.plannedBlockedTargets, 'mine approach path should not target blocked building footprint tiles').toHaveLength(0)
+    expect(result.stuckFarWorkers, `workers waiting away from mine edge: states=${JSON.stringify(result.states)}`).toBe(0)
+    expect(result.earnedGold, 'five starting workers should keep returning gold instead of visually jamming near the mine').toBeGreaterThanOrEqual(80)
   })
 })

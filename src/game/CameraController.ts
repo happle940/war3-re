@@ -7,7 +7,7 @@ import * as THREE from 'three'
  * - FOV 45°（比 50° 更压缩，减少透视畸变，更像经典 RTS）
  * - 俯角 ~55° AoA（war3 经营视角：看得到建筑立面和空间层次）
  * - 水平旋转 90°（朝北看）
- * - WASD/方向键平移，滚轮缩放
+ * - 方向键/屏幕边缘平移，滚轮缩放
  * - 缩放范围 10-70，默认 22（聚焦基地一角）
  * - 平移速度随缩放距离缩放（近景慢、远景快，更直觉）
  *
@@ -44,6 +44,7 @@ export class CameraController {
 
     window.addEventListener('keydown', (e) => this.keys.add(e.key.toLowerCase()))
     window.addEventListener('keyup', (e) => this.keys.delete(e.key.toLowerCase()))
+    window.addEventListener('blur', () => this.keys.clear())
 
     const canvas = document.getElementById('game-canvas')!
     canvas.addEventListener('wheel', this.onWheel.bind(this), { passive: false })
@@ -67,10 +68,10 @@ export class CameraController {
     let dx = 0  // 屏幕 左(-1)/右(+1)
     let dz = 0  // 屏幕 上(-1)/下(+1)
 
-    if (this.keys.has('w') || this.keys.has('arrowup'))    dz -= 1
-    if (this.keys.has('s') || this.keys.has('arrowdown'))  dz += 1
-    if (this.keys.has('a') || this.keys.has('arrowleft'))  dx -= 1
-    if (this.keys.has('d') || this.keys.has('arrowright')) dx += 1
+    if (this.keys.has('arrowup'))    dz -= 1
+    if (this.keys.has('arrowdown'))  dz += 1
+    if (this.keys.has('arrowleft'))  dx -= 1
+    if (this.keys.has('arrowright')) dx += 1
 
     // 叠加边缘滚动
     dx += this.mouseEdgeX * 0.4

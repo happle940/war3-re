@@ -258,13 +258,15 @@ label {
 #single-select {
   display: grid;
   grid-template-columns: 88px minmax(0, 1fr);
-  align-items: center;
+  align-items: stretch;
   gap: 12px;
   width: 100%;
+  height: 100%;
 }
 
 #unit-portrait {
   position: relative;
+  align-self: center;
   width: 86px;
   height: 86px;
   overflow: hidden;
@@ -314,18 +316,28 @@ label {
 }
 
 #unit-details {
+  display: grid;
+  grid-template-rows: auto 16px auto minmax(0, 1fr);
+  align-content: start;
+  gap: 5px;
+  height: 100%;
   min-width: 0;
+  min-height: 0;
+  overflow: hidden;
 }
 
 #unit-name {
-  margin-bottom: 7px;
   color: var(--ui-text);
   font-size: 17px;
   line-height: 1.1;
-  white-space: nowrap;
+  white-space: normal;
+  overflow-wrap: anywhere;
   overflow: hidden;
   text-overflow: ellipsis;
   text-shadow: 0 2px 3px var(--ui-shadow);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
 }
 
 #unit-hp-bar,
@@ -373,23 +385,31 @@ label {
 
 #unit-state {
   min-height: 16px;
-  margin-top: 5px;
   color: var(--ui-muted);
   font-size: 12px;
   line-height: 1.25;
-  white-space: nowrap;
+  white-space: normal;
+  overflow-wrap: anywhere;
   overflow: hidden;
   text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
 }
 
 #unit-stats {
   display: flex;
   flex-wrap: wrap;
+  align-content: flex-start;
   gap: 4px;
-  margin-top: 6px;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 2px;
+  scrollbar-width: thin;
 }
 
 #unit-stats .stat {
+  max-width: 100%;
   min-height: 18px;
   padding: 2px 6px;
   border: 1px solid rgba(168, 144, 72, 0.18);
@@ -399,6 +419,8 @@ label {
   font-size: 11px;
   line-height: 13px;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* ===== Multi Select ===== */
