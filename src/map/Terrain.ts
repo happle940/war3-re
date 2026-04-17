@@ -117,12 +117,12 @@ export class Terrain {
         else                this.tileData[idx] = TileType.Grass
 
         // ===== 玩家基地空间组织 =====
-        // TH 中心 ≈ (11.5, 13.5)，tile 区域 (10-12, 12-14)
-        // 金矿中心 ≈ (15.5, 10.5)，tile 区域 (14-16, 9-11)
+        // TH footprint ≈ (10-13, 12-15)
+        // 金矿 footprint ≈ (18-20, 8-10)，比旧版更远，保证 worker 有可见矿线
         // 兵营中心 ≈ (7.5, 17.5)，tile 区域 (6-7, 16-17)
 
         // Town Hall 核心区：亮色压实地面（建筑基座）
-        const dBase = Math.sqrt((x - 11) ** 2 + (z - 13) ** 2)
+        const dBase = Math.sqrt((x - 12) ** 2 + (z - 14) ** 2)
         if (dBase < 3.5) {
           this.tileData[idx] = TileType.LightDirt
         } else if (dBase < 5.5) {
@@ -130,7 +130,7 @@ export class Terrain {
         }
 
         // 金矿核心区：深石质地面（矿区）
-        const dMine = Math.sqrt((x - 15) ** 2 + (z - 10) ** 2)
+        const dMine = Math.sqrt((x - 19) ** 2 + (z - 9) ** 2)
         if (dMine < 3) {
           this.tileData[idx] = TileType.DarkStone
         } else if (dMine < 4.5) {
@@ -142,8 +142,8 @@ export class Terrain {
         }
 
         // 基地 → 金矿资源路径（压实带，一眼看出 worker 往返路线）
-        if (x >= 10 && x <= 16 && z >= 9 && z <= 13) {
-          const pathDist = Math.abs(z - 11.5)
+        if (x >= 10 && x <= 20 && z >= 9 && z <= 17) {
+          const pathDist = Math.abs((z - 17) - (x - 10) * -0.75)
           if (pathDist < 1.5) {
             this.tileData[idx] = TileType.LightDirt
           } else if (pathDist < 2.5 && this.tileData[idx] === TileType.Grass) {
@@ -189,7 +189,7 @@ export class Terrain {
           this.tileData[idx] = TileType.Dirt
         }
         // AI 矿区
-        const dAiMine = Math.sqrt((x - 45.5) ** 2 + (z - 51.5) ** 2)
+        const dAiMine = Math.sqrt((x - 59) ** 2 + (z - 47) ** 2)
         if (dAiMine < 3) {
           this.tileData[idx] = TileType.DarkStone
         } else if (dAiMine < 5) {

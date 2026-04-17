@@ -13747,7 +13747,8 @@ Status: `completed`.
 Closeout evidence (2026-04-14):
 - All 7/7 focused specs passed (`tests/v3-battlefield-grammar-proof.spec.ts`).
 - TH center: TH at ~(13,14) is the reference point for all spatial relationships.
-- Economic axis: Goldmine NE of TH, distance ~4.5, edge gap ~1.0, pathing grid clear.
+- Economic axis at 2026-04-14 closeout: Goldmine NE of TH, distance ~4.5, edge gap ~1.0, pathing grid clear.
+- Superseded by 2026-04-17 mining scale refresh: default Gold Mine moved to tile `(18,8)` with visible worker route, 5-slot whole-loop mining reservation, and `tests/mining-saturation-regression.spec.ts` / `tests/m3-base-grammar-regression.spec.ts` proof.
 - Treeline boundary: 187 trees, no TH footprint encroachment, mine path verified clear.
 - Exit readability: 4/4 exit directions open (SE/S/SW/E), mine is NE.
 - Production zone: Barracks SW of TH, angle >90° from mine, not in gather corridor.

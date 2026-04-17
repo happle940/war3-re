@@ -410,7 +410,7 @@ export const UNITS: Record<string, UnitDef> = {
     key: 'worker',
     name: '农民',
     cost: { gold: 75, lumber: 0 },
-    trainTime: 12, hp: 250, speed: 3.5, supply: 1,
+    trainTime: 12, hp: 250, speed: 2.1, supply: 1,
     attackDamage: 5, attackRange: 1.0, attackCooldown: 1.5,
     armor: 0, sightRange: 8,
     canGather: true,
@@ -474,7 +474,7 @@ export const UNITS: Record<string, UnitDef> = {
     key: 'militia',
     name: '民兵',
     cost: { gold: 0, lumber: 0 },
-    trainTime: 0, hp: 230, speed: 3.5, supply: 1,
+    trainTime: 0, hp: 230, speed: 3.0, supply: 1,
     attackDamage: 12, attackRange: 1.0, attackCooldown: 1.2,
     armor: 2, sightRange: 8,
     canGather: false,
@@ -539,7 +539,7 @@ export const GOLDMINE_MAX_WORKERS = 5  // 单个金矿有效采集容量（War3-
 export const LUMBER_PER_TRIP = 10      // 每次伐木量
 export const TREE_LUMBER = 50          // 每棵树的木材量
 export const GOLDMINE_GOLD = 2000      // 每座金矿的初始金量
-export const GATHER_RANGE = 1.5        // 判定到达资源点的距离
+export const GATHER_RANGE = 0.6        // 判定到达资源点的距离；避免出生在矿边就跳过可见矿线
 export const BUILD_RANGE = 1.5         // 判定到达建造点的距离
 
 // ===== 战斗参数 =====

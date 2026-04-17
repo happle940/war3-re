@@ -322,9 +322,9 @@ test.describe('M3 Base Grammar', () => {
       const gmPos = { x: gm.mesh.position.x, z: gm.mesh.position.z }
 
       // TH footprint: size 4, anchor tile (10,12), occupies tiles (10..13, 12..15)
-      // GM footprint: size 3, anchor tile (15,8), occupies tiles (15..17, 8..10)
+      // GM footprint: size 3, anchor tile (18,8), occupies tiles (18..20, 8..10)
       // The gather corridor is the rectangular band between TH north edge (z=12)
-      // and GM south edge (z=10), spanning x from TH east edge (x=13) to GM west edge (x=15).
+      // and GM south edge (z=10), spanning from the TH east edge toward the GM east edge.
       // But the full corridor should cover the direct line from TH center to GM center.
 
       // Collect all blocked tiles in the corridor band between TH and GM

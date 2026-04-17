@@ -99,6 +99,7 @@ export interface Unit {
   gatherType: 'gold' | 'lumber' | null
   carryAmount: number
   resourceTarget: ResourceTarget | null  // 明确资源目标引用，不再靠"最近邻推断"
+  goldLoopSlotMine: Unit | null           // 金矿全循环槽位预约；同一矿最多 5 个有效矿工
   gatherTimer: number
   attackTimer: number
   attackTarget: Unit | null
@@ -203,6 +204,15 @@ const CONSTRUCTION_CANCEL_REFUND_RATE = 0.75
 const UNIT_SEPARATION_RADIUS = 0.6   // minimum distance between units (world units)
 const UNIT_SEPARATION_PUSH = 0.08    // max push per frame
 const FORMATION_SPACING = 0.7        // formation offset spacing
+const OPENING_GOLDMINE_OFFSET = { x: 8, z: -4 } as const
+const OPENING_BARRACKS_OFFSET = { x: -5, z: 5 } as const
+const OPENING_WORKER_OFFSETS: readonly { x: number; z: number }[] = [
+  { x: -1, z: 5 },
+  { x: 0, z: 5 },
+  { x: 1, z: 5 },
+  { x: 2, z: 5 },
+  { x: 3, z: 5 },
+]
 
 /**
  * 游戏主类
@@ -669,7 +679,7 @@ export class Game {
   private applySeparation() {
     const mobileUnits: Unit[] = []
     for (const u of this.units) {
-      if (!u.isBuilding && u.hp > 0) mobileUnits.push(u)
+      if (!u.isBuilding && u.hp > 0 && !this.hasSuppressedUnitCollision(u)) mobileUnits.push(u)
     }
 
     for (let i = 0; i < mobileUnits.length; i++) {
@@ -725,6 +735,21 @@ export class Game {
         }
       }
     }
+  }
+
+  /**
+   * Gold workers use a dedicated economy lane.
+   *
+   * Applying ordinary unit separation to five miners makes them push each other
+   * away from the mine mouth / dropoff edge, which creates visible jitter and
+   * unstable income. Combat and normal movement still collide; the exception is
+   * scoped to the active gold loop only.
+   */
+  private hasSuppressedUnitCollision(unit: Unit): boolean {
+    return unit.gatherType === 'gold' &&
+      (unit.state === UnitState.MovingToGather ||
+        unit.state === UnitState.Gathering ||
+        unit.state === UnitState.MovingToReturn)
   }
 
   /** Check if a world position falls on a blocked tile */
@@ -803,6 +828,7 @@ export class Game {
       unit.state = UnitState.Idle
       unit.gatherType = null
       unit.resourceTarget = null
+      unit.goldLoopSlotMine = null
       unit.moveTarget = null
       unit.waypoints = []
       return
@@ -997,6 +1023,7 @@ export class Game {
         hero.moveTarget = null
         hero.gatherType = null
         hero.resourceTarget = null
+        hero.goldLoopSlotMine = null
         hero.waypoints = []
         hero.moveQueue = []
         hero.attackMoveTarget = null
@@ -1369,6 +1396,7 @@ export class Game {
     unit.carryAmount = 0
     unit.gatherTimer = 0
     unit.resourceTarget = null
+    unit.goldLoopSlotMine = null
     if (unit.buildTarget?.builder === unit) {
       unit.buildTarget.builder = null
     }
@@ -1814,6 +1842,7 @@ export class Game {
       unit.moveTarget = null
       unit.waypoints = []
       unit.resourceTarget = null
+      unit.goldLoopSlotMine = null
       return
     }
 
@@ -1850,6 +1879,7 @@ export class Game {
         } else {
           unit.state = UnitState.Idle
           unit.resourceTarget = null
+          unit.goldLoopSlotMine = null
         }
       }
     }
@@ -1879,6 +1909,7 @@ export class Game {
     // 队列命令切换时，清理采集/建造相关状态
     unit.gatherType = null
     unit.resourceTarget = null
+    unit.goldLoopSlotMine = null
     unit.buildTarget = null
     unit.carryAmount = 0
     unit.attackTarget = null
@@ -2161,6 +2192,7 @@ export class Game {
       hero.moveTarget = null
       hero.gatherType = null
       hero.resourceTarget = null
+      hero.goldLoopSlotMine = null
       hero.state = UnitState.Idle
       hero.waypoints = []
       hero.moveQueue = []
@@ -2264,6 +2296,7 @@ export class Game {
           other.moveTarget = null
           other.waypoints = []
           other.resourceTarget = null
+          other.goldLoopSlotMine = null
         }
         // 清理 previousResourceTarget 中指向死亡单位的引用
         if (other.previousResourceTarget) {
@@ -2462,21 +2495,44 @@ export class Game {
     return candidates
   }
 
-  /** 金矿采集槽位：同一座金矿最多 5 个农民同时真正采集。 */
+  /** 金矿采集槽位：同一座金矿最多 5 个有效矿工保留完整往返循环。 */
   private canStartGoldGather(unit: Unit): boolean {
     const rt = unit.resourceTarget
     if (unit.gatherType !== 'gold' || rt?.type !== 'goldmine') return true
 
-    const activeGatherers = this.units.filter(other =>
-      other !== unit &&
-      other.hp > 0 &&
-      other.gatherType === 'gold' &&
-      other.state === UnitState.Gathering &&
-      other.resourceTarget?.type === 'goldmine' &&
-      other.resourceTarget.mine === rt.mine,
+    return this.reserveGoldLoopSlot(unit, rt.mine)
+  }
+
+  /**
+   * Default mining saturation is a whole-loop contract, not only an in-mine
+   * timer cap. A sixth worker should wait unless one of the five assigned
+   * workers leaves the gold loop, otherwise long travel gaps become linear
+   * extra income.
+   */
+  private reserveGoldLoopSlot(unit: Unit, mine: Unit): boolean {
+    if (this.hasGoldLoopSlot(unit, mine)) return true
+
+    const reservedLoopWorkers = this.units.filter(other =>
+      other !== unit && this.hasGoldLoopSlot(other, mine),
     ).length
 
-    return activeGatherers < GOLDMINE_MAX_WORKERS
+    if (reservedLoopWorkers >= GOLDMINE_MAX_WORKERS) return false
+    unit.goldLoopSlotMine = mine
+    return true
+  }
+
+  private hasGoldLoopSlot(unit: Unit, mine: Unit): boolean {
+    return unit.goldLoopSlotMine === mine && this.isAssignedToGoldLoop(unit, mine)
+  }
+
+  private isAssignedToGoldLoop(unit: Unit, mine: Unit): boolean {
+    return unit.hp > 0 &&
+      unit.gatherType === 'gold' &&
+      unit.resourceTarget?.type === 'goldmine' &&
+      unit.resourceTarget.mine === mine &&
+      (unit.state === UnitState.MovingToGather ||
+        unit.state === UnitState.Gathering ||
+        unit.state === UnitState.MovingToReturn)
   }
 
   /**
@@ -2538,6 +2594,7 @@ export class Game {
     // 找不到资源 → 空闲，清除资源目标
     unit.state = UnitState.Idle
     unit.resourceTarget = null
+    unit.goldLoopSlotMine = null
   }
 
   /** 找最近的未耗尽金矿 */
@@ -3992,29 +4049,39 @@ export class Game {
   private spawnStartingUnits() {
     // ===== 玩家基地区（地图左下象限）=====
     // WC3 研究参考布局：
-    //   TH (4x4) 居中锚定，金矿 (3x3) 紧贴 NE，worker 往返路径短
+    //   TH (4x4) 是基地核心，金矿 (3x3) 在 NE，但不能贴到让 worker 出生即采集
     //   Barracks (3x3) 在 SW 出口方向，Farm (2x2) 用于填充墙
     //   开放方向 S-SE 用于出兵/集结/扩张
     //
     // 空间语法（从 TH 中心看）：
-    //   NE: Gold Mine（3-4 tile edge-to-edge）
+    //   NE: Gold Mine（短矿线，但有可见往返路线）
     //   C: Town Hall（4x4，基地核心，最大建筑）
     //   SW: Barracks（3x3，出口/军事区）
     //   S-SE: 开阔空地（出兵/集结/扩张方向）
 
-    // Town Hall：tile (10,12) size=4 → occupies (10-13, 12-15), world center (12.5, 14.5)
+    // Town Hall：tile (10,12) size=4 → occupies (10-13, 12-15)
     this.spawnBuilding('townhall', 0, 10, 12)
 
-    // Gold Mine：TH 右上方 (NE)，tile (15,8) size=3 → occupies (15-17, 8-10)
-    // TH edge (x=13) to GM edge (x=15) = 2 tile gap，接近 WC3 典型的 3-4 tile
-    this.spawnBuilding('goldmine', -1, 15, 8)
+    // Gold Mine：TH 右上方 (NE)，留出可见的 worker 往返路线。
+    this.spawnBuilding(
+      'goldmine',
+      -1,
+      10 + OPENING_GOLDMINE_OFFSET.x,
+      12 + OPENING_GOLDMINE_OFFSET.z,
+    )
 
     // Barracks：TH 左下方 (SW)，tile (5,17) size=3 → occupies (5-7, 17-19)
-    this.spawnBuilding('barracks', 0, 5, 17)
+    this.spawnBuilding(
+      'barracks',
+      0,
+      10 + OPENING_BARRACKS_OFFSET.x,
+      12 + OPENING_BARRACKS_OFFSET.z,
+    )
 
-    // 5 个农民：TH 南面空地，在 TH (z=12) 和树林之间
-    // worker 排成一排，紧贴 TH 南面，第一趟采金路径自然
-    for (let i = 0; i < 5; i++) this.spawnUnit('worker', 0, 10 + i, 11)
+    // 5 个农民：TH 南侧空地。第一帧会自动接采金命令，但必须先走过可见矿线。
+    for (const offset of OPENING_WORKER_OFFSETS) {
+      this.spawnUnit('worker', 0, 10 + offset.x, 12 + offset.z)
+    }
 
     // 自动派玩家初始农民去采金（War3 开局惯例：农民自动进金矿）
     const playerWorkers = this.units.filter(
@@ -4038,13 +4105,15 @@ export class Game {
     // ===== AI 基地区（地图右上角，镜像布局）=====
     const far = 50
     this.spawnBuilding('townhall', 1, far, far)
-    this.spawnBuilding('goldmine', -1, far + 5, far - 4)
-    this.spawnBuilding('barracks', 1, far - 5, far + 5)
-    for (let i = 0; i < 5; i++) this.spawnUnit('worker', 1, far + i, far - 2)
+    this.spawnBuilding('goldmine', -1, far + OPENING_GOLDMINE_OFFSET.x, far + OPENING_GOLDMINE_OFFSET.z)
+    this.spawnBuilding('barracks', 1, far + OPENING_BARRACKS_OFFSET.x, far + OPENING_BARRACKS_OFFSET.z)
+    for (const offset of OPENING_WORKER_OFFSETS) {
+      this.spawnUnit('worker', 1, far + offset.x, far + offset.z)
+    }
 
     // 初始镜头：聚焦玩家基地中心，让 TH + 金矿 + 农民一屏尽收
-    this.cameraCtrl.distance = 24
-    this.cameraCtrl.setTarget(13, 14)
+    this.cameraCtrl.distance = 26
+    this.cameraCtrl.setTarget(14, 14)
   }
 
   private spawnUnit(type: string, team: number, x: number, z: number): Unit {
@@ -4063,6 +4132,7 @@ export class Game {
       state: UnitState.Idle,
       gatherType: null, carryAmount: 0, gatherTimer: 0,
       resourceTarget: null,
+      goldLoopSlotMine: null,
       attackTimer: 0, attackTarget: null,
       attackDamage: def?.attackDamage ?? 5,
       attackRange: def?.attackRange ?? MELEE_RANGE,
@@ -4137,6 +4207,7 @@ export class Game {
       state: UnitState.Idle,
       gatherType: null, carryAmount: 0, gatherTimer: 0,
       resourceTarget: null,
+      goldLoopSlotMine: null,
       attackTimer: 0, attackTarget: null,
       attackDamage: def?.attackDamage ?? 0, attackRange: def?.attackRange ?? 0, attackCooldown: def?.attackCooldown ?? 2, armor: def?.key === 'tower' ? 0 : 2,
       buildProgress: 1, builder: null, buildTarget: null,
@@ -4612,7 +4683,7 @@ export class Game {
     const rng = this.seededRandom(42)
 
     // ===== 玩家基地树环 =====
-    // TH occupies (10-13, 12-15), goldmine occupies (15-17, 8-10)
+    // TH occupies (10-13, 12-15), goldmine occupies (18-20, 8-10)
     // 树林在金矿北侧（z<8）和基地西侧（x<5），形成自然的基地边界
     const baseTreePositions: [number, number][] = []
     // 金矿北侧/东侧：x=13-24, z=0-7（密集，形成北边界和伐木资源）
@@ -4684,7 +4755,7 @@ export class Game {
       const tile = this.terrain.getTile(x, z)
       if (tile === TileType.Water || tile === TileType.Dirt || tile === TileType.LightDirt
         || tile === TileType.Stone || tile === TileType.DarkStone) continue
-      const d1 = Math.sqrt((x - 12) ** 2 + (z - 13) ** 2)
+      const d1 = Math.sqrt((x - 12) ** 2 + (z - 14) ** 2)
       const d2 = Math.sqrt((x - 50) ** 2 + (z - 50) ** 2)
       if (d1 < 16 || d2 < 16) continue
 
@@ -6832,22 +6903,32 @@ export class Game {
       const team = player.id
 
       // 以出生点为 Town Hall 中心，套用与默认开局一致的 WC3-like 空间语法：
-      // TH(4x4) 为基地核心，金矿在 NE，兵营在 SW，worker 在 TH 南侧一字排开。
+      // TH(4x4) 为基地核心，金矿在 NE 形成可见矿线，兵营在 SW，worker 在 TH 南侧一字排开。
       const townhallX = px - 2
       const townhallZ = pz - 2
 
       // 主基地
       this.spawnBuilding('townhall', team, townhallX, townhallZ)
 
-      // 金矿：NE，保持与默认开局相同的 3-4 tile 级别短路径语法
-      this.spawnBuilding('goldmine', -1, townhallX + 5, townhallZ - 4)
+      // 金矿：NE，保持与默认开局相同的短路径语法，但不贴脸跳过移动。
+      this.spawnBuilding(
+        'goldmine',
+        -1,
+        townhallX + OPENING_GOLDMINE_OFFSET.x,
+        townhallZ + OPENING_GOLDMINE_OFFSET.z,
+      )
 
       // 兵营：SW 出口，形成军事区/出兵方向
-      this.spawnBuilding('barracks', team, townhallX - 5, townhallZ + 5)
+      this.spawnBuilding(
+        'barracks',
+        team,
+        townhallX + OPENING_BARRACKS_OFFSET.x,
+        townhallZ + OPENING_BARRACKS_OFFSET.z,
+      )
 
       // 5个农民：在 TH 南侧一字排开，避免出生在 blocker 内
-      for (let i = 0; i < 5; i++) {
-        this.spawnUnit('worker', team, townhallX + i, townhallZ - 1)
+      for (const offset of OPENING_WORKER_OFFSETS) {
+        this.spawnUnit('worker', team, townhallX + offset.x, townhallZ + offset.z)
       }
     }
   }

@@ -73,23 +73,32 @@ GLM Task25 已加入 `Crowded goldmine targetability`：
 
 当前可作为方向性基准：
 
-- Blizzard Classic Battle.net Peasant 页面：Human Peasant 金矿建议上限是 5 个，且农民可以右键未完成建筑参与加速建造。
-- Blizzard Classic Battle.net Rookie Mistakes：Human/Orc 金矿通常 5 个 worker 是最大有效采矿数；基地离矿过远时可能需要 6-7 个。
-- Blizzard Classic Battle.net Economy：Night Elf / Undead 每矿 5 个；Human / Orc 若 Town Hall 离矿太远，可能需要超过 5 个。
-- Liquipedia Gold Mine：每个 worker 采 10 gold 需要约 5 秒；基地距离合适时，Human/Orc 超过 5 个 worker 不提高效率。
+- Blizzard Classic Battle.net Peasant / Human Unit Stats：Human Peasant speed = `190`。本项目已有 Paladin `270 -> 3.0` 的数值映射，因此 Peasant 速度用 `190 / 270 * 3.0 ≈ 2.1`。
+  - https://classic.battle.net/war3/human/units/peasant.shtml
+  - https://classic.battle.net/war3/human/unitstats.shtml
+- Warcraft III 经济社区共识：基地贴近金矿时 Human / Orc 通常以 5 个 worker 形成有效饱和；距离过远时可能需要额外 worker，但那属于 long-distance mining，不应作为默认开局尺度。
+  - https://www.hiveworkshop.com/threads/basic-knowledge-of-warcraft-iii-the-economy.33364/
+- Liquipedia Gold Mine：每个 worker 采 `10 gold` 的矿内服务时间约 `5s`；基地距离合适时，超过 5 个 worker 不提高效率。
+  - https://liquipedia.net/warcraft/Gold_Mine
 
 ### 当前项目已知参数
 
-当前代码：
+当前代码合同：
 
 - `GOLD_GATHER_TIME = 5`
 - `LUMBER_GATHER_TIME = 3`
 - `GOLD_PER_TRIP = 10`
-- worker speed = `3.5`
+- `GOLDMINE_MAX_WORKERS = 5`
+- worker speed = `2.1`
+- militia speed = `3.0`
+- `GATHER_RANGE = 0.6`
 - 默认 Town Hall：tile `(10,12)`，size `4`
-- 默认 Gold Mine：tile `(15,8)`，size `3`
+- 默认 Gold Mine：tile `(18,8)`，size `3`
+- 默认 5 个 worker 出生在 TH 南侧，不出生在矿边；第一帧自动采矿，但必须先走过可见矿线。
+- 采矿状态下的 worker 不参与普通 unit separation，避免 5 人矿线在矿口/回本边缘互相推开。
+- 金矿槽位是“完整矿线预约”，不是只数当前 `Gathering`：进入采矿、矿内计时、回本、返回矿口都保留同一个有效槽位；第 6 个 worker 等待，不应填补往返空隙形成线性增产。
 
-问题是这些参数没有被一个“5 worker 饱和合同”统一约束。
+问题的处理原则：距离、速度、矿内服务时间、边界交互、碰撞、槽位预约必须一起看；不能只改某一个数字。
 
 ### 下一步 Codex 独立泳道
 
@@ -101,7 +110,7 @@ Codex 应建立 `Mining Saturation Benchmark`，不与 GLM Task25 冲突：
   - 5 workers 明显高于 4 workers。
   - 6 workers 不应显著高于 5 workers。
   - 初始 TH-GM 距离下，5 workers 应接近饱和。
-- 如果不满足，再调整距离、速度、采集时间或矿点排队规则。
+- 如果不满足，再调整距离、速度、采集时间、矿点排队规则或采矿状态碰撞规则。
 
 不能先靠肉眼挪位置。
 

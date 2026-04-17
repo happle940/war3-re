@@ -90,10 +90,21 @@ async function measureGoldScenario(page: Page, activeCount: number) {
 
     const townhallPos = townhall.mesh.position.clone()
     const minePos = mine.mesh.position.clone()
+    const thTx = Math.round(townhall.mesh.position.x - 0.5)
+    const thTz = Math.round(townhall.mesh.position.z - 0.5)
+    const openingWorkerOffsets = [
+      { x: -1, z: 5 },
+      { x: 0, z: 5 },
+      { x: 1, z: 5 },
+      { x: 2, z: 5 },
+      { x: 3, z: 5 },
+      { x: 4, z: 5 },
+    ]
 
     const resetWorker = (worker: any, idx: number, active: boolean) => {
-      const x = active ? 10.5 + idx : 26 + idx
-      const z = active ? 11.5 : 28
+      const offset = openingWorkerOffsets[idx] ?? openingWorkerOffsets[openingWorkerOffsets.length - 1]
+      const x = active ? thTx + offset.x + 0.5 : thTx + 16 + idx
+      const z = active ? thTz + offset.z + 0.5 : thTz + 16
       worker.mesh.position.set(x, g.getWorldHeight(x - 0.5, z - 0.5), z)
       worker.mesh.rotation.set(0, 0, 0)
       worker.moveTarget = null
@@ -116,6 +127,7 @@ async function measureGoldScenario(page: Page, activeCount: number) {
       worker.state = 0
       worker.gatherType = null
       worker.resourceTarget = null
+      worker.goldLoopSlotMine = null
     }
 
     teamStore.gold = 0
@@ -214,6 +226,7 @@ test.describe('Mining Saturation Regression', () => {
         worker.carryAmount = 0
         worker.gatherTimer = 0
         worker.state = 2 // UnitState.MovingToGather
+        worker.goldLoopSlotMine = null
       }
 
       let maxGathering = 0
@@ -322,6 +335,133 @@ test.describe('Mining Saturation Regression', () => {
     ).toBeLessThanOrEqual(Math.max(20, Math.floor(gain45 * 0.5)))
   })
 
+  test('default opening miners walk a visible route before entering the goldmine', async ({ page }) => {
+    await waitForGame(page)
+
+    const result = await page.evaluate(() => {
+      const g = (window as any).__war3Game
+      if (!g) return { ok: false, reason: 'no game' }
+
+      if (g.ai) {
+        if (typeof g.ai.reset === 'function') g.ai.reset()
+        g.ai.update = () => {}
+      }
+
+      const townhall = g.units.find((u: any) => u.team === 0 && u.type === 'townhall' && u.hp > 0)
+      const mine = g.units.find((u: any) => u.type === 'goldmine' && u.hp > 0 && u.remainingGold > 0)
+      if (!townhall || !mine) return { ok: false, reason: 'missing townhall or mine' }
+
+      const workers: any[] = g.units
+        .filter((u: any) => u.team === 0 && u.type === 'worker' && u.hp > 0)
+        .slice(0, 5)
+      if (workers.length < 5) return { ok: false, reason: 'missing starting workers' }
+
+      const thTx = Math.round(townhall.mesh.position.x - 0.5)
+      const thTz = Math.round(townhall.mesh.position.z - 0.5)
+      const openingWorkerOffsets = [
+        { x: -1, z: 5 },
+        { x: 0, z: 5 },
+        { x: 1, z: 5 },
+        { x: 2, z: 5 },
+        { x: 3, z: 5 },
+      ]
+
+      const footprint = (building: any) => {
+        const tx = Math.round(building.mesh.position.x - 0.5)
+        const tz = Math.round(building.mesh.position.z - 0.5)
+        const size = 3
+        return { minX: tx, minZ: tz, maxX: tx + size, maxZ: tz + size }
+      }
+      const distanceToFootprint = (worker: any, building: any) => {
+        const fp = footprint(building)
+        const x = worker.mesh.position.x
+        const z = worker.mesh.position.z
+        const dx = x < fp.minX ? fp.minX - x : x > fp.maxX ? x - fp.maxX : 0
+        const dz = z < fp.minZ ? fp.minZ - z : z > fp.maxZ ? z - fp.maxZ : 0
+        return Math.sqrt(dx * dx + dz * dz)
+      }
+
+      const initialPositions: { x: number; z: number }[] = []
+      workers.forEach((worker, idx) => {
+        const offset = openingWorkerOffsets[idx]
+        const x = thTx + offset.x + 0.5
+        const z = thTz + offset.z + 0.5
+        worker.mesh.position.set(x, g.getWorldHeight(x - 0.5, z - 0.5), z)
+        worker.mesh.rotation.set(0, 0, 0)
+        worker.moveTarget = null
+        worker.waypoints = []
+        worker.moveQueue = []
+        worker.attackTarget = null
+        worker.attackMoveTarget = null
+        worker.buildTarget = null
+        worker.carryAmount = 0
+        worker.gatherTimer = 0
+        worker.state = 0
+        worker.gatherType = null
+        worker.resourceTarget = null
+        worker.goldLoopSlotMine = null
+        initialPositions.push({ x, z })
+      })
+
+      g.issueCommand(workers, {
+        type: 'gather',
+        resourceType: 'gold',
+        target: mine.mesh.position.clone(),
+      })
+      for (const worker of workers) {
+        worker.resourceTarget = { type: 'goldmine', mine }
+      }
+      g.planPathForUnitsToBuildingInteraction(workers, mine)
+
+      const initialMovingWorkers = workers.filter((worker) =>
+        worker.state === 2 &&
+        worker.gatherType === 'gold' &&
+        worker.resourceTarget?.type === 'goldmine' &&
+        worker.resourceTarget.mine === mine &&
+        !!worker.moveTarget,
+      ).length
+
+      const initialMineDistances = workers.map(worker => distanceToFootprint(worker, mine))
+      const travelBeforeGather = new Array(workers.length).fill(null)
+      const maxTravel = new Array(workers.length).fill(0)
+
+      for (let t = 0; t < 10; t += 0.05) {
+        g.update(0.05)
+        workers.forEach((worker, idx) => {
+          const start = initialPositions[idx]
+          const dx = worker.mesh.position.x - start.x
+          const dz = worker.mesh.position.z - start.z
+          const travelled = Math.sqrt(dx * dx + dz * dz)
+          maxTravel[idx] = Math.max(maxTravel[idx], travelled)
+          if (travelBeforeGather[idx] === null && worker.state === 3) {
+            travelBeforeGather[idx] = travelled
+          }
+        })
+      }
+
+      return {
+        ok: true,
+        workerSpeed: workers[0]?.speed ?? 0,
+        initialMovingWorkers,
+        minInitialMineDistance: Math.min(...initialMineDistances),
+        minTravelBeforeGather: Math.min(...travelBeforeGather.filter((value) => value !== null)),
+        maxTravel,
+        travelBeforeGather,
+        enteredGatherCount: travelBeforeGather.filter((value) => value !== null).length,
+      }
+    })
+
+    expect(result.ok, result.reason ?? 'opening mining trajectory proof failed').toBe(true)
+    expect(result.workerSpeed, 'worker speed should use slow peasant scale, not cavalry scale').toBeLessThan(3)
+    expect(result.initialMovingWorkers, 'all opening workers should start with a real mine path').toBe(5)
+    expect(result.minInitialMineDistance, 'workers should not spawn inside the mine interaction range').toBeGreaterThan(2)
+    expect(result.enteredGatherCount, `not all workers entered the mine: ${JSON.stringify(result)}`).toBe(5)
+    expect(
+      result.minTravelBeforeGather,
+      `workers must visibly travel before disappearing into mine: ${JSON.stringify(result)}`,
+    ).toBeGreaterThanOrEqual(2)
+  })
+
   test('default opening workers path to standable mine edges and keep producing gold', async ({ page }) => {
     await waitForGame(page)
 
@@ -335,17 +475,29 @@ test.describe('Mining Saturation Regression', () => {
       }
 
       const teamStore = g.resources.teams?.get?.(0)
+      const townhall = g.units.find((u: any) => u.team === 0 && u.type === 'townhall' && u.hp > 0)
       const mine = g.units.find((u: any) => u.type === 'goldmine' && u.hp > 0 && u.remainingGold > 0)
-      if (!teamStore || !mine) return { ok: false, reason: 'missing team resources or mine' }
+      if (!teamStore || !townhall || !mine) return { ok: false, reason: 'missing team resources, townhall, or mine' }
 
       const workers: any[] = g.units
         .filter((u: any) => u.team === 0 && u.type === 'worker' && u.hp > 0)
         .slice(0, 5)
       if (workers.length < 5) return { ok: false, reason: 'missing starting workers' }
 
+      const thTx = Math.round((townhall?.mesh.position.x ?? 10.5) - 0.5)
+      const thTz = Math.round((townhall?.mesh.position.z ?? 12.5) - 0.5)
+      const openingWorkerOffsets = [
+        { x: -1, z: 5 },
+        { x: 0, z: 5 },
+        { x: 1, z: 5 },
+        { x: 2, z: 5 },
+        { x: 3, z: 5 },
+      ]
+
       const resetWorker = (worker: any, idx: number) => {
-        const x = 10.5 + idx
-        const z = 11.5
+        const offset = openingWorkerOffsets[idx] ?? openingWorkerOffsets[openingWorkerOffsets.length - 1]
+        const x = thTx + offset.x + 0.5
+        const z = thTz + offset.z + 0.5
         worker.mesh.position.set(x, g.getWorldHeight(x - 0.5, z - 0.5), z)
         worker.moveTarget = null
         worker.waypoints = []
@@ -358,6 +510,7 @@ test.describe('Mining Saturation Regression', () => {
         worker.state = 0
         worker.gatherType = null
         worker.resourceTarget = null
+        worker.goldLoopSlotMine = null
       }
 
       teamStore.gold = 0

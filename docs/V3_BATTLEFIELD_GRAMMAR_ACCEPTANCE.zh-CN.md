@@ -443,6 +443,17 @@ Known gaps:
 | 兵营形成生产区 | `pass` | Barracks SW of TH, angle >90°, not in mine corridor. |
 | 农场支持基地尺度 | `pass` | Farm within base area, not in mine corridor. |
 | 塔形成防御区逻辑 | `pass` | Tower near exit direction, within defense range of TH. |
+
+## 12. 2026-04-17 Mining Scale Refresh
+
+用户试玩反馈指出旧版金矿太贴近、农民第一眼缺少明显行动轨迹，且 5 人矿线容易在矿口互相挤压。当前运行时代码已把 BG1 经济轴线刷新为：
+
+- 默认 Town Hall tile `(10,12)`，Gold Mine tile `(18,8)`，仍在 NE 方向，但保留可见矿线。
+- 默认 5 个 worker 出生在 TH 南侧，开局自动采矿，但不会出生在矿边秒进矿。
+- `Peasant speed = 2.1`，对齐 Warcraft III `190` speed 相对本项目 `270 -> 3.0` 的比例映射。
+- 采金 worker 在 `MovingToGather / Gathering / MovingToReturn` 中不参与普通 unit separation，避免矿口/回本边缘互推卡死。
+- 金矿饱和改成完整矿线槽位预约：同一矿最多 5 个有效 worker，第 6 个等待，不填补往返空隙。
+- 回归证据：`tests/mining-saturation-regression.spec.ts` 4/4 passed；`tests/m3-base-grammar-regression.spec.ts` 6/6 passed。
 | 截图、布局说明、focused regression 三者一致 | `pass-with-debt` | Layout explanation + focused regression consistent; raw/annotated screenshots deferred (requires runtime capture). |
 
 ### Closeout verdict
