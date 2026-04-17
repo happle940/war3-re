@@ -215,11 +215,22 @@ test.describe('Unit Presence Regression', () => {
           minDist = Math.min(minDist, Math.hypot(p.x - q.x, p.z - q.z))
         }
       }
-      return { ok: true, minDist, blockedCount }
+      return {
+        ok: true,
+        minDist,
+        blockedCount,
+        workers: workers.map((u: any) => ({
+          x: u.mesh.position.x,
+          z: u.mesh.position.z,
+          state: u.state,
+          hasMoveTarget: !!u.moveTarget,
+          hasGoldStandMine: !!u.goldStandMine,
+        })),
+      }
     }, { movingToGather: S.MovingToGather })
 
     expect(result.ok).toBe(true)
-    expect(result.minDist).toBeGreaterThan(0.25)
+    expect(result.minDist, `gold gatherer positions collapsed: ${JSON.stringify(result)}`).toBeGreaterThan(0.25)
     expect(result.blockedCount).toBe(0)
     expect(severeConsoleErrors(page)).toHaveLength(0)
   })

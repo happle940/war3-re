@@ -451,7 +451,7 @@ Known gaps:
 - 默认 Town Hall tile `(10,12)`，Gold Mine tile `(18,8)`，仍在 NE 方向，但保留可见矿线。
 - 默认 5 个 worker 出生在 TH 南侧，开局自动采矿，但不会出生在矿边秒进矿。
 - `Peasant speed = 2.1`，对齐 Warcraft III `190` speed 相对本项目 `270 -> 3.0` 的比例映射。
-- 采金 worker 在 `MovingToGather / Gathering / MovingToReturn` 中不参与普通 unit separation，避免矿口/回本边缘互推卡死。
+- 占到金矿槽位的 worker 在 `MovingToGather / Gathering / MovingToReturn` 中不参与普通 unit separation，避免矿口/回本边缘互推卡死；未占槽单位仍保留基础分散。
 - 金矿饱和改成完整矿线槽位预约：同一矿最多 5 个有效 worker，第 6 个等待，不填补往返空隙。
 - 回归证据：`tests/mining-saturation-regression.spec.ts` 4/4 passed；`tests/m3-base-grammar-regression.spec.ts` 6/6 passed。
 | 截图、布局说明、focused regression 三者一致 | `pass-with-debt` | Layout explanation + focused regression consistent; raw/annotated screenshots deferred (requires runtime capture). |

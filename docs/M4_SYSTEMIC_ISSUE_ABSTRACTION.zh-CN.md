@@ -91,11 +91,11 @@ GLM Task25 已加入 `Crowded goldmine targetability`：
 - `GOLDMINE_MAX_WORKERS = 5`
 - worker speed = `2.1`
 - militia speed = `3.0`
-- `GATHER_RANGE = 0.6`
+- `GATHER_RANGE = 0.75`
 - 默认 Town Hall：tile `(10,12)`，size `4`
 - 默认 Gold Mine：tile `(18,8)`，size `3`
 - 默认 5 个 worker 出生在 TH 南侧，不出生在矿边；第一帧自动采矿，但必须先走过可见矿线。
-- 采矿状态下的 worker 不参与普通 unit separation，避免 5 人矿线在矿口/回本边缘互相推开。
+- 占到金矿槽位的 worker 在采金循环中不参与普通 unit separation，避免 5 人矿线在矿口/回本边缘互相推开；未占槽的移动/等待单位仍保留基础分散，防止视觉坍缩成同一点。
 - 金矿槽位是“完整矿线预约”，不是只数当前 `Gathering`：进入采矿、矿内计时、回本、返回矿口都保留同一个有效槽位；第 6 个 worker 等待，不应填补往返空隙形成线性增产。
 
 问题的处理原则：距离、速度、矿内服务时间、边界交互、碰撞、槽位预约必须一起看；不能只改某一个数字。

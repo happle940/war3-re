@@ -100,6 +100,7 @@ export interface Unit {
   carryAmount: number
   resourceTarget: ResourceTarget | null  // 明确资源目标引用，不再靠"最近邻推断"
   goldLoopSlotMine: Unit | null           // 金矿全循环槽位预约；同一矿最多 5 个有效矿工
+  goldStandMine: Unit | null              // 已经落到矿边站位的金矿，避免等待时每帧重算
   gatherTimer: number
   attackTimer: number
   attackTarget: Unit | null
@@ -746,7 +747,9 @@ export class Game {
    * scoped to the active gold loop only.
    */
   private hasSuppressedUnitCollision(unit: Unit): boolean {
-    return unit.gatherType === 'gold' &&
+    const rt = unit.resourceTarget
+    if (unit.gatherType !== 'gold' || rt?.type !== 'goldmine') return false
+    return this.hasGoldLoopSlot(unit, rt.mine) &&
       (unit.state === UnitState.MovingToGather ||
         unit.state === UnitState.Gathering ||
         unit.state === UnitState.MovingToReturn)
@@ -829,6 +832,7 @@ export class Game {
       unit.gatherType = null
       unit.resourceTarget = null
       unit.goldLoopSlotMine = null
+      unit.goldStandMine = null
       unit.moveTarget = null
       unit.waypoints = []
       return
@@ -836,10 +840,31 @@ export class Game {
 
     switch (unit.state) {
       case UnitState.MovingToGather: {
-        if (unit.moveTarget && !this.hasReachedGatherInteraction(unit)) return
+        const reachedGatherInteraction = this.hasReachedGatherInteraction(unit)
+        if (unit.moveTarget && !reachedGatherInteraction) return
         if (unit.moveTarget) {
           unit.moveTarget = null
           unit.waypoints = []
+        }
+        if (!reachedGatherInteraction) {
+          const rt = unit.resourceTarget
+          if (rt?.type === 'goldmine') {
+            this.planPathToBuildingInteraction(unit, rt.mine)
+            if (!unit.moveTarget && this.distanceToBuildingFootprint(unit, rt.mine) <= 2.5) {
+              this.placeGoldWorkerAtMineEdge(unit, rt.mine)
+              unit.goldStandMine = rt.mine
+            }
+          } else if (rt?.type === 'tree') {
+            this.planPath(unit, rt.entry.mesh.position)
+          }
+          return
+        }
+        if (reachedGatherInteraction &&
+          unit.gatherType === 'gold' &&
+          unit.resourceTarget?.type === 'goldmine' &&
+          unit.goldStandMine !== unit.resourceTarget.mine) {
+          this.placeGoldWorkerAtMineEdge(unit, unit.resourceTarget.mine)
+          unit.goldStandMine = unit.resourceTarget.mine
         }
         // 到达资源点 → 验证资源目标仍有效
         if (!this.validateResourceTarget(unit)) {
@@ -1024,6 +1049,7 @@ export class Game {
         hero.gatherType = null
         hero.resourceTarget = null
         hero.goldLoopSlotMine = null
+        hero.goldStandMine = null
         hero.waypoints = []
         hero.moveQueue = []
         hero.attackMoveTarget = null
@@ -1397,6 +1423,7 @@ export class Game {
     unit.gatherTimer = 0
     unit.resourceTarget = null
     unit.goldLoopSlotMine = null
+    unit.goldStandMine = null
     if (unit.buildTarget?.builder === unit) {
       unit.buildTarget.builder = null
     }
@@ -1843,6 +1870,7 @@ export class Game {
       unit.waypoints = []
       unit.resourceTarget = null
       unit.goldLoopSlotMine = null
+      unit.goldStandMine = null
       return
     }
 
@@ -1880,6 +1908,7 @@ export class Game {
           unit.state = UnitState.Idle
           unit.resourceTarget = null
           unit.goldLoopSlotMine = null
+          unit.goldStandMine = null
         }
       }
     }
@@ -1910,6 +1939,7 @@ export class Game {
     unit.gatherType = null
     unit.resourceTarget = null
     unit.goldLoopSlotMine = null
+    unit.goldStandMine = null
     unit.buildTarget = null
     unit.carryAmount = 0
     unit.attackTarget = null
@@ -2193,6 +2223,7 @@ export class Game {
       hero.gatherType = null
       hero.resourceTarget = null
       hero.goldLoopSlotMine = null
+      hero.goldStandMine = null
       hero.state = UnitState.Idle
       hero.waypoints = []
       hero.moveQueue = []
@@ -2297,6 +2328,7 @@ export class Game {
           other.waypoints = []
           other.resourceTarget = null
           other.goldLoopSlotMine = null
+          other.goldStandMine = null
         }
         // 清理 previousResourceTarget 中指向死亡单位的引用
         if (other.previousResourceTarget) {
@@ -2536,6 +2568,52 @@ export class Game {
   }
 
   /**
+   * Gold miners should not use ordinary collision once they are in the reserved
+   * mining loop, but their visible stand points must still remain distinct.
+   * This keeps old point-target command paths from collapsing every miner onto
+   * the same mine-center coordinate.
+   */
+  private placeGoldWorkerAtMineEdge(unit: Unit, mine: Unit): void {
+    const candidates = this.getBuildingApproachCandidates(mine, 2).sort((a, b) =>
+      a.z === b.z ? a.x - b.x : a.z - b.z,
+    )
+    if (candidates.length === 0) return
+
+    const peers = this.units
+      .filter(other => this.isAssignedToGoldLoop(other, mine))
+      .sort((a, b) => this.units.indexOf(a) - this.units.indexOf(b))
+    if (!peers.includes(unit)) peers.push(unit)
+
+    const used = new Set<number>()
+    let target = candidates[0]
+    for (const peer of peers) {
+      const peerPos = peer.mesh.position
+      let bestIndex = 0
+      let bestDist = Infinity
+      for (let i = 0; i < candidates.length; i++) {
+        if (used.has(i) && used.size < candidates.length) continue
+        const c = candidates[i]
+        const d = Math.hypot(c.x - peerPos.x, c.z - peerPos.z)
+        if (d < bestDist) {
+          bestDist = d
+          bestIndex = i
+        }
+      }
+      used.add(bestIndex)
+      if (peer === unit) {
+        target = candidates[bestIndex]
+        break
+      }
+    }
+
+    const pos = unit.mesh.position
+    pos.x = target.x
+    pos.z = target.z
+    pos.y = this.getWorldHeight(pos.x - 0.5, pos.z - 0.5)
+    unit.mesh.rotation.y = Math.atan2(mine.mesh.position.x - pos.x, mine.mesh.position.z - pos.z)
+  }
+
+  /**
    * 统一采集结算：扣减真实资源对象，返回本次携带量
    * gold/lumber 对称处理：
    * - 有有效目标 → 扣减资源 + 返回携带量
@@ -2577,6 +2655,7 @@ export class Game {
       if (mine && mine.remainingGold > 0) {
         unit.state = UnitState.MovingToGather
         unit.resourceTarget = { type: 'goldmine', mine }
+        unit.goldStandMine = null
         this.planPathToBuildingInteraction(unit, mine)
         return
       }
@@ -2595,6 +2674,7 @@ export class Game {
     unit.state = UnitState.Idle
     unit.resourceTarget = null
     unit.goldLoopSlotMine = null
+    unit.goldStandMine = null
   }
 
   /** 找最近的未耗尽金矿 */
@@ -3141,6 +3221,15 @@ export class Game {
   }
 
   private planPathForUnitsToBuildingInteraction(units: Unit[], target: Unit) {
+    if (target.type === 'goldmine') {
+      for (const u of units) {
+        if (u.isBuilding) continue
+        if (u.gatherType !== 'gold') continue
+        if (u.resourceTarget?.type !== 'goldmine' || u.resourceTarget.mine !== target) continue
+        this.reserveGoldLoopSlot(u, target)
+      }
+    }
+
     const reserved = new Set<string>()
     for (const u of units) {
       if (!u.isBuilding) this.planPathToBuildingInteraction(u, target, reserved)
@@ -4133,6 +4222,7 @@ export class Game {
       gatherType: null, carryAmount: 0, gatherTimer: 0,
       resourceTarget: null,
       goldLoopSlotMine: null,
+      goldStandMine: null,
       attackTimer: 0, attackTarget: null,
       attackDamage: def?.attackDamage ?? 5,
       attackRange: def?.attackRange ?? MELEE_RANGE,
@@ -4208,6 +4298,7 @@ export class Game {
       gatherType: null, carryAmount: 0, gatherTimer: 0,
       resourceTarget: null,
       goldLoopSlotMine: null,
+      goldStandMine: null,
       attackTimer: 0, attackTarget: null,
       attackDamage: def?.attackDamage ?? 0, attackRange: def?.attackRange ?? 0, attackCooldown: def?.attackCooldown ?? 2, armor: def?.key === 'tower' ? 0 : 2,
       buildProgress: 1, builder: null, buildTarget: null,

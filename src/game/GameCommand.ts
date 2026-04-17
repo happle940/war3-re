@@ -38,6 +38,7 @@ export function issueCommand(units: Unit[], cmd: GameCommand) {
         u.attackTarget = null
         u.resourceTarget = null
         u.goldLoopSlotMine = null
+        u.goldStandMine = null
         u.carryAmount = 0  // 中断采集时丢弃携带资源
         u.previousState = null
         u.previousGatherType = null
@@ -60,6 +61,7 @@ export function issueCommand(units: Unit[], cmd: GameCommand) {
         u.moveQueue = []
         u.resourceTarget = null
         u.goldLoopSlotMine = null
+        u.goldStandMine = null
         u.carryAmount = 0
         u.previousState = null
         u.previousGatherType = null
@@ -85,6 +87,7 @@ export function issueCommand(units: Unit[], cmd: GameCommand) {
         u.attackTarget = null
         u.resourceTarget = null  // 调用方在 issueCommand 后立即设置具体资源目标
         u.goldLoopSlotMine = null
+        u.goldStandMine = null
         u.previousState = null
         u.previousGatherType = null
         u.previousResourceTarget = null
@@ -107,6 +110,7 @@ export function issueCommand(units: Unit[], cmd: GameCommand) {
         u.gatherType = null
         u.resourceTarget = null
         u.goldLoopSlotMine = null
+        u.goldStandMine = null
         u.carryAmount = 0
         u.previousState = null
         u.previousGatherType = null
@@ -135,6 +139,7 @@ export function issueCommand(units: Unit[], cmd: GameCommand) {
         u.gatherType = null
         u.resourceTarget = null
         u.goldLoopSlotMine = null
+        u.goldStandMine = null
         u.buildTarget = null
         u.carryAmount = 0  // stop 丢弃携带的资源
         // stop 明确切断恢复链
@@ -160,6 +165,7 @@ export function issueCommand(units: Unit[], cmd: GameCommand) {
         u.gatherType = null
         u.resourceTarget = null
         u.goldLoopSlotMine = null
+        u.goldStandMine = null
         // hold 明确切断恢复链
         u.previousState = null
         u.previousGatherType = null
@@ -184,6 +190,7 @@ export function issueCommand(units: Unit[], cmd: GameCommand) {
         u.gatherType = null
         u.resourceTarget = null
         u.goldLoopSlotMine = null
+        u.goldStandMine = null
         u.carryAmount = 0
         u.previousState = null
         u.previousGatherType = null

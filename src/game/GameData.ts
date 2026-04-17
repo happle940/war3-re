@@ -539,7 +539,7 @@ export const GOLDMINE_MAX_WORKERS = 5  // 单个金矿有效采集容量（War3-
 export const LUMBER_PER_TRIP = 10      // 每次伐木量
 export const TREE_LUMBER = 50          // 每棵树的木材量
 export const GOLDMINE_GOLD = 2000      // 每座金矿的初始金量
-export const GATHER_RANGE = 0.6        // 判定到达资源点的距离；避免出生在矿边就跳过可见矿线
+export const GATHER_RANGE = 0.75       // 判定到达资源点的距离；覆盖建筑角点但避免出生在矿边跳过可见矿线
 export const BUILD_RANGE = 1.5         // 判定到达建造点的距离
 
 // ===== 战斗参数 =====
