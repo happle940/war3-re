@@ -6,7 +6,7 @@
   <title>War3 RE</title>
   <link rel="stylesheet" href="/src/styles.css" />
 </head>
-<body>
+<body class="battlefield-focus-mode">
   <!-- 游戏3D画布 -->
   <canvas id="game-canvas"></canvas>
 
@@ -19,6 +19,7 @@
         <span class="resource resource-food"><span class="icon food-icon">⊕</span><span class="resource-label">人口</span><span id="supply">0/0</span></span>
       </div>
       <div id="game-time">00:00</div>
+      <button id="battlefield-focus-toggle" type="button" data-active="true" aria-pressed="true" title="恢复目标、路线和身份面板（F9）">显示面板</button>
     </div>
 
     <aside id="objective-tracker" aria-label="短局目标">
@@ -184,6 +185,7 @@
           <label class="page-shell-toggle"><input id="setting-objective-beacons" type="checkbox" />显示战场目标信标</label>
           <label class="page-shell-toggle"><input id="setting-minimap-fog" type="checkbox" />显示小地图战争迷雾</label>
           <label class="page-shell-toggle"><input id="setting-human-route-panel" type="checkbox" />显示人族路线面板</label>
+          <label class="page-shell-toggle"><input id="setting-battlefield-focus" type="checkbox" checked />纯战场模式隐藏大型信息面板</label>
           <label class="page-shell-toggle"><input id="setting-audio-cues" type="checkbox" />启用目标 / 技能 / 压力音效 cue</label>
           <label class="page-shell-field">AI 难度
             <select id="setting-ai-difficulty">

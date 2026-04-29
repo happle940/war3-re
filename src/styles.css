@@ -193,6 +193,41 @@ label {
   text-shadow: 0 2px 3px var(--ui-shadow);
 }
 
+#battlefield-focus-toggle {
+  min-width: 72px;
+  height: 26px;
+  padding: 0 10px;
+  border: 1px solid rgba(168, 144, 72, 0.36);
+  border-radius: 4px;
+  background:
+    linear-gradient(180deg, rgba(34, 39, 28, 0.96), rgba(11, 14, 10, 0.94));
+  color: var(--ui-gold-bright);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 24px;
+  letter-spacing: 0;
+  white-space: nowrap;
+  text-shadow: 0 2px 3px var(--ui-shadow);
+  cursor: pointer;
+}
+
+#battlefield-focus-toggle:hover {
+  border-color: rgba(241, 220, 141, 0.68);
+  color: #fff1b9;
+}
+
+#battlefield-focus-toggle[data-active="true"] {
+  border-color: rgba(114, 169, 133, 0.68);
+  color: #d9e7b5;
+}
+
+body.battlefield-focus-mode #objective-tracker,
+body.battlefield-focus-mode #map-objective-radar,
+body.battlefield-focus-mode #human-route-panel,
+body.battlefield-focus-mode #milestone-status-panel {
+  display: none;
+}
+
 /* ===== Objective Tracker ===== */
 
 #objective-tracker {

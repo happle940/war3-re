@@ -133,6 +133,7 @@ War3-like browser RTS private alpha, Roadmap-driven Codex-only development
 - `Tab`：切换子组。
 - 选中可训练单位的建筑后按 `Y`：设置集结点。
 - 右键或 `Esc`：取消建造、攻击移动或集结点模式。
+- 试玩默认进入纯战场显示；顶部 `显示面板` / `纯战场` 按钮或 `F9` 可恢复 / 隐藏短局目标、战场目标、人族路线和战术身份大面板。
 
 ## 本地运行和验证
 

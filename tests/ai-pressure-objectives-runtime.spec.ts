@@ -114,6 +114,9 @@ test.describe('AI pressure and objective feedback runtime', () => {
 
     const result = await page.evaluate(() => {
       const g = (window as any).__war3Game
+      if (document.body.classList.contains('battlefield-focus-mode')) {
+        ;(document.getElementById('battlefield-focus-toggle') as HTMLButtonElement | null)?.click()
+      }
       g.updateHUD(0.016)
 
       const initialItems = Array.from(document.querySelectorAll('#objective-list .objective-item')).map((item: any) => ({
@@ -190,6 +193,9 @@ test.describe('AI pressure and objective feedback runtime', () => {
 
     const geometry = await page.evaluate(() => {
       const g = (window as any).__war3Game
+      if (document.body.classList.contains('battlefield-focus-mode')) {
+        ;(document.getElementById('battlefield-focus-toggle') as HTMLButtonElement | null)?.click()
+      }
       g.updateHUD(0.016)
       const panel = document.getElementById('objective-tracker') as HTMLElement
       const topHud = document.getElementById('hud-top') as HTMLElement

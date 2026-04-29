@@ -3,6 +3,7 @@ export type SessionPreferenceKey =
   | 'minimapFog'
   | 'closeProtection'
   | 'humanRoutePanel'
+  | 'battlefieldFocus'
   | 'audioCues'
 
 export type AIDifficultyKey = 'standard' | 'rush'
@@ -33,6 +34,7 @@ export const DEFAULT_SESSION_PREFERENCES: SessionPreferences = {
   minimapFog: true,
   closeProtection: true,
   humanRoutePanel: true,
+  battlefieldFocus: true,
   audioCues: true,
   aiDifficulty: 'standard',
 }
@@ -58,6 +60,7 @@ export function loadSessionPreferences(storage: Storage | null = globalThis.loca
       minimapFog: asBoolean(parsed.minimapFog, DEFAULT_SESSION_PREFERENCES.minimapFog),
       closeProtection: asBoolean(parsed.closeProtection, DEFAULT_SESSION_PREFERENCES.closeProtection),
       humanRoutePanel: asBoolean(parsed.humanRoutePanel, DEFAULT_SESSION_PREFERENCES.humanRoutePanel),
+      battlefieldFocus: asBoolean(parsed.battlefieldFocus, DEFAULT_SESSION_PREFERENCES.battlefieldFocus),
       audioCues: asBoolean(parsed.audioCues, DEFAULT_SESSION_PREFERENCES.audioCues),
       aiDifficulty: asDifficulty(parsed.aiDifficulty, DEFAULT_SESSION_PREFERENCES.aiDifficulty),
     }

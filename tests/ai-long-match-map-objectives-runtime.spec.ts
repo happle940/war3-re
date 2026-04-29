@@ -157,6 +157,9 @@ test.describe('AI long-match director and map objectives runtime', () => {
 
     const result = await page.evaluate(() => {
       const g = (window as any).__war3Game
+      if (document.body.classList.contains('battlefield-focus-mode')) {
+        ;(document.getElementById('battlefield-focus-toggle') as HTMLButtonElement | null)?.click()
+      }
       g.updateHUD(0.016)
       const before = g.getMapObjectiveSnapshot()
 

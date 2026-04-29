@@ -567,6 +567,7 @@ export class Game {
   private elPressureNext = document.getElementById('pressure-next') as HTMLSpanElement | null
   private elPressureMeterFill = document.getElementById('pressure-meter-fill') as HTMLSpanElement | null
   private elPressureAlert = document.getElementById('pressure-alert') as HTMLDivElement | null
+  private elBattlefieldFocusToggle = document.getElementById('battlefield-focus-toggle') as HTMLButtonElement | null
   private elPlaytestReadinessStatus = document.getElementById('playtest-readiness-status') as HTMLDivElement | null
   private elPlaytestReadinessList = document.getElementById('playtest-readiness-list') as HTMLDivElement | null
   private elPlaytestFeedbackPacket = document.getElementById('playtest-feedback-packet') as HTMLTextAreaElement | null
@@ -848,9 +849,16 @@ export class Game {
     bind('setting-minimap-fog', 'minimapFog', () => this.updateMinimap())
     bind('setting-close-protection', 'closeProtection')
     bind('setting-human-route-panel', 'humanRoutePanel', () => this.renderHumanRoutePanel(true))
+    bind('setting-battlefield-focus', 'battlefieldFocus', () => this.syncBattlefieldFocusMode())
     bind('setting-audio-cues', 'audioCues', () => {
       this.audioCues.setEnabled(this.sessionPreferences.audioCues)
       this.renderMilestoneStatusPanel(true)
+    })
+    this.elBattlefieldFocusToggle?.addEventListener('click', () => this.setBattlefieldFocusMode(!this.sessionPreferences.battlefieldFocus))
+    window.addEventListener('keydown', (event) => {
+      if (event.key !== 'F9') return
+      event.preventDefault()
+      this.setBattlefieldFocusMode(!this.sessionPreferences.battlefieldFocus)
     })
     const difficultySelect = document.getElementById('setting-ai-difficulty') as HTMLSelectElement | null
     if (difficultySelect) {
@@ -864,9 +872,34 @@ export class Game {
         this.renderMilestoneStatusPanel(true)
       })
     }
+    this.syncBattlefieldFocusMode()
     this.renderHumanRoutePanel(true)
     this.renderMilestoneStatusPanel(true)
     this.renderPlaytestReadinessPanel(true)
+  }
+
+  private setBattlefieldFocusMode(enabled: boolean) {
+    this.sessionPreferences = {
+      ...this.sessionPreferences,
+      battlefieldFocus: enabled,
+    }
+    saveSessionPreferences(this.sessionPreferences)
+    const setting = document.getElementById('setting-battlefield-focus') as HTMLInputElement | null
+    if (setting) setting.checked = enabled
+    this.syncBattlefieldFocusMode()
+  }
+
+  private syncBattlefieldFocusMode() {
+    document.body.classList.toggle('battlefield-focus-mode', this.sessionPreferences.battlefieldFocus)
+    if (this.elBattlefieldFocusToggle) {
+      this.elBattlefieldFocusToggle.dataset.active = this.sessionPreferences.battlefieldFocus ? 'true' : 'false'
+      this.elBattlefieldFocusToggle.setAttribute('aria-pressed', this.sessionPreferences.battlefieldFocus ? 'true' : 'false')
+      this.elBattlefieldFocusToggle.textContent = this.sessionPreferences.battlefieldFocus ? '显示面板' : '纯战场'
+      this.elBattlefieldFocusToggle.title = this.sessionPreferences.battlefieldFocus
+        ? '恢复目标、路线和身份面板（F9）'
+        : '隐藏目标、路线和身份面板（F9）'
+    }
+    this.renderMapObjectiveRadar(true)
   }
 
   private attachPlaytestControls() {
@@ -6386,7 +6419,7 @@ export class Game {
   private renderMapObjectiveRadar(force = false) {
     if (!this.elMapObjectiveList) return
     const objectives = this.buildCurrentMapObjectives()
-    if (this.sessionPreferences.objectiveBeacons) {
+    if (this.sessionPreferences.objectiveBeacons && !this.sessionPreferences.battlefieldFocus) {
       this.mapObjectiveBeacons.render(objectives)
     } else {
       this.mapObjectiveBeacons.render([])
