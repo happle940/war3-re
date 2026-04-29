@@ -9,10 +9,10 @@
  * 3. Keep completed → worker command card unlocks Workshop / Arcane Sanctum
  * 4. Spawned Workshop trains Mortar Team through normal command card
  * 5. Spawned Arcane Sanctum trains Priest through normal command card
- * 6. No Castle / Knight / new content
+ * 6. Castle / Knight can exist as T3 seeds, but the T2 path stops at Keep production
  *
  * Uses fresh state reads after every mutation.
- * NOT Castle, Knight, full tech tree, AI strategy, or asset work.
+ * NOT Castle runtime upgrade, Knight production, full tech tree, AI strategy, or asset work.
  */
 import { test, expect, type Page } from '@playwright/test'
 import {
@@ -238,11 +238,18 @@ test.describe('V9 Human T2 Production Path Smoke', () => {
     expect(result.phaseE.priestType).toBe('priest')
   })
 
-  test('PS-2: boundary — no Castle, Knight, or new content', () => {
-    expect(BUILDINGS.castle).toBeUndefined()
-    expect((UNITS as Record<string, unknown>)['knight']).toBeUndefined()
+  test('PS-2: boundary — T3 seeds exist, T2 smoke still stops at Keep production', () => {
+    expect(BUILDINGS.castle).toBeDefined()
+    expect(UNITS.knight).toBeDefined()
+    expect(BUILDINGS.townhall.upgradeTo).toBe('keep')
+    expect(BUILDINGS.keep.upgradeTo).toBe('castle')
+    expect(BUILDINGS.keep.trains).not.toContain('knight')
+    expect(BUILDINGS.barracks.trains).toContain('knight')
+    expect(UNITS.knight.techPrereqs).toEqual(['castle', 'blacksmith', 'lumber_mill'])
     expect(PEASANT_BUILD_MENU).toContain('workshop')
     expect(PEASANT_BUILD_MENU).toContain('arcane_sanctum')
+    expect(PEASANT_BUILD_MENU).not.toContain('keep')
+    expect(PEASANT_BUILD_MENU).not.toContain('castle')
     expect(BUILDINGS.keep.trains).toContain('worker')
     expect(BUILDINGS.workshop.techPrereq).toBe('keep')
     expect(BUILDINGS.arcane_sanctum.techPrereq).toBe('keep')

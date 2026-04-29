@@ -10,7 +10,7 @@
 import * as THREE from 'three'
 import { getLoadedModel } from './AssetLoader'
 
-const TEAM_COLORS = [0x4488ff, 0xff4444]
+const TEAM_COLORS = [0x4488ff, 0xff4444, 0x8f8f7a]
 const WORKER_SPRITE_TEXTURES = new Map<number, THREE.CanvasTexture>()
 const REAL_MODEL_ROUTE = 'real-gltf-unit-model'
 
@@ -24,6 +24,11 @@ const UNIT_HEALTH_BAR_Y: Record<string, number> = {
   sorceress: 2.45,
   knight: 2.55,
   paladin: 2.7,
+  archmage: 2.75,
+  mountain_king: 2.3,
+  water_elemental: 2.55,
+  forest_troll: 2.25,
+  ogre_warrior: 2.85,
 }
 
 /**
@@ -55,6 +60,9 @@ const TEAM_COLOR_SLOTS: Record<string, string[]> = {
   militia: ['Worker_Yellow', 'Worker_Vest', 'team_color', 'TeamColor'],
   sorceress: ['Wizard_Secondary', 'team_color', 'TeamColor'],
   paladin: ['Blue', 'team_color', 'TeamColor'],
+  archmage: ['team_color', 'TeamColor'],
+  mountain_king: ['team_color', 'TeamColor'],
+  water_elemental: ['team_color', 'TeamColor'],
 }
 
 /**
@@ -62,7 +70,7 @@ const TEAM_COLOR_SLOTS: Record<string, string[]> = {
  * Exported for regression testing of per-instance color isolation.
  */
 export function applyTeamColorGLTF(group: THREE.Group, team: number, type: string): THREE.Group {
-  const color = TEAM_COLORS[team]
+  const color = TEAM_COLORS[team] ?? TEAM_COLORS[2]
   const slots = TEAM_COLOR_SLOTS[type] ?? ['team_color', 'TeamColor']
   const slotSet = new Set(slots)
 
@@ -113,6 +121,11 @@ const MATERIAL_LIGHTNESS_BOOST: Record<string, number> = {
   sorceress: 0.07,
   knight: 0.08,
   paladin: 0.06,
+  archmage: 0.08,
+  mountain_king: 0.06,
+  water_elemental: 0.05,
+  forest_troll: 0.05,
+  ogre_warrior: 0.05,
 }
 
 function polishUnitMaterials(group: THREE.Group, type: string) {
@@ -173,7 +186,7 @@ function addWorldSpaceChildPreserveScale(
 
 function createTeamMaterial(team: number, opacity = 1): THREE.MeshLambertMaterial {
   return new THREE.MeshLambertMaterial({
-    color: TEAM_COLORS[team],
+    color: TEAM_COLORS[team] ?? TEAM_COLORS[2],
     transparent: opacity < 1,
     opacity,
   })
@@ -222,6 +235,10 @@ function addRoleCue(root: THREE.Group, team: number, type: string) {
   }
   if (type === 'paladin') {
     addPaladinHalo(root, team)
+    return
+  }
+  if (type === 'archmage') {
+    addCasterFocus(root, team, type)
     return
   }
   if (type === 'mortar_team') {

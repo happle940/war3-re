@@ -26,6 +26,12 @@ export interface LoadedAsset {
 const cache = new Map<string, LoadedAsset>()
 const gltfLoader = new GLTFLoader()
 
+function attachAnimationMetadata(group: THREE.Group, animations: THREE.AnimationClip[]) {
+  group.userData.assetAnimations = animations
+  group.userData.assetAnimationClipCount = animations.length
+  group.userData.assetAnimationClipNames = animations.map(clip => clip.name)
+}
+
 async function loadOne(entry: AssetEntry): Promise<void> {
   if (cache.has(entry.key)) return
 
@@ -39,6 +45,7 @@ async function loadOne(entry: AssetEntry): Promise<void> {
     scene.userData.assetKey = entry.key
     scene.userData.assetPath = entry.path
     scene.userData.assetScale = entry.scale
+    attachAnimationMetadata(scene, gltf.animations)
 
     applyStaticIdlePose(entry.key, scene, gltf.animations)
 
@@ -114,12 +121,17 @@ export function getLoadedModel(key: string): THREE.Group | null {
   const asset = cache.get(key)
   if (!asset || asset.status !== 'loaded') return null
   const clone = cloneSkeleton(asset.scene) as THREE.Group
+  attachAnimationMetadata(clone, asset.animations)
   deepCloneMaterials(clone)
   return clone
 }
 
 export function getAssetStatus(key: string): AssetStatus {
   return cache.get(key)?.status ?? 'pending'
+}
+
+export function getAssetAnimationClipNames(key: string): string[] {
+  return cache.get(key)?.animations.map(clip => clip.name) ?? []
 }
 
 // ==================== Test-only helpers ====================
@@ -144,6 +156,7 @@ export function __testInjectFakeAsset(
   scale: number,
   offsetY: number = 0,
   kind: AssetEntry['kind'] = 'unit',
+  animations: THREE.AnimationClip[] = [],
 ): () => void {
   const previous = cache.get(key)
   scene.scale.setScalar(scale)
@@ -151,8 +164,9 @@ export function __testInjectFakeAsset(
   scene.userData.assetKey = key
   scene.userData.assetPath = '__test__'
   scene.userData.assetScale = scale
+  attachAnimationMetadata(scene, animations)
   const entry: AssetEntry = { key, kind, path: '__test__', scale, offsetY }
-  cache.set(key, { entry, scene, status: 'loaded', animations: [] })
+  cache.set(key, { entry, scene, status: 'loaded', animations })
   return () => {
     if (previous) cache.set(key, previous)
     else cache.delete(key)

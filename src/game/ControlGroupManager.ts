@@ -1,4 +1,4 @@
-import type { Unit } from './Game'
+import type { Unit } from './UnitTypes'
 
 /**
  * War3 风格控制组管理

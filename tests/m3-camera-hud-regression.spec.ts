@@ -119,6 +119,15 @@ test.describe('M3 Camera/HUD Readability', () => {
     expect(result.arrowDelta, 'Arrow keys should remain available for camera panning').toBeGreaterThan(0.1)
   })
 
+  test('help text does not advertise WASD as camera movement', async ({ page }) => {
+    await waitForGame(page)
+
+    const helpText = await page.locator('#help-shell').textContent()
+
+    expect(helpText).toContain('方向键：移动摄像机')
+    expect(helpText).not.toContain('WASD')
+  })
+
   test('TH, worker, and goldmine all project into default viewport', async ({ page }) => {
     await waitForGame(page)
 
@@ -242,6 +251,58 @@ test.describe('M3 Camera/HUD Readability', () => {
     expect(cardState.cardVisible, 'command-card must be visible').toBe(true)
     // Worker command card: build buttons + empty slots should fill the fixed 16-slot grid.
     expect(cardState.childCount, 'command-card should have 16 slots/buttons').toBe(16)
+  })
+
+  test('command card text stays clipped inside a small button without overlap', async ({ page }) => {
+    await waitForGame(page)
+    await selectFirstWorker(page)
+
+    const result = await page.evaluate(() => {
+      const button = document.querySelector('#command-card button') as HTMLButtonElement | null
+      if (!button) return { ok: false, reason: 'no command button' }
+
+      button.innerHTML = [
+        '<span class="btn-hotkey">A</span>',
+        '<span class="btn-label">很长很长的单位命令名称不会撑开按钮</span>',
+        '<span class="btn-cost">金木人口和很长的前置条件说明</span>',
+        '<span class="btn-reason">资源不足且科技建筑尚未完成</span>',
+      ].join('')
+
+      const rectOf = (el: Element) => {
+        const r = el.getBoundingClientRect()
+        return { top: r.top, bottom: r.bottom, left: r.left, right: r.right, width: r.width, height: r.height }
+      }
+      const overlaps = (a: ReturnType<typeof rectOf>, b: ReturnType<typeof rectOf>) =>
+        a.left < b.right - 1 && a.right > b.left + 1 && a.top < b.bottom - 1 && a.bottom > b.top + 1
+
+      const buttonRect = rectOf(button)
+      const label = button.querySelector('.btn-label')!
+      const cost = button.querySelector('.btn-cost')!
+      const reason = button.querySelector('.btn-reason')!
+      const labelRect = rectOf(label)
+      const costRect = rectOf(cost)
+      const reasonRect = rectOf(reason)
+      const rows = [labelRect, costRect, reasonRect]
+      const rowsInsideButton = rows.every((r) =>
+        r.left >= buttonRect.left - 1 &&
+        r.right <= buttonRect.right + 1 &&
+        r.top >= buttonRect.top - 1 &&
+        r.bottom <= buttonRect.bottom + 1,
+      )
+
+      return {
+        ok: true,
+        rowsInsideButton,
+        labelCostOverlap: overlaps(labelRect, costRect),
+        costReasonOverlap: overlaps(costRect, reasonRect),
+        buttonHeight: buttonRect.height,
+      }
+    })
+
+    expect(result.ok, result.reason ?? 'command button setup failed').toBe(true)
+    expect(result.rowsInsideButton, `command text rows should stay inside the button height=${result.buttonHeight}`).toBe(true)
+    expect(result.labelCostOverlap, 'command label should not overlap cost text').toBe(false)
+    expect(result.costReasonOverlap, 'command cost text should not overlap disabled reason').toBe(false)
   })
 
   test('selected worker has visible selection ring and health bar', async ({ page }) => {

@@ -1,553 +1,201 @@
-# War3 RE - 项目总控计划（中文讨论版）
+# War3 RE - 顶层 Roadmap
 
-> Last updated: 2026-04-13
-> 对应英文权威版：`/Users/zhaocong/Documents/war3-re/PLAN.md`
-> 用途：给项目目标、当前阶段、长期差距和优先级提供中文讨论口径。
-> 注意：权威执行源仍是 `PLAN.md`。本文件用于对齐和讨论，不单独维护长队列。
+最后更新：2026-04-29
 
-## 0. 这份中文计划解决什么问题
+## 现在的项目定义
 
-过去我们把一句话目标：
+`war3-re` 是一个浏览器内运行的 War3-like RTS 私有 alpha。目标不是复刻官方 War3，而是做出一个合法、可玩、可持续扩展的 RTS 页面产品：开局能理解，命令可信，经济和战斗闭环成立，人族内容逐步完整，最终能形成一局像样的人机短局。
 
-> “让 Warcraft III 玩家在前 5 分钟认真对待它”
+本文件现在是项目顶层路线图。后续推进不再从旧 V8/V9 runway、双泳道、watch、看板、长队列或自动补货开始，而是从下面的 Roadmap 中切出小任务。
 
-既当成当前阶段目标，又当成整个项目的总北极星。
+## 当前工作方式
 
-这样会导致一个错觉：
+- 只由当前 Codex 会话推进。
+- GLM、双泳道、watch、自动补货、看板全部停止维护。
+- 不再用长队列文件驱动项目。
+- 每次只开一个主攻问题；主攻问题必须能映射到本 Roadmap 的一个阶段。
+- 行为改动做完后用构建、类型检查和必要的 focused runtime 测试验收。
+- 文档只服务产品方向、系统合同和真实验收，不再为每个小任务生成三件套。
 
-- 按这个目标看，项目似乎已经完成了一大半；
-- 但按“离真正 War3-like 还有多远”看，项目其实还在中前段。
+## 当前真实阶段
 
-所以这份中文计划的核心作用是：
+项目已经越过早期原型阶段，但还不是完整 Human race、完整 War3-like demo 或完整浏览器游戏产品。
 
-1. 把**当前阶段目标**和**长期终局愿景**拆开。
-2. 把 `M2-M7` 这些执行里程碑放回它们该在的位置。
-3. 让我们讨论“离 War3 终极点还有哪些大山”时，不再被当前工程阶段绑住。
+已经成立的核心：
 
-## 1. 目标层级
+- 浏览器 RTS 场景、选择、框选、右键命令、编队、命令卡。
+- worker 采金、伐木、建造、训练、资源、人口和部分科技门槛。
+- Human-like 基础单位、建筑、部分科技、英雄和能力链路。
+- AI 有经济、生产、英雄补给、首波前练级意图、进攻波次、基地防守、重组、防守反击、长局 director 阶段和压力快照。
+- `R1-R6` 基础体验已完成当前私有 alpha 第一轮闭环：打开网页前门、第一局开始、第一分钟可读、RTS 命令信任、经济/建造/生产和战斗底盘进入统一运行时快照、HUD 状态和 R15 反馈包。
+- `R7` Human 路线整理已完成当前私有 alpha 深化基线：经济、兵营、英雄、支援、科技、后期六段路线进入运行时快照和 HUD 路线面板，并补出 T1/T2/T3 解锁状态、技术节奏阶段、战术角色、混编覆盖、兵种克制读法、科技收益、下一步动作、power spike、生产线概览、路线 icon、解锁完成 cue、命令卡路线角色提示、字母热键执行、命令卡视觉身份、HUD 背包槽、命令状态层级、冷却/生效 meter、法力缺口 badge 和目标模式高亮基线。
+- `R10` 短局闭环已完成当前私有 alpha 基线：开局经济、生产、部队、英雄、地图目标、商店、AI 压力、决战、胜负摘要和重开重置都由真实 runtime 状态验收。
+- `R11` 战场可读闭环已完成当前私有 alpha 基线：我方基地、金矿线、树线、野怪营地、商店、敌方基地进入 HUD 雷达、世界视角 beacon 和小地图目标圈。
+- `R12` Fog / 侦察 / War3 身份已完成当前私有 alpha 基线：可见/已探索状态、中立营地、掉落物、商店消耗品、回城卷轴和目标侦察进入同一运行时验收。
+- `R13` 产品壳层已完成当前私有 alpha 基线：主菜单、设置、briefing、暂停、结果、返回、重开、偏好保存、关闭保护和上局摘要都有明确状态语义。
+- `R8` 英雄 / 技能成局已完成当前私有 alpha 深化基线：三英雄、XP/等级、技能学习、死亡记录/复活底座、三英雄技能反馈、技能可用性矩阵、目标合法性提示、施法距离/范围/光标语义、主动目标合法/非法判定、复活尸体 marker/范围环和运行时快照进入同一验收。
+- `R9` AI 稳定对手已完成当前私有 alpha 基线：经济、生产、科技、英雄技能、练级/商店理解、进攻波、防守/重组/反击和难度 director 都可 runtime 验收。
+- `R14` 视觉 / 音频身份已完成当前私有 alpha 深化基线：低模资产 catalog、War3-like HUD 皮肤、技能视觉反馈、施法预览语言、主动目标合法性反馈、目标 marker、复活尸体 marker/范围环、目标/压力/技能 cue 总线、选中/命令/命中/血条/状态表现层、玩家感知反馈层、最小单位动作语言、clip-aware 动作管线和真实动作/音效素材门禁进入统一验收。当前 R14 合同已覆盖 12 个核心单位的 51 个基础 GLB transform clip 状态和 10 类 wav cue 文件；但这些仍是基线素材，不是最终骨骼动画或发布级音频 identity。
+- `R15` 外部试玩准备已完成当前私有 alpha 深化基线：主菜单试玩信息入口、版本边界、已知问题入口、反馈诊断包、暂停/结果页反馈入口、关闭保护、兼容信号、性能预算、错误缓冲、反馈分流、Human 解锁层和战场表现层进入统一验收。
+- `R16` GitHub Pages 私测发布版进入发布工程阶段：目标是让朋友通过网页链接打开当前 Human 私有 alpha，不需要本地安装；发布门禁使用 `npm run build`、`npm run typecheck:app` 和 `npm run test:release`。
+- `WAR3-GAP` 全局追赶雷达已进入 R15 反馈包：从打开网页到关闭网页，按前门、第一分钟、操控、经济、战斗、Human、英雄、地图/Fog/物品、AI、视觉音频、试玩发布和架构 12 个域持续报告 War3 差距，不再只按单个里程碑报喜。
+- Vite / TypeScript / Playwright runtime 回归可用。
 
-## 1.1 长期愿景
+当前主要缺口：
 
-做一个合法、安全、浏览器内可运行、值得认真玩的 `War3-like RTS` 页面版产品。
+- R1-R15 都已有当前私有 alpha 第一轮运行时闭环；R15 也已有性能/兼容/错误缓冲/反馈分流和玩家体验信号底座。但还不是公开发布级包装：设置深度、帮助层级、真实性能阈值、真实玩家反馈运营和 10-15 分钟稳定体验仍要继续补。
+- Human 内容已经整理成当前路线面板，T1/T2/T3 解锁状态、节奏阶段、战术角色、混编覆盖、兵种克制读法、科技收益、结果页战斗原因复盘、命令卡字母热键执行、命令卡程序化 icon 身份、HUD 背包槽、命令状态徽标、冷却/生效 meter、法力缺口 badge 和施法目标模式高亮都能运行时验收；但还不是完整 Human race：真实二本/三本数值曲线、升级平衡、克制调参、发布级 icon art、真实多充能体系、最终 cooldown art 和可配置热键体系仍要继续打磨。
+- 战场第一眼还不够像 War3-like RTS：地形层次、建筑比例、资源点距离、单位尺度和视觉素材仍要校准。
+- AI 已有短局压力曲线、防守、重组、防守反击、难度选择和长局节奏递进基线，但还不是完整侦察、撤退微操或能稳定支撑 10-15 分钟的强对手。
+- Fog / 侦察 / 野怪 / 物品 / 商店 / 回城、英雄成局和视觉音频身份已有 runtime 基线；但完整 War3 级 Fog、反隐、高低差遮挡、真实视野争夺、长期 AI 对抗深度和发布级包装仍缺失。
+- 全局差距现在已可运行时观测，但“可观测”不等于“已追平”：`visual-audio-identity` 仍是最大硬缺口之一，R14 已补施法距离/范围/光标语义、主动目标合法性反馈、目标 marker、复活尸体 marker/范围环和合同全覆盖素材门禁，但死亡/攻击/施法/采集/建造的动作质量、最终音效混音、UI 声音 identity、远景剪影和发布级资产批准仍未关闭。
+- 代码结构也必须进入 Roadmap：`Game.ts` 仍承担过多职责，后续不能继续把新系统都塞回单一控制器。
 
-这里的“值得认真玩”，不只是“开局 5 分钟不出戏”，而是要逐步具备：
+## 目标架构
 
-- 完整页面版产品壳层，而不是打开页面直接进局的原型
-- 可信的 RTS 命令与控制权
-- 可读的战场语言
-- 能成立的一整局对局弧线
-- 足够的系统深度和战略骨架
-- 未来可对外试玩和迭代的产品包装能力
+架构目标不是换引擎，也不是一次性重写。正确方向是把当前项目演进成一个可维护的浏览器 RTS 模块化单体：局内 simulation、输入命令、渲染表现、UI 壳层、AI、地图和内容数据边界清晰，但仍由一个浏览器应用整体交付。
 
-这不是说项目要复刻完整 Warcraft III。
+### 分层目标
 
-不是目标的东西包括：
-
-- 完整四族复刻
-- 官方数值、官方地图、官方 UI、官方美术一比一还原
-- 一开始就做英雄、物品、酒馆、中立、完整科技树
-- 直接冲发行级包装
-
-长期终局差距图见：
-
-- `/Users/zhaocong/Documents/war3-re/docs/WAR3_ENDSTATE_GAP_ATLAS.zh-CN.md`
-
-## 1.2 当前阶段北极星
-
-让一个 Warcraft III 玩家在前 5 分钟内，愿意把它当成一个真的 RTS，而不是网页样机。
-
-这句话今天仍然重要，但它只代表**当前阶段北极星**。
-
-当前阶段现在更准确地写成：
-
-```text
-V6 War3 identity alpha
-```
-
-V2 到 V5 的工程主线已经向前推进：页面产品入口、战场清晰度、短局闭环、经济/科技/counter 战略骨架，以及第一条人族 Blacksmith -> Rifleman -> Long Rifles -> AI composition 分支都已有工程证据。
-
-当前阶段不再是“证明网页 RTS 像真的”，而是开始补 War3-like 身份层。第一步是 V6-NUM1 数值系统底座：单位、建筑、科技、技能要进入统一数值模型，后续人族内容不能继续靠散落硬编码。
-
-当前阶段真正要赚到的是：
-
-1. 人族现有单位、建筑、科技先进入统一数值字段和基础账本
-2. 攻击类型、护甲类型、研究效果不再是一次性特殊逻辑
-3. 玩家能看到关键数值、前置和禁用原因来自真实数据
-4. AI 使用同一套规则，不直接生成单位或绕过前置
-5. 数值 proof 先成立，再继续 Militia、Call to Arms、Defend、英雄、法术或后续人族内容
-
-C67 后的硬口径：
-
-```text
-V6 War3 identity alpha = 完整人族路线的数值底座 + 第一批可识别身份表达。
-它不是一次性完整人族，也不是 UI polish 或真实素材导入。
-```
-
-## 1.3 这两个目标不能混用
-
-结论必须分开说：
-
-- 对**当前阶段北极星**的完成度，可以是中高；
-- 对**长期 War3-like 愿景**的完成度，仍然可能偏低。
-
-所以以后讨论进度时，默认用两把尺子：
-
-1. 当前阶段北极星完成度
-2. 长期 War3-like 愿景完成度
-
-不要再只报一个百分比。
-
-## 2. 当前项目到底处在什么位置
-
-当前项目不是空白原型了，但它仍然是一个**很窄的 Human-like RTS slice**。
-
-### 2.1 当前已经明确存在的东西
-
-从当前代码和验证材料看，已经存在：
-
-- selection / drag-select / right-click / control group / Tab subgroup
-- 采集、建造、训练、取消、恢复、退款等基础合同
-- 资源和人口门控、disabled reason
-- worker / footman 两种单位
-- townhall / barracks / farm / tower / goldmine 五类建筑/资源点
-- 基础 AI：采集、建造、训练、出兵、基础恢复
-- 基础胜负状态
-- minimap / map load / camera / live build / runtime test / cleanup 这些工程外壳
-- 一批有用的 runtime regression，而不是只靠 build/tsc 假绿
-
-### 2.2 当前还明显不存在的东西
-
-当前仍然没有进入核心实现的，包括：
-
-- 完整主菜单 / 模式选择 / 对局前配置
-- 完整 loading / briefing / settings / help
-- 完整 return-to-menu / re-entry / rematch / session continuity
-- hero / spell / mana / inventory
-- creep / neutral camp / item / shop / altar
-- 升级 / research / tech tree 深化
-- 第二种族或阵营非对称
-- 真正 War3 式碰撞、body blocking、让路、卡口语法
-- 完整战斗系统：damage type / armor type / projectile / target filters
-- 完整一局 10-15 分钟人机可信闭环
-- 真正成熟的战场语言与视觉身份
-
-所以项目今天更像：
-
-```text
-一个可信度正在上升的 RTS alpha 基底
-```
-
-而不是：
-
-```text
-一个已经很接近 War3 成品的浏览器 RTS
-```
-
-## 3. 当前状态的两把尺子
-
-为了避免口径打架，这里明确记录当前推荐说法：
-
-### 3.1 当前阶段北极星完成度
-
-如果只看：
-
-> “Warcraft III 玩家前 5 分钟愿不愿意认真对待它”
-
-当前大致可按：
-
-```text
-55% - 65%
-```
-
-理解。
-
-理由：
-
-- 基础 RTS loop 已经真实存在
-- 命令可信度和工程证据比早期强很多
-- 但战场语言、HUD/镜头/空间语法、完整短局可信度还没过
-
-### 3.2 长期 War3-like 愿景完成度
-
-如果看：
-
-> “离一个真正值得认真玩的 War3-like 浏览器 RTS 还有多远”
-
-当前更合理的理解是：
-
-```text
-20% - 30%
-```
-
-理由：
-
-- 我们主要还在建立 RTS trust loop
-- 还没有真正跨过战场语言、对局弧线、战略骨架三座山
-- 更高层的英雄、法术、深度、重玩价值、产品包装基本还在未来
-
-## 4. 真正的大山，不是 M2-M7，而是这几层
-
-## 4.0 Promotion Boundary：V2 收口、V3 主攻、后期深度
-
-从现在开始，V2 -> V3 的边界按下面这张表判断：
-
-| 归属 | 包含什么 | 不包含什么 |
+| 层 | 责任 | 目标模块 |
 | --- | --- | --- |
-| `V2 closeout` | command trust、economy/build trust、combat/control baseline、AI same-rule、M7 hardening、最小 front door / menu start、pause/setup/results/reload/terminal reset、A1/A2 intake approval surface、README/share reality wording | 完整主菜单、完整模式选择、完整 loading/briefing、正式素材完成、完整短局 |
-| `V3 battlefield / product-shell work` | Human opening grammar、worker/footman/building/resource 默认镜头可读、tree line/terrain aids、front-door source truth、return-to-menu、re-entry、最小 loading/briefing 解释层 | 英雄、法术、第二阵营、完整科技树、完整公开 demo |
-| `later strategic depth` | 10-15 分钟短局、tech/timing/composition/counter、英雄/中立/物品/种族非对称、最终视觉音频 identity、公开 release 候选 | 不应塞进 V2 收口，也不应作为 V3 第一眼战场的前置条件 |
-
-V2 closeout 的剩余 blocker、允许 residual debt 和 evidence 口径，统一看：
-
-- `docs/V2_PAGE_PRODUCT_REMAINING_GATES.zh-CN.md`
-- `docs/SHELL_TO_BATTLEFIELD_CUTOVER_CRITERIA.zh-CN.md`
-
-这份 gate list 是关闭 `V2 credible page-product vertical slice` 的检查表；它把 product-shell gate、battlefield/readability gate、工程 proof、用户验收和可后移债务分开，避免把 V3/V4 工作提前写成 V2 已完成。
-
-其中 shell-to-battlefield cutover 标准负责判断：哪些 front-door / session-shell gate 必须先闭合，哪些 battlefield/readability 工作可以并行，什么证据能防止过早把主线切回战场。
-
-一句话：
-
-```text
-V2 关可信底盘和最小页面产品事实；
-V3 关第一眼战场和产品壳层清晰度；
-战略深度和 War3 标志系统后置。
-```
-
-## 4.1 G1 - 可信 RTS 底盘
-
-目标：
-
-- 玩家命令可信
-- opening loop 可信
-- HUD/命令卡/状态反馈不骗人
-- AI 至少是活的，不是样机
-
-当前判断：
-
-- 我们正在这座山的后半段
-- `M2 + M7` 大多属于这层
-- 当前 V2 closeout 还额外包含最小页面产品事实，不再只是 gameplay hardening
-
-## 4.2 G2 - War3 战场语言
-
-目标：
-
-- 第一眼像 War3-like 战场，而不是平面测试场
-- TH / 金矿 / 树线 / 出口 / 兵营 / 农场 / 塔有空间语法
-- worker / footman / building / resource role 一眼能读
-
-当前判断：
-
-- 这座山还没过
-- 它是离“像 War3”最近的第一道真正大关
-- 它现在是 V3 的核心，而不是 V2 无限补洞
-
-## 4.3 G3 - 一局可信的人机短局
-
-目标：
-
-- 能打一局 10-15 分钟
-- 有开始、中期压力、结束或可理解卡点
-- AI 不会低级坏死
-- 玩家能防守、补兵、反打
-
-当前判断：
-
-- 这座山也还没过
-- 它决定项目是不是从“opening alpha”变成“真的对局 alpha”
-
-## 4.4 G4 - War3-like 战略骨架
-
-目标：
-
-- tech / timing / composition / counter / expansion 开始成立
-- 不再只是 worker + footman + tower 的最小循环
-
-当前判断：
-
-- 这层基本还没开始真正爬
-
-## 4.5 G5 - War3 标志系统
-
-目标：
-
-- heroes
-- spells
-- creeps / neutrals / items
-- race asymmetry
-
-当前判断：
-
-- 这是后面的大山，不是眼下的工程补洞
-
-## 4.6 G6 - 可长期游玩的产品层
-
-目标：
-
-- 深度、重玩、视觉身份、音频、内容量
-- README / Known Issues / private playtest / public share
-- 真正意义上的外部产品化
-
-当前判断：
-
-- 现在还只是提前准备了一部分 release 材料，不是临近完成
-
-## 5. 当前优先级，不再用短视角来排
-
-## P0 - 收掉 V2 credible page-product closeout
-
-当前最重要：
-
-- 把 RTS trust loop 做实
-- 把最小 front door / session shell / results truth / share wording 做实
-- 不让已赚到的可信度在重构或壳层接入中回退
-
-这仍然是最近阶段的头号目标，因为没过这层，后面都站不住。
-
-## P1 - 打 G2：War3 战场语言
-
-下一座真正大山：
-
-- base grammar
-- camera / HUD / readability
-- footprint / gap / landmark language
-
-这一步过不了，就还是“能玩，但不像 War3-like”。
-
-但 P1 不能靠忽略 shell truth 来提前切主线。只有当前门、mode-select placeholder、pause/results/reload 等 V2 page-product gate 已经关闭、降级为 residual debt，或明确路由到用户判断后，battlefield readability 才能从并行准备变成主要压力线。
-
-## P2 - 打 G3：完整短局可信度
-
-再下一座山：
-
-- 一局人机 Alpha 真的成立
-- 不是只有开局动作正确
-
-## P3 - 明确 G4 的骨架方向
-
-在 G2/G3 后，要尽快决定：
-
-- 这个项目未来靠什么变成真正的 War3-like
-- 是哪条战略骨架先长出来
-
-## P4 - 把 G5/G6 保持在未来层，不抢主轴
-
-英雄、法术、第二阵营、公开包装都重要，
-但现在不能让它们抢走 G1/G2/G3 的主轴。
-
-## 6. M2-M7 在这张图里的位置
-
-`M2-M7` 不是“终极阶段图”，而是当前执行切片。
-
-可以这样理解：
-
-- `M2`：G1 的系统对齐
-- `M3`：G2 的部分客观基线
-- `M4`：G3 的 match-loop 尝试
-- `M5`：为 G4/G5/G6 做方向选择
-- `M6`：G6 的分享门槛
-- `M7`：G1 的工程硬化收口
-
-所以：
-
-```text
-M7 做完，不等于项目进入后期。
-M7 只是 G1 尾声的一部分。
-```
-
-## 7. 我们接下来讨论时怎么用这份计划
-
-以后讨论时，优先问清楚你在问哪一层：
-
-1. 你是在问当前工程收口没有？
-2. 你是在问现在像不像 War3-like？
-3. 你是在问离终局还有多远？
-4. 你是在问接下来该打哪座山？
-
-对应输出也要分开：
-
-- 工程结论
-- 当前阶段北极星结论
-- 长期愿景结论
-
-不要再把这三种判断揉成一句“完成度 xx%”。
-
-## 8. 当前一句话结论
-
-如果只看“前 5 分钟值得认真玩”，项目已经走出原型泥坑。
-
-如果看“离真正 War3-like 终态还有多远”，项目还没有爬上半山腰。
-
-这两个判断可以同时成立，而且必须同时成立。
-
-## 9. 具体推进计划
-
-上面那套是目标图，这一节才是执行图。
-
-原则：
-
-- 现在不追“什么都做一点”。
-- 先连续打穿 `G1 -> G2 -> G3`。
-- `G4/G5/G6` 先只做准备，不抢当前主轴。
-
-## 9.1 Wave 1：收掉 V2 credible page-product closeout
-
-目标：
-
-把“可信 RTS 底盘 + 最小页面产品事实”真正收口，结束 `能跑但仍像测试 harness` 的状态。
-
-### 必须达成
-
-- M7 hardening 作为 V2 工程证据收口：Task 35 接受、review log 完整、closeout packet 完整。
-- M2 当前客观合同不再回退：选择、HUD、建造、取消、恢复、采集、人口、基础战斗、AI opening/recovery 都有清楚证据。
-- V2 page-product gate 不再悬空：PS1 / PS2 / PS3 / PS4 / PS6 / PS7 / BF1 必须被记录为 closed、user-open、conditional residual 或 blocker，而不是藏在叙述里。
-- 最小 front door / mode-select placeholder / pause / setup / results / reload / terminal reset 的可见 surface 必须真实、可返回、可回归，不允许 fake route、fake loading 或假战报。
-- 当前 opening RTS loop 不出现明显假绿：测试绿但玩家一上手就不信的情况要继续收口。
-
-### 可以留债
-
-- 视觉身份还没定。
-- 完整 War3-like 比例/镜头/基地空间感还没过人眼 gate，但 BF1 basic visibility 不能回退。
-- 对局弧线还没成立。
-- 完整主菜单、完整模式池、完整 loading/briefing、公开 release 包装仍然后置。
-
-### 不能带过去
-
-- command ownership 漂移
-- HUD stale state
-- builder / cancel / refund / occupancy 死状态
-- AI 明显死锁
-- runtime cleanup / lock / smoke 失效
-- 普通用户入口仍像 runtime harness
-- visible shell surface 只有容器、图标、coming soon 或静态假文案
-- outward wording 暗示 finished product、War3 parity 或 public release ready
-
-### 这波主要交付
-
-- 完整的 V2 evidence ledger / remaining gate closeout
-- M2/M7 当前状态的干净证据包
-- 不再反复打回的 RTS trust baseline
-- 可以进入 V3 战场第一眼和产品壳层清晰度的 promotion boundary
-
-## 9.2 Wave 2：打 G2，建立 War3 战场语言
-
-目标：
-
-让项目从“可信 RTS alpha”开始变成“像 War3-like 战场的 RTS alpha”。
-
-### 必须达成
-
-- TH / 金矿 / 树线 / 出口 / 兵营 / 农场 / 塔 的开局空间关系有清晰语法。
-- 默认镜头下 worker / footman / building / resource role 一眼能读。
-- HUD 不破坏主战场阅读。
-- 至少有一套 Human-like opening layout 能被你看成“有意图的基地”，不是随机摆件。
-
-### 可以留债
-
-- 最终资产方向还没定。
-- 不同地图风格还没展开。
-- 细节 polish、音效、动画仍可粗糙。
-
-### 不能带过去
-
-- 看得见功能、看不懂战场
-- worker / footman / barracks / mine 角色混淆
-- 基地布局没有开口、没有 rally / move lane、没有矿区逻辑
-
-### 这波主要交付
-
-- Human opening layout contract 和必要修正
-- camera/HUD/readability 的人眼判断包
-- M3 从“客观比例测试”升级为“战场语言判断”
-
-## 9.3 Wave 3：打 G3，建立一局可信的人机短局
-
-目标：
-
-让项目从“opening 好像可以”进入“真的能打一局短局”。
-
-### 必须达成
-
-- 有开始、中期压力、结束或可理解卡点。
-- AI 不会在第一波后低级坏死。
-- 玩家有防守、补兵、反击空间。
-- 胜负或卡住原因能被说清。
-
-### 可以留债
-
-- 节奏还不够细
-- balance 还不成熟
-- 长期内容厚度不足
-
-### 不能带过去
-
-- AI 低级停摆
-- 胜负表达混乱
-- 玩家因为控制/HUD 问题无法判断自己在输什么
-
-### 这波主要交付
-
-- 一局 10-15 分钟 Alpha 的验证包
-- match-loop / AI pressure / end-state 的人眼与工程共同结论
-
-## 9.4 Wave 4：决定 G4 的骨架，不急着上 G5/G6
-
-目标：
-
-在 G2/G3 通过后，决定项目到底靠什么从 alpha 走向真正的 War3-like。
-
-这里要回答：
-
-- 先长 tech / timing / composition 哪条骨架？
-- Human 深化先做什么？
-- 英雄/法术/第二阵营是否进入下一阶段，还是继续后置？
-
-### 原则
-
-- 这一波先做方向判断和第一刀，不一口气把所有高层系统都拉进来。
-- 如果 G2/G3 没过，不要跳级做英雄、法术、二阵营来制造“像大作”的错觉。
-
-## 9.5 三波内的 owner 拆分
-
-### Wave 1
-
-- Codex：M7 closeout、长期口径修正、review / acceptance / docs 统一
-- GLM：focused contract pack、非冲突小修、小范围基线补洞
-- 用户：暂不需要频繁介入，只在口径和大方向上纠偏
-
-### Wave 2
-
-- Codex：base grammar / camera / HUD / readability 的主判断与集成
-- GLM：objective layout/readability contracts、窄修复
-- 用户：必须做人眼 gate，因为这波核心是“像不像 War3-like 战场”
-
-### Wave 3
-
-- Codex：match-loop acceptance framing、AI/节奏问题归因
-- GLM：AI / end-state / runtime proof 的 deterministic 补强
-- 用户：必须打短局并判断“这一局到底成立没成立”
-
-## 9.6 接下来不该做什么
-
-即使很诱人，下面这些也不该抢到前面：
-
-- 直接做英雄 / 法术 / 物品 / 酒馆
-- 直接开第二阵营
-- 大规模重做视觉资产
-- 过早做 public demo 包装
-- 因为想看起来“更像 War3”而跳过 G2/G3 的基础判断
-
-## 9.7 当前推荐路线
-
-一句话版：
-
-```text
-先把 G1 收干净；
-再拿下 G2 的战场语言；
-再证明 G3 的一局成立；
-然后才配讨论 G4/G5/G6 的长期扩张。
-```
-
-如果这条顺序不变，项目会越来越像 War3-like。  
-如果跳过 G2/G3，直接冲高层内容，项目只会变成“系统更多，但不像 War3 的 web RTS”。
+| App / Boot | 启动网页、连接 DOM、创建游戏、处理普通入口和 runtime test 入口 | `src/main.ts`、后续 `src/app/` |
+| Session Shell | menu、briefing、pause、setup、results、return/reload、关闭/重开语义 | 后续 `src/game/session/` |
+| Game Facade | 对外保持 `Game` 入口，兼容测试和页面调用；内部只做组合和调度 | `src/game/Game.ts` 逐步瘦身 |
+| World Model | 单位、建筑、资源、队伍、时间、订单、死亡记录、比赛结果的权威状态 | 后续 `src/game/model/` |
+| Commands / Orders | move、attack、gather、build、train、research、ability 的统一命令入口和失败原因 | `src/game/GameCommand.ts`，后续 `src/game/commands/` |
+| Systems | 移动、采集、建造、生产、研究、战斗、技能、死亡、胜负、buff/debuff | 后续 `src/game/systems/` |
+| Presentation | Three.js 场景、单位/建筑 visual、血条、特效、截图、minimap 渲染 | `UnitVisualFactory`、`BuildingVisualFactory`、`FeedbackEffects`，后续 `src/game/render/` |
+| UI / HUD | 选择面板、命令卡、资源栏、训练队列、错误反馈、cursor/提示 | 后续 `src/game/ui/` |
+| AI | build order、worker 分配、进攻波次、英雄学习/施法、恢复策略 | `SimpleAI.ts`，后续 `src/game/ai/` |
+| Map Runtime | 程序化地图、W3X 地形、pathing、occupancy、tree、地图实体生成 | `src/map/` + `PathingGrid` / `TreeManager` |
+| Content Data | 单位、建筑、科技、能力、数值、Human 路线配置 | `GameData.ts`，后续 `src/game/content/` |
+| Test Harness | 给 Playwright 暴露稳定调试 API，减少测试直接摸内部字段 | 后续 `src/game/testing/` |
+
+### 架构决策
+
+1. **保留模块化单体，不做 ECS / 微服务 / 引擎重写。**
+   当前项目是单页浏览器 RTS，最大风险是功能体验未闭合，不是规模化部署。模块化单体能降低复杂度，也能保留现有测试资产。
+
+2. **`Game` 先做 facade，再逐步瘦身。**
+   `Game.ts` 不能继续膨胀，但也不能突然删除。短期让它继续作为页面和测试入口，内部把 session、HUD、command card、ability、combat、economy 等边界逐个外移。
+
+3. **权威状态要逐步从 Three.js 对象中剥离。**
+   当前很多状态挂在 `Unit.mesh.position` 和 Three object 上。长期应由 World Model 持有权威状态，Three.js 只读状态并表现出来。这个过程必须渐进，先从新系统开始，不强行一次性迁移全部单位。
+
+4. **命令必须成为系统边界。**
+   玩家输入、AI 和测试都应通过命令 / order 层表达意图。系统内部可以拒绝命令并给出失败原因，不能让 UI、AI 或测试绕过同一套规则。
+
+5. **每次重构都必须绑定一个 Roadmap 切片。**
+   不开“纯重构大阶段”。例如 R1 做主菜单时抽 session shell；R4 做命令反馈时抽 command / HUD；R6 做战斗时抽 combat；R8 做英雄时抽 abilities。
+
+## `R-ARCH` 横切重构主线
+
+`R-ARCH` 不是独立玩家功能阶段，而是贯穿 R1-R15 的工程约束。每个 Roadmap 切片都应检查是否有一个小而可测的结构边界可以顺手拆出。
+
+| 子阶段 | 绑定 Roadmap | 目标 | 验收 |
+| --- | --- | --- | --- |
+| `R-ARCH-0` | `R0` | 固化目标架构和重构原则 | 顶层 Roadmap 记录清楚，不开始代码大改 |
+| `R-ARCH-1` | `R1/R13` | 抽 `SessionShellController`，管理 menu/briefing/pause/results/return/reload | shell 相关 focused tests 通过 |
+| `R-ARCH-2` | `R4/R7` | 抽 `CommandCardBuilder` / HUD presenter，命令按钮和禁用原因从 `Game.ts` 外移 | command-card、resource、selection 回归通过 |
+| `R-ARCH-3` | `R4/R5` | 强化 `Command` / `Order` 层，统一玩家、AI、测试命令入口和失败原因 | command、resource、construction focused tests 通过 |
+| `R-ARCH-4` | `R8` | 建立 `abilities/`，把 Paladin / Archmage / Mountain King 技能逐步从 `Game.ts` 外移 | 对应英雄技能 runtime tests 通过 |
+| `R-ARCH-5` | `R5` | 抽 `EconomySystem` / `WorkerLoopSystem`，采金、采木、回本、矿边站位成独立系统 | mining、lumber、resource 回归通过 |
+| `R-ARCH-6` | `R6` | 抽 `CombatSystem`，普攻、护甲、AOE、stun、tower、target filter 成独立系统 | combat-control、static-defense、hero combat tests 通过 |
+| `R-ARCH-7` | `R9/R10` | 拆 `SimpleAI` 为 economy、build order、wave、hero usage、recovery 模块 | ai、first-five、short-skirmish tests 通过 |
+| `R-ARCH-8` | `R11/R12` | 强化 `MapRuntime` / pathing / fog / neutral object 边界 | map、pathing、visibility、fog/neutral tests 通过 |
+| `R-ARCH-9` | `R14/R15` | 把 render/assets/audio/performance 形成发布前可维护边界 | build、typecheck、smoke、performance smoke 通过 |
+| `R-ARCH-10` | `R15/全局追赶` | 抽 `War3GapSystem`，把 R1-R15 证据汇成 War3 全局差距雷达 | R15 feedback packet 和 R-ARCH 边界测试通过 |
+
+当前进展：`R-ARCH-10` 已完成第九刀，`MilestoneSignalSystem` 接管 R15 反馈包里的里程碑信号组装，`UnitPresentationSystem` 接管单位 idle/move/attack/cast/status/death 的最小表现状态并支持 clip/fallback，`AudioCueSystem` 支持 asset-backed cue 优先、失败回退程序音，`BattlefieldPerceptionSystem` 接管命令、战斗、技能、死亡、建造、动作状态和音效语义覆盖的玩家感知快照，`PresentationAssetReadinessSystem` 接管真实动作 clip 与真实音效素材门禁，`HeroAbilityPresentationSystem` 接管英雄施法距离/范围/光标语义和主动目标合法性快照，`ResurrectionReadabilitySystem` 接管 Paladin 复活尸体 marker、可复活高亮和范围环快照，`ResultPresentationSystem` 接管结果页视觉复盘快照并消费战斗原因/科技收益，`HumanCombatProfileSystem` 接管 Human 混编角色、DPS/有效血量和护甲克制读法，`HumanUpgradeImpactSystem` 接管 Human 攻防/射程/生命科技收益读法，`War3GapSystem` 接管 12 个 War3 差距域的全局追赶快照，避免 `Game.ts` 继续承载 R7/R8/R14/R15 摘要表、表现状态机、资产门禁、结果复盘和产品差距判断。
+
+### 重构红线
+
+- 不做一次性 `Game.ts` 全量拆分。
+- 不在没有 focused tests 的情况下迁移经济、战斗、技能或 AI 行为。
+- 不把重构 PR 和大功能 PR 混成不可审的超大变更。
+- 不因为架构目标推迟玩家体验主线；架构服务 R1-R15，而不是替代 R1-R15。
+- 不恢复旧队列、GLM、watch、自动补货或 task synthesis 来管理重构。
+
+## 顶层 Roadmap
+
+| 阶段 | 目标 | 功能缺口 | 用户体验缺口 |
+| --- | --- | --- | --- |
+| `R0` | 项目口径统一 | 清理旧 V8/V9、队列、GLM、watch 叙述 | 入口文档和实际产品状态一致 |
+| `R1` | 打开网页像打开游戏 | 当前主菜单、模式/地图/帮助/设置/试玩信息入口和渲染就绪已通过 R1-R6 proof；后续补发布级氛围 | 不再像工程说明页；第一屏有游戏感、焦点明确 |
+| `R2` | 第一局能自然开始 | 当前默认地图、AI、双方基地、局前 briefing 和地图/模式状态已通过 R1-R6 proof；后续补局前配置深度 | 玩家知道自己要打什么、怎么开始、当前版本边界是什么 |
+| `R3` | 第一分钟可信 | 当前 worker、矿、树、基地、HUD、目标面板和路线面板已通过 R1-R6 proof；后续补更强镜头/引导/地形层次 | 玩家一眼知道基地、资源、农民、下一步操作 |
+| `R4` | RTS 操控可信 | 当前选择、命令卡、建造入口、移动/采集/攻击移动/停止/驻守命令入口和命令卡字母热键执行已通过 proof；后续补 cursor、目标合法性和失败原因层级 | 玩家相信“我选谁，谁听命令”；错误原因清楚 |
+| `R5` | 经济 / 建造 / 生产稳定 | 当前采金、伐木、资源、人口、训练、建造和科技入口已通过 R1-R6 proof；后续抽 EconomySystem 并补长局压力 | 不会卡死；按钮灰掉时知道为什么 |
+| `R6` | 战斗系统像 RTS | 当前普攻、攻击移动、静态防御、血条/状态、伤害模型和战斗数据入口已通过 R1-R6 proof；后续抽 CombatSystem 并补动画/音效/范围提示 | 战斗结果可读，谁在打谁、为什么死、能否撤退都清楚 |
+| `R7` | Human 核心内容闭环 | Worker、Footman、Rifleman、Priest、Sorceress、Knight、Mortar、三英雄、建筑、科技、升级；当前六段 Human 路线、T1/T2/T3 解锁状态、技术节奏阶段、战术角色、混编覆盖、兵种克制读法、科技收益、下一步动作、power spike、路线 icon、解锁完成 cue、命令卡路线角色提示、字母热键执行、命令卡视觉身份、HUD 背包槽、命令状态层级、冷却/生效 meter、法力缺口 badge 和施法目标模式高亮基线已通过 proof | 玩家能理解人族路线，并在命令卡里看到、按下、辨认下一步属于哪条路线、当前命令是否可施放、当前混编缺什么、哪些护甲克制要点、当前研究带来多少攻击/护甲/生命/射程收益；后续继续补真实二本/三本数值曲线、升级平衡、克制调参、发布级图标、真实多充能体系、最终 cooldown art 和可配置热键体系 |
+| `R8` | 英雄 / 技能真正成局 | XP、升级、技能学习、复活、Paladin / Archmage / Mountain King 完整技能链；当前三英雄技能成局、技能可用/阻断/目标提示、施法距离/范围/光标语义、主动目标合法/非法、复活尸体可读快照已通过 runtime proof | 英雄不是装饰；技能有反馈、有时机、有战术意义；后续继续补技能 icon 质量、动画和音效 |
+| `R9` | AI 是稳定对手 | AI 经济、建造、科技、英雄、技能、进攻、防守、恢复、难度 director；当前稳定对手快照已通过 runtime proof | 10-15 分钟内像一个对手，不是脚本样机；后续继续补侦察、撤退、适应玩家打法 |
+| `R10` | 短局闭环 | 胜负条件、AI 压力曲线、防守、反打、结算、重开；当前私有 alpha 完整闭环已通过 runtime proof，并补出战斗读法与科技收益结果卡 | 玩家能完整打一局，知道为什么赢 / 输；结算页能读出混编、克制和科技收益对结果的影响 |
+| `R11` | War3-like 战场可读 | 地图空间、基地布局、矿线、树线、出口、堵口、建筑占地、单位比例；当前 HUD 雷达、世界 beacon、小地图目标圈已通过 runtime proof | 第一眼能读出主要战场目标，但还不是完整美术/地形/Fog of war |
+| `R12` | War3 身份系统 | Fog of war、侦察、野怪、物品、商店、掉落、回城 / 消耗品；当前可见/已探索、目标侦察、回城卷轴和身份快照已通过 proof | 有侦察、练级、争夺点，开始接近 War3 核心味道；后续补完整 Fog 规则、反隐、高低差和遮挡 |
+| `R13` | 产品壳层完整 | 设置、帮助、暂停、结果、返回、重开、偏好保存、关闭保护；当前主菜单到关闭保护的产品旅程已通过 proof | 从打开网页到关闭网页都有明确状态语义；后续补发布级包装、反馈入口和错误恢复 |
+| `R14` | 视觉 / 音频身份 | 合法资产、动画、攻击特效、音效、UI 皮肤、主菜单氛围；当前低模资产、HUD 皮肤、命令卡 icon、HUD 背包槽、命令状态徽标、冷却/生效 meter、法力缺口 badge、目标模式高亮、技能反馈、施法预览语言、主动目标合法性反馈、目标 marker、复活尸体 marker/范围环、技能特效爆发、结果页视觉复盘、cue 总线、选中/命令/命中/血条/状态表现层、玩家感知反馈层、最小单位动作语言、clip/fallback 动作管线、真实动作/音效素材门禁和 51/51 clips、10/10 wav cues 合同覆盖已通过 runtime proof | 不再像纯 proxy 工程版；后续重点是把基线 clips/cues、程序化 icon、冷却层和技能爆发升级为发布级动作、技能特效、音频 identity、最终图标和主菜单氛围 |
+| `R15` | 外部试玩 / 发布准备 | 当前已接入试玩信息、版本边界、已知问题入口、诊断反馈包、暂停/结果反馈入口、性能预算信号、兼容矩阵、错误缓冲、反馈分类、恢复按钮、Human 解锁层、战场表现层和 War3 全局差距雷达；后续继续补真实性能阈值、浏览器矩阵和反馈运营 | 普通玩家可试玩，不需要项目背景解释；每轮能看到离 War3-like 目标还有哪些最大差距；但还不是公开发布或 release-ready |
+| `R16` | GitHub Pages 私测发布 | 固化 Pages workflow、发布 smoke、朋友试玩口径和当前链接 | 朋友能点链接进入当前私有 alpha；发布仍受控，不升级为公开 release |
+
+## 推进顺序
+
+1. `R0` 先统一项目口径，避免 README、Known Issues、Roadmap 和实际执行方式互相打架。
+2. `R1-R6` 当前私有 alpha 基础体验已经完成第一轮闭环：前门、开局、第一分钟、操控、经济生产和战斗底盘都可 runtime 验收。
+3. `R7-R15` 当前私有 alpha 主线也已经完成第一轮闭环：Human 路线、英雄技能、AI 对手、短局、战场可读、War3 身份、产品壳层、视觉音频身份和外部试玩准备都可 runtime 验收。
+4. 顶层 Roadmap 当前状态：`R1-R15` 全部完成第一轮 alpha proof，但未达到 War3 parity、完整 Human race、发布版或公开 release-ready。
+5. `R16` 先把当前 alpha 固化为 GitHub Pages 私测发布链路，让真实朋友试玩反馈进入后续 R14/R7/R-ARCH/R15/WAR3-GAP 深化。
+6. 下一轮主攻先放下 AI 长局，围绕 `R14/R7/R-ARCH/R15/WAR3-GAP`：把基础 clips、程序化 icon、HUD 背包槽、冷却/生效 meter 和技能爆发升级为更可信动作/图标/特效，补 Human 真实 T2/T3 数值曲线、升级平衡、玩家可读反馈、命令卡路线/热键/视觉身份一致性、外部试玩包装、全局差距雷达复盘，以及把 HUD/command/ability/combat/economy/result presentation 边界继续从 `Game.ts` 外移。
+7. `R9` 作为已有稳定对手底座保留，后续再做侦察/撤退/适应；当前不抢占 R14/R7/R-ARCH 主线。
+
+## 已完成的第一批切片
+
+1. `R0` 项目口径清理：README、Known Issues、Roadmap、Command Center 统一到 Codex-only 和当前真实阶段。
+2. `R1-R6` 基础体验闭环：打开网页、开始一局、第一分钟可读、RTS 操控、经济/生产、战斗底盘进入 `FoundationMilestoneSystem`、HUD 和 R15 反馈包。
+3. `R1/R13` 主菜单和产品壳层：打开网页第一屏、设置、briefing、暂停、结果、返回、重开和关闭保护形成闭环。
+4. `R3/R10` 第一局短局体验：默认开局、经济、生产、英雄、目标、AI 压力、胜负和复盘形成闭环。
+5. `R11/R12` 战场目标和侦察身份：HUD 目标、世界 beacon、小地图圈、Fog/已探索状态、野怪、物品、商店、回城形成闭环。
+6. `R7` Human 路线整理：经济、兵营、英雄、支援、科技、后期六段路线，以及 T1/T2/T3 解锁状态、技术节奏阶段、战术角色、生产线概览、下一步动作、power spike、路线 icon、解锁完成 cue、命令卡路线角色提示、字母热键执行、命令卡视觉身份、HUD 背包槽、命令状态层级、冷却/生效 meter、法力缺口 badge 和目标模式高亮进入玩家可读面板和运行时快照。
+7. `R8` 英雄成局：三英雄技能链、经验等级、死亡/复活底座、技能反馈、技能可用性矩阵、目标合法性提示和复活尸体可读层进入 `HeroMilestoneSystem`。
+8. `R9` AI 稳定对手：经济、生产、科技、英雄技能、地图/商店理解、压力波次、防守恢复和难度 director 进入 `AIOpponentMilestoneSystem`。
+9. `R10` 短局闭环：目标、AI 压力、胜负摘要和重开路径进入 `SkirmishProgressSystem`。
+10. `R11` 战场可读：HUD 雷达、世界 beacon 和小地图目标圈进入 `MapObjectiveSystem`。
+11. `R12` War3 身份：Fog/侦察、野怪、掉落、商店和回城进入 `War3IdentitySystem`。
+12. `R13` 产品壳层：主菜单、设置、briefing、暂停、结果、返回、重开、偏好和关闭保护进入 `SessionMilestoneSystem`。
+13. `R14` 视觉 / 音频身份：低模资产基线、HUD 皮肤、命令卡 icon、HUD 背包槽、命令状态徽标、冷却/生效 meter、法力缺口 badge、目标模式高亮、技能反馈、复活尸体 marker/范围环、技能特效爆发、结果页视觉复盘、音效 cue 总线、选中/命令/命中/血条/状态表现层、玩家感知反馈层、最小单位动作语言、clip/fallback 动作来源、真实动作/音效素材门禁和当前合同全覆盖 asset-backed clips/cues 进入 `VisualAudioIdentitySystem`。
+14. `R15` 外部试玩准备：试玩信息、已知问题入口、诊断反馈包、暂停/结果反馈入口、性能/兼容/错误缓冲/反馈分流、Human 解锁层、战场表现层和发布边界进入 `PlaytestReadinessSystem`。
+15. `WAR3-GAP` 全局追赶雷达：R1-R15 证据汇总为 12 个玩家旅程差距域，并进入 R15 诊断反馈包和 R-ARCH 边界测试。
+
+## 下一批主攻方向
+
+1. `R14` 深化：把当前合同全覆盖的基础 transform clips / wav cues、技能爆发和结果页视觉复盘升级为更接近 War3-like 的动作节奏、发布级技能特效、主菜单氛围和最终音频 identity。
+2. `R7` 深化：T2/T3 数值节奏、兵种克制、升级平衡、发布级图标、真实多充能体系、最终 cooldown art、可配置热键体系和路线完成后的实战目标反馈。
+3. `R-ARCH` 结构化重构：继续把 milestone/playtest/HUD/command/ability/combat/audio/result presentation 边界逐步从 `Game.ts` 拆出。
+4. `R15` 发布级打磨：真实浏览器矩阵、性能阈值、可分享试玩包、反馈运营和人工 triage 规则。
+5. `WAR3-GAP` 每轮复盘：每轮结束用全局差距雷达报告哪些 War3-like 域缩小、哪些仍是关键缺口。
+6. `R9` 暂缓到下一轮：真实侦察、撤退/恢复微策略、对玩家打法的长期反应、10-15 分钟稳定性证明。
+
+## 默认入口
+
+- 项目总控：`docs/PROJECT_COMMAND_CENTER.zh-CN.md`
+- 顶层 Roadmap：`PLAN.zh-CN.md`
+- 版本级历史路线：`docs/PROJECT_MASTER_ROADMAP.zh-CN.md`
+- 终局差距：`docs/WAR3_ENDSTATE_GAP_ATLAS.zh-CN.md`
+- Human 能力板：`docs/HUMAN_RACE_CAPABILITY_BOARD.zh-CN.md`
+- 已知问题：`docs/KNOWN_ISSUES.zh-CN.md`
+- 回归清单：`docs/GAMEPLAY_REGRESSION_CHECKLIST.md`
+
+## 不再使用
+
+- `board.html`
+- `public/board.js`
+- `public/board.css`
+- `scripts/*watch*`
+- `scripts/*lane*`
+- `scripts/queue-refill.mjs`
+- `scripts/task-synthesis.mjs`
+- `scripts/version-*.mjs`
+- `docs/CODEX_ACTIVE_QUEUE.md`
+- `docs/GLM_READY_TASK_QUEUE.md`
+- 双泳道 runways / transition automation 文档

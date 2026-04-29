@@ -2,8 +2,8 @@
  * V9 HN3-UX8 ability command-card data-read migration.
  *
  * Proves:
- * - Game.ts command-card/status UI reads existing ability values from ABILITIES.
- * - Game.ts no longer reads RALLY_CALL_* / PRIEST_HEAL_* constants directly.
+ * - Command-card builder/status UI reads existing ability values from ABILITIES.
+ * - Command-card/status source no longer reads RALLY_CALL_* / PRIEST_HEAL_* constants directly.
  * - Rally Call and Priest Heal visible command-card values remain unchanged.
  * - Manual Heal still uses the ability range when selecting an injured friendly target.
  */
@@ -13,6 +13,8 @@ import { ABILITIES } from '../src/game/GameData'
 
 const BASE = 'http://127.0.0.1:4173/?runtimeTest=1'
 const gameSource = readFileSync(new URL('../src/game/Game.ts', import.meta.url), 'utf8')
+const unitCommandSource = readFileSync(new URL('../src/game/ui/UnitCommandButtonBuilders.ts', import.meta.url), 'utf8')
+const abilityUiSource = `${gameSource}\n${unitCommandSource}`
 
 const RALLY = ABILITIES.rally_call
 const HEAL = ABILITIES.priest_heal
@@ -64,15 +66,15 @@ test.describe('V9 ability command-card data-read migration', () => {
     await waitForGame(page)
   })
 
-  test('proof-1: Game.ts visible ability UI reads ABILITIES instead of legacy constants', async () => {
-    expect(gameSource).toContain('ABILITIES.rally_call.effectValue')
-    expect(gameSource).toContain('ABILITIES.rally_call.duration')
-    expect(gameSource).toContain('ABILITIES.priest_heal.cost.mana ?? 0')
-    expect(gameSource).toContain('ABILITIES.priest_heal.effectValue')
-    expect(gameSource).toContain('ABILITIES.priest_heal.range')
+  test('proof-1: visible ability UI reads ABILITIES instead of legacy constants', async () => {
+    expect(abilityUiSource).toContain('ABILITIES.rally_call.effectValue')
+    expect(abilityUiSource).toContain('ABILITIES.rally_call.duration')
+    expect(abilityUiSource).toContain('ABILITIES.priest_heal.cost.mana ?? 0')
+    expect(abilityUiSource).toContain('ABILITIES.priest_heal.effectValue')
+    expect(abilityUiSource).toContain('ABILITIES.priest_heal.range')
 
-    expect(gameSource).not.toMatch(/\bRALLY_CALL_(?:DURATION|COOLDOWN|RADIUS|DAMAGE_BONUS)\b/)
-    expect(gameSource).not.toMatch(/\bPRIEST_HEAL_(?:AMOUNT|MANA_COST|COOLDOWN|RANGE)\b/)
+    expect(abilityUiSource).not.toMatch(/\bRALLY_CALL_(?:DURATION|COOLDOWN|RADIUS|DAMAGE_BONUS)\b/)
+    expect(abilityUiSource).not.toMatch(/\bPRIEST_HEAL_(?:AMOUNT|MANA_COST|COOLDOWN|RANGE)\b/)
   })
 
   test('proof-2: Rally Call command card and selected-state text show ability data values', async ({ page }) => {

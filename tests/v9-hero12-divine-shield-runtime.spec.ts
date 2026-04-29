@@ -342,13 +342,10 @@ test.describe('V9 HERO12-IMPL1B Divine Shield self-cast runtime', () => {
 
   test('CS-7: DS cannot be manually deactivated (no cancel while active)', async ({ page }) => {
     await waitForRuntime(page)
-    const pal = await summonPaladin(page)
-    expect(pal).not.toBeNull()
 
     const result = await page.evaluate(() => {
       const g = (window as any).__war3Game
-      const paladin = g.units.find((u: any) => u.type === 'paladin' && !u.isBuilding && u.team === 0)
-      if (!paladin) return null
+      const paladin = g.spawnUnit('paladin', 0, 30, 30)
       if (!paladin.abilityLevels) paladin.abilityLevels = {}
       paladin.abilityLevels.divine_shield = 1
       paladin.mana = 100

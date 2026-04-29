@@ -117,6 +117,167 @@ test.describe('Asset Pipeline Contracts', () => {
     }
   })
 
+  test('blacksmith runtime import uses GLB candidate with team color slot and stable browser budget', async ({ page }) => {
+    await waitForGame(page)
+
+    await page.waitForFunction(() => {
+      const g = (window as any).__war3Game
+      const summary = g?.__testCreateAssetVisualSummary?.('blacksmith', true, 0)
+      return summary?.visibleMeshCount === 12 && summary?.bboxWidth > 3.5
+    }, { timeout: 15000 })
+
+    const result = await page.evaluate(() => {
+      const g = (window as any).__war3Game
+      const assetSummary = g.__testCreateAssetVisualSummary('blacksmith', true, 0)
+      const blue = g.spawnBuilding('blacksmith', 0, 18, 18)
+      const red = g.spawnBuilding('blacksmith', 1, 23, 18)
+
+      const summarize = (unit: any) => {
+        unit.mesh.updateWorldMatrix(true, true)
+        let visibleMeshCount = 0
+        let triangleCount = 0
+        let teamColorHex: number | null = null
+        const materialNames = new Set<string>()
+
+        unit.mesh.traverse((child: any) => {
+          if (!child?.isMesh || child.visible === false) return
+          visibleMeshCount++
+
+          const geometry = child.geometry
+          if (geometry?.index) {
+            triangleCount += geometry.index.count / 3
+          } else if (geometry?.attributes?.position) {
+            triangleCount += geometry.attributes.position.count / 3
+          }
+
+          const materials = Array.isArray(child.material) ? child.material : [child.material]
+          for (const material of materials) {
+            if (!material) continue
+            if (material.name) materialNames.add(material.name)
+            if ((material.name === 'team_color' || material.name === 'TeamColor') && material.color?.getHex) {
+              teamColorHex = material.color.getHex()
+            }
+          }
+        })
+
+        return {
+          visibleMeshCount,
+          triangleCount,
+          directChildCount: unit.mesh.children.length,
+          materialNames: [...materialNames].sort(),
+          teamColorHex,
+        }
+      }
+
+      return {
+        assetSummary,
+        blue: summarize(blue),
+        red: summarize(red),
+      }
+    })
+
+    expect(result.assetSummary.visibleMeshCount, 'blacksmith should use imported GLB meshes, not fallback proxy').toBe(12)
+    expect(result.assetSummary.directChildCount, 'imported blacksmith should be one cloned GLB root').toBe(1)
+    expect(result.assetSummary.bboxWidth, 'blacksmith footprint width should fit RTS browser budget').toBeGreaterThan(3.5)
+    expect(result.assetSummary.bboxWidth, 'blacksmith footprint width should fit RTS browser budget').toBeLessThan(4.1)
+    expect(result.assetSummary.bboxHeight, 'blacksmith height should stay below camera occlusion budget').toBeGreaterThan(2.8)
+    expect(result.assetSummary.bboxHeight, 'blacksmith height should stay below camera occlusion budget').toBeLessThan(3.4)
+    expect(result.assetSummary.bboxDepth, 'blacksmith depth should fit RTS browser budget').toBeGreaterThan(2.8)
+    expect(result.assetSummary.bboxDepth, 'blacksmith depth should fit RTS browser budget').toBeLessThan(3.3)
+
+    for (const [label, summary] of Object.entries({ blue: result.blue, red: result.red })) {
+      expect(summary.visibleMeshCount, `${label}: spawned blacksmith should retain GLB mesh count`).toBe(12)
+      expect(summary.triangleCount, `${label}: spawned blacksmith triangle count should remain browser-light`).toBe(664)
+      expect(summary.directChildCount, `${label}: spawned blacksmith should keep one imported root`).toBe(1)
+      expect(summary.materialNames, `${label}: material manifest should expose team slot`).toContain('team_color')
+    }
+    expect(result.blue.teamColorHex, 'team 0 blacksmith should apply blue team_color').toBe(0x4488ff)
+    expect(result.red.teamColorHex, 'team 1 blacksmith should apply red team_color').toBe(0xff4444)
+  })
+
+  test('complete low-poly baseline pack loads for gameplay models, items, and pine tree', async ({ page }) => {
+    await waitForGame(page)
+
+    const unitKeys = [
+      'worker', 'footman', 'rifleman', 'mortar_team', 'priest', 'militia', 'sorceress', 'knight',
+      'paladin', 'archmage', 'mountain_king', 'water_elemental', 'forest_troll', 'ogre_warrior',
+    ]
+    const buildingKeys = [
+      'townhall', 'barracks', 'farm', 'tower', 'goldmine', 'blacksmith', 'altar_of_kings',
+      'arcane_vault', 'lumber_mill', 'workshop', 'arcane_sanctum', 'keep', 'castle',
+    ]
+    const itemKeys = ['tome_of_experience', 'healing_potion', 'mana_potion', 'boots_of_speed', 'scroll_of_town_portal']
+    const catalogOnlyKeys = ['goldmine_accent', 'pine_tree']
+    const keys = [...unitKeys, ...buildingKeys, ...itemKeys, ...catalogOnlyKeys]
+
+    await page.waitForFunction((runtimeKeys) => {
+      const g = (window as any).__war3Game
+      return runtimeKeys.every((key: string) => g?.__testGetAssetStatus?.(key) === 'loaded')
+    }, keys, { timeout: 20000 })
+
+    const result = await page.evaluate(({ unitKeys, buildingKeys, itemKeys }) => {
+      const g = (window as any).__war3Game
+      return {
+        statuses: Object.fromEntries(
+          [...unitKeys, ...buildingKeys, ...itemKeys, 'goldmine_accent', 'pine_tree']
+            .map((key: string) => [key, g.__testGetAssetStatus(key)]),
+        ),
+        units: Object.fromEntries(
+          unitKeys.map((key: string) => [key, g.__testCreateAssetVisualSummary(key, false, key.includes('troll') || key.includes('ogre') ? 2 : 0)]),
+        ),
+        buildings: Object.fromEntries(
+          buildingKeys.map((key: string) => [key, g.__testCreateAssetVisualSummary(key, true, 0)]),
+        ),
+        items: Object.fromEntries(
+          itemKeys.map((key: string) => [key, g.__testCreateItemVisualSummary(key)]),
+        ),
+      }
+    }, { unitKeys, buildingKeys, itemKeys })
+
+    for (const [key, status] of Object.entries(result.statuses)) {
+      expect(status, `${key} should be loaded from the low-poly baseline pack`).toBe('loaded')
+    }
+
+    for (const [key, summary] of Object.entries(result.units)) {
+      expect(summary.visibleMeshCount, `${key}: GLB unit should expose multiple readable meshes`).toBeGreaterThanOrEqual(5)
+      expect(summary.bboxHeight, `${key}: unit height collapsed`).toBeGreaterThan(1.0)
+      expect(summary.bboxWidth, `${key}: unit width collapsed`).toBeGreaterThan(0.5)
+      expect(summary.bboxDepth, `${key}: unit depth collapsed`).toBeGreaterThan(0.35)
+    }
+
+    for (const [key, summary] of Object.entries(result.buildings)) {
+      const minWidth: Record<string, number> = {
+        farm: 1.4,
+        tower: 1.2,
+        arcane_vault: 1.4,
+        blacksmith: 3.0,
+        townhall: 3.0,
+        keep: 3.0,
+        castle: 3.0,
+      }
+      const minDepth: Record<string, number> = {
+        farm: 1.3,
+        tower: 1.2,
+        arcane_vault: 1.3,
+        blacksmith: 2.5,
+        townhall: 3.0,
+        keep: 3.0,
+        castle: 3.0,
+      }
+      expect(summary.visibleMeshCount, `${key}: GLB building should expose multiple readable meshes`).toBeGreaterThanOrEqual(5)
+      expect(summary.bboxHeight, `${key}: building height collapsed`).toBeGreaterThan(1.0)
+      expect(summary.bboxWidth, `${key}: building footprint collapsed`).toBeGreaterThan(minWidth[key] ?? 2.0)
+      expect(summary.bboxDepth, `${key}: building footprint collapsed`).toBeGreaterThan(minDepth[key] ?? 1.5)
+    }
+
+    for (const [key, summary] of Object.entries(result.items)) {
+      expect(summary.visibleMeshCount, `${key}: item should keep GLB body plus pickup cue`).toBeGreaterThanOrEqual(4)
+      expect(summary.bboxHeight, `${key}: item height collapsed`).toBeGreaterThan(0.1)
+      expect(summary.bboxWidth, `${key}: item pickup footprint collapsed`).toBeGreaterThan(0.7)
+      expect(summary.bboxDepth, `${key}: item pickup footprint collapsed`).toBeGreaterThan(0.7)
+    }
+  })
+
   test('explicit refresh preserves live entity position and rotation', async ({ page }) => {
     await waitForGame(page)
 
@@ -188,7 +349,7 @@ test.describe('Asset Pipeline Contracts', () => {
       const treeCount = g.treeManager?.trees?.length ?? 0
 
       // 2. Spawn missing types to verify all factories work
-      const testTypes = ['footman', 'farm', 'tower']
+      const testTypes = ['footman', 'farm', 'tower', 'blacksmith']
       for (const type of testTypes) {
         if (!runtimeTypes.has(type)) {
           if (type === 'footman') g.spawnUnit(type, 0, 25, 25)
@@ -234,7 +395,7 @@ test.describe('Asset Pipeline Contracts', () => {
     })
 
     // All required types must have valid visuals
-    const requiredTypes = ['worker', 'footman', 'townhall', 'barracks', 'farm', 'tower', 'goldmine']
+    const requiredTypes = ['worker', 'footman', 'townhall', 'barracks', 'farm', 'tower', 'goldmine', 'blacksmith']
     for (const type of requiredTypes) {
       expect(result.typeChecks[type], `${type} must produce valid mesh`).toBe(true)
     }

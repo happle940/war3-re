@@ -2,7 +2,7 @@
  * V9 HN7-MODEL8 Research multi-building prerequisite model.
  *
  * Uses the runtime-test-only `window.__war3Researches` hook to inject a
- * temporary research definition without adding product data.
+ * temporary research definition without adding product-only test data.
  */
 import { test, expect, type Page } from '@playwright/test'
 import { RESEARCHES } from '../src/game/GameData'
@@ -45,9 +45,9 @@ async function waitForGame(page: Page) {
 test.describe('V9 HN7-MODEL8 Research multi-building prerequisite model', () => {
   test.setTimeout(90000)
 
-  test('MBP-1: runtime test hook injects a temporary research without product data', async ({ page }) => {
+  test('MBP-1: runtime test hook injects a temporary research alongside product data', async ({ page }) => {
     expect(RESEARCHES[TEST_KEY]).toBeUndefined()
-    expect(RESEARCHES.animal_war_training).toBeUndefined()
+    expect(RESEARCHES.animal_war_training).toBeDefined()
 
     await waitForGame(page)
     const result = await page.evaluate((key) => {
@@ -63,7 +63,7 @@ test.describe('V9 HN7-MODEL8 Research multi-building prerequisite model', () => 
     expect(result.hasHook).toBe(true)
     expect(result.testRequiresBuilding).toBe('barracks')
     expect(result.testRequiresBuildings).toEqual(['castle', 'lumber_mill', 'blacksmith'])
-    expect(result.hasAnimalWarTraining).toBe(false)
+    expect(result.hasAnimalWarTraining).toBe(true)
   })
 
   test('MBP-2: missing multi-building prerequisites are all listed in player text', async ({ page }) => {

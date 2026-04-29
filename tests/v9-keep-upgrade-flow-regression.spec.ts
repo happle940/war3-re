@@ -4,10 +4,10 @@
  * 3 focused runtime proofs:
  * 1) Resource insufficient: upgrade button disabled, click does nothing
  * 2) Resource sufficient: upgrade deducts cost, starts progress
- * 3) Completion + boundary: first upgrade becomes keep, no live castle or Knight appears
+ * 3) Completion + boundary: first upgrade becomes keep, no live Castle/Knight appears
  *
  * Uses fresh state reads after every mutation.
- * NOT Castle, Knight, full tech tree, AI, or asset work.
+ * NOT Castle completion flow, Knight production, full tech tree, AI, or asset work.
  */
 import { test, expect, type Page } from '@playwright/test'
 import { BUILDINGS, UNITS, RESEARCHES, PEASANT_BUILD_MENU } from '../src/game/GameData'
@@ -171,7 +171,7 @@ test.describe('V9 Keep Upgrade Flow Regression', () => {
     expect(result.upgradeRemaining).toBeGreaterThan(0)
   })
 
-  test('UF-3: completion + boundary — first upgrade becomes keep, no live castle or Knight', async ({ page }) => {
+  test('UF-3: completion + boundary — first upgrade becomes keep, no live Castle/Knight', async ({ page }) => {
     await waitForRuntime(page)
 
     const result = await page.evaluate(({ keepBuildTime, keepHp }) => {
@@ -199,6 +199,7 @@ test.describe('V9 Keep Upgrade Flow Regression', () => {
       const freshTh = g.units.find((u: any) => u === th)
       // Read building types from live units only
       const buildingTypes = [...new Set(g.units.filter((u: any) => u.isBuilding).map((u: any) => u.type))]
+      const unitTypes = [...new Set(g.units.filter((u: any) => !u.isBuilding).map((u: any) => u.type))]
 
       return {
         found: true,
@@ -214,6 +215,7 @@ test.describe('V9 Keep Upgrade Flow Regression', () => {
           : false,
         sameTeam: freshTh?.team === originalTeam,
         hasCastleInUnits: buildingTypes.includes('castle'),
+        hasKnightInUnits: unitTypes.includes('knight'),
       }
     }, { keepBuildTime: KEEP_BUILD_TIME, keepHp: KEEP_HP })
 
@@ -229,13 +231,20 @@ test.describe('V9 Keep Upgrade Flow Regression', () => {
     expect(result.sameTeam).toBe(true)
     // No castle in live units
     expect(result.hasCastleInUnits).toBe(false)
+    expect(result.hasKnightInUnits).toBe(false)
 
     // Node-side boundary checks (not in page.evaluate).
-    // Castle data now exists for HN6, but Town Hall -> Keep must not skip directly to it.
+    // Castle/Knight data seeds exist, but the first Town Hall upgrade must only produce Keep.
     expect(BUILDINGS.castle).toBeDefined()
-    expect(UNITS.knight).toBeUndefined()
+    expect(UNITS.knight).toBeDefined()
+    expect(BUILDINGS.townhall.upgradeTo).toBe('keep')
+    expect(BUILDINGS.keep.upgradeTo).toBe('castle')
+    expect(BUILDINGS.keep.trains).not.toContain('knight')
+    expect(BUILDINGS.barracks.trains).toContain('knight')
+    expect(UNITS.knight.techPrereqs).toEqual(['castle', 'blacksmith', 'lumber_mill'])
     expect(Object.keys(UNITS).sort()).toEqual(KNOWN_UNITS)
     expect(Object.keys(RESEARCHES).sort()).toEqual(KNOWN_RESEARCHES)
     expect(PEASANT_BUILD_MENU.includes('keep')).toBe(false)
+    expect(PEASANT_BUILD_MENU.includes('castle')).toBe(false)
   })
 })

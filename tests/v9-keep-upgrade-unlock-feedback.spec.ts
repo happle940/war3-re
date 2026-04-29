@@ -5,7 +5,7 @@
  * 1. Upgrade-in-progress shows "升级主城…" with remaining time, no duplicate upgrade button
  * 2. Without Keep, worker command card shows Workshop/Arcane Sanctum disabled with 主城 reason
  * 3. With Keep, Workshop/Arcane Sanctum become available
- * 4. Keep still trains worker, no Castle/Knight/new content
+ * 4. Keep still trains worker; Castle/Knight remain T3-gated seeds
  *
  * Uses fresh state reads after every mutation.
  */
@@ -309,12 +309,19 @@ test.describe('V9 Keep Upgrade and T2 Unlock Feedback', () => {
     expect(result.sanctumReason).toBe('')
   })
 
-  test('UF-5: Keep still trains worker, no Castle/Knight/new content', async ({ page }) => {
+  test('UF-5: Keep still trains worker; T3 seeds remain gated past the T2 path', async ({ page }) => {
     // Static data checks (run in Node, not browser)
     expect(BUILDINGS.keep.trains).toContain('worker')
-    expect(BUILDINGS.castle).toBeUndefined()
-    expect((UNITS as Record<string, unknown>)['knight']).toBeUndefined()
+    expect(BUILDINGS.castle).toBeDefined()
+    expect(UNITS.knight).toBeDefined()
+    expect(BUILDINGS.townhall.upgradeTo).toBe('keep')
+    expect(BUILDINGS.keep.upgradeTo).toBe('castle')
+    expect(BUILDINGS.keep.trains).not.toContain('knight')
+    expect(BUILDINGS.barracks.trains).toContain('knight')
+    expect(UNITS.knight.techPrereqs).toEqual(['castle', 'blacksmith', 'lumber_mill'])
     expect(PEASANT_BUILD_MENU).toContain('workshop')
     expect(PEASANT_BUILD_MENU).toContain('arcane_sanctum')
+    expect(PEASANT_BUILD_MENU).not.toContain('keep')
+    expect(PEASANT_BUILD_MENU).not.toContain('castle')
   })
 })

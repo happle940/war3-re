@@ -1,7 +1,7 @@
 import * as THREE from 'three'
 import { disposeObject3DDeep } from '../utils/dispose'
 import { BUILDINGS, UnitState } from './GameData'
-import type { Unit } from './Game'
+import type { Unit } from './UnitTypes'
 import type { SelectionModel } from './SelectionModel'
 import type { FeedbackEffects } from './FeedbackEffects'
 

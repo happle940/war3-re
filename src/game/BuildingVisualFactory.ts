@@ -10,7 +10,7 @@ import * as THREE from 'three'
 import { getLoadedModel } from './AssetLoader'
 import { BUILDINGS } from './GameData'
 
-const TEAM_COLORS = [0x4488ff, 0xff4444]
+const TEAM_COLORS = [0x4488ff, 0xff4444, 0x8f8f7a]
 
 /**
  * 创建建筑视觉模型
@@ -121,10 +121,17 @@ const TEAM_COLOR_SLOTS: Record<string, string[]> = {
   farm: ['team_color', 'TeamColor'],
   tower: ['team_color', 'TeamColor'],
   blacksmith: ['team_color', 'TeamColor'],
+  lumber_mill: ['team_color', 'TeamColor'],
+  workshop: ['team_color', 'TeamColor'],
+  arcane_sanctum: ['team_color', 'TeamColor'],
+  altar_of_kings: ['team_color', 'TeamColor'],
+  arcane_vault: ['team_color', 'TeamColor'],
+  keep: ['team_color', 'TeamColor'],
+  castle: ['team_color', 'TeamColor'],
 }
 
 export function applyTeamColorGLTF(group: THREE.Group, team: number, type: string): THREE.Group {
-  const color = TEAM_COLORS[team]
+  const color = TEAM_COLORS[team] ?? TEAM_COLORS[2]
   const slots = TEAM_COLOR_SLOTS[type] ?? ['team_color', 'TeamColor']
   const slotSet = new Set(slots)
 
@@ -146,7 +153,7 @@ export function applyTeamColorGLTF(group: THREE.Group, team: number, type: strin
 
 function createProxyBuilding(type: string, team: number): THREE.Group {
   const group = new THREE.Group()
-  const color = TEAM_COLORS[team]
+  const color = TEAM_COLORS[team] ?? TEAM_COLORS[2]
 
   if (type === 'townhall') {
     createProxyTownhall(group, color)
@@ -158,6 +165,8 @@ function createProxyBuilding(type: string, team: number): THREE.Group {
     createProxyTower(group, color)
   } else if (type === 'blacksmith') {
     createProxyBlacksmith(group, color)
+  } else if (type === 'arcane_vault') {
+    createProxyArcaneVault(group, color)
   } else if (type === 'goldmine') {
     createProxyGoldmine(group)
   } else {
@@ -180,6 +189,58 @@ function createProxyBuilding(type: string, team: number): THREE.Group {
   })
 
   return group
+}
+
+function createProxyArcaneVault(group: THREE.Group, color: number) {
+  const base = new THREE.Mesh(
+    new THREE.BoxGeometry(1.8, 0.28, 1.8),
+    new THREE.MeshLambertMaterial({ color: 0x5c5268 }),
+  )
+  base.position.y = 0.14
+  group.add(base)
+
+  const walls = new THREE.Mesh(
+    new THREE.BoxGeometry(1.55, 0.9, 1.55),
+    new THREE.MeshLambertMaterial({ color: 0x6d6790 }),
+  )
+  walls.position.y = 0.72
+  group.add(walls)
+
+  const roof = new THREE.Mesh(
+    new THREE.ConeGeometry(1.2, 0.9, 4),
+    new THREE.MeshLambertMaterial({ color: 0x3f3972 }),
+  )
+  roof.position.y = 1.55
+  roof.rotation.y = Math.PI / 4
+  group.add(roof)
+
+  const door = new THREE.Mesh(
+    new THREE.BoxGeometry(0.52, 0.7, 0.06),
+    new THREE.MeshLambertMaterial({ color: 0x1a1208 }),
+  )
+  door.position.set(0, 0.45, 0.8)
+  group.add(door)
+
+  const sign = new THREE.Mesh(
+    new THREE.TorusGeometry(0.2, 0.045, 8, 16),
+    new THREE.MeshLambertMaterial({ color: 0xd4c76d, emissive: 0x3a2f00 }),
+  )
+  sign.position.set(0, 1.05, 0.82)
+  group.add(sign)
+
+  const orb = new THREE.Mesh(
+    new THREE.SphereGeometry(0.16, 10, 8),
+    new THREE.MeshLambertMaterial({ color: 0xcdd8ff, emissive: 0x4559aa }),
+  )
+  orb.position.y = 2.12
+  group.add(orb)
+
+  const flag = new THREE.Mesh(
+    new THREE.PlaneGeometry(0.35, 0.22),
+    new THREE.MeshLambertMaterial({ color, side: THREE.DoubleSide }),
+  )
+  flag.position.set(0.48, 1.78, 0.18)
+  group.add(flag)
 }
 
 function createProxyTownhall(group: THREE.Group, color: number) {

@@ -423,6 +423,11 @@ test.describe('Command Regression: Player Agency', () => {
       const g = (window as any).__war3Game
       if (!g) return null
 
+      for (const unit of [...g.units]) {
+        if (unit.team !== 0) unit.hp = 0
+      }
+      g.handleDeadUnits()
+
       // Player footman at (30, 30)
       const player = g.spawnUnit('footman', 0, 30, 30)
       // Enemy at (35, 30) — on the path to attackMove target

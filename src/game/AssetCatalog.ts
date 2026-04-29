@@ -8,10 +8,10 @@
  *
  * V3.1 fallback manifest (asset-handoff-a1-s0-fallback-001):
  * - 九类 A1 battlefield target key 都有 fallback route
- * - Unit A1 real-model pass uses local CC0 intake files under public/assets
+ * - Current gameplay model keys use local low-poly baseline GLBs, with fallback routes kept as safety net
  */
 
-export type AssetKind = 'unit' | 'building' | 'nature'
+export type AssetKind = 'unit' | 'building' | 'nature' | 'item'
 
 export interface AssetEntry {
   /** 唯一 key（同 unit/building type） */
@@ -51,25 +51,43 @@ export interface FallbackManifestEntry {
 
 const CATALOG: AssetEntry[] = [
   // ===== 单位 =====
-  { key: 'worker',      kind: 'unit', path: 'assets/models/vendor/poly-pizza/units/worker.glb',      scale: 1.12, offsetY: 0 },
-  { key: 'footman',     kind: 'unit', path: 'assets/models/vendor/poly-pizza/units/footman.glb',     scale: 90.0, offsetY: 0 },
-  { key: 'rifleman',    kind: 'unit', path: 'assets/models/vendor/poly-pizza/units/rifleman_adventurer.glb', scale: 1.12, offsetY: 0 },
-  { key: 'mortar_team', kind: 'unit', path: 'assets/models/vendor/poly-pizza/units/mortar_team.glb', scale: 1.25, offsetY: 0 },
-  { key: 'priest',      kind: 'unit', path: 'assets/models/vendor/poly-pizza/units/priest.glb',      scale: 0.42, offsetY: 0 },
-  { key: 'militia',     kind: 'unit', path: 'assets/models/vendor/poly-pizza/units/militia.glb',     scale: 1.12, offsetY: 0 },
-  { key: 'sorceress',   kind: 'unit', path: 'assets/models/vendor/poly-pizza/units/sorceress.glb',   scale: 0.38, offsetY: 0 },
-  { key: 'knight',      kind: 'unit', path: 'assets/models/vendor/poly-pizza/units/knight.glb',      scale: 95.0, offsetY: 0 },
-  { key: 'paladin',     kind: 'unit', path: 'assets/models/vendor/poly-pizza/units/paladin.glb',     scale: 1.12, offsetY: 0 },
+  { key: 'worker',      kind: 'unit', path: 'assets/models/units/worker.glb',      scale: 1.0, offsetY: 0 },
+  { key: 'footman',     kind: 'unit', path: 'assets/models/units/footman.glb',     scale: 1.0, offsetY: 0 },
+  { key: 'rifleman',    kind: 'unit', path: 'assets/models/units/rifleman.glb',    scale: 1.0, offsetY: 0 },
+  { key: 'mortar_team', kind: 'unit', path: 'assets/models/units/mortar_team.glb', scale: 1.0, offsetY: 0 },
+  { key: 'priest',      kind: 'unit', path: 'assets/models/units/priest.glb',      scale: 1.0, offsetY: 0 },
+  { key: 'militia',     kind: 'unit', path: 'assets/models/units/militia.glb',     scale: 1.0, offsetY: 0 },
+  { key: 'sorceress',   kind: 'unit', path: 'assets/models/units/sorceress.glb',   scale: 1.0, offsetY: 0 },
+  { key: 'knight',      kind: 'unit', path: 'assets/models/units/knight.glb',      scale: 1.0, offsetY: 0 },
+  { key: 'paladin',     kind: 'unit', path: 'assets/models/units/paladin.glb',     scale: 1.0, offsetY: 0 },
+  { key: 'archmage',        kind: 'unit', path: 'assets/models/units/archmage.glb',        scale: 1.0, offsetY: 0 },
+  { key: 'mountain_king',   kind: 'unit', path: 'assets/models/units/mountain_king.glb',   scale: 1.0, offsetY: 0 },
+  { key: 'water_elemental', kind: 'unit', path: 'assets/models/units/water_elemental.glb', scale: 1.0, offsetY: 0 },
+  { key: 'forest_troll',    kind: 'unit', path: 'assets/models/units/forest_troll.glb',    scale: 1.0, offsetY: 0 },
+  { key: 'ogre_warrior',    kind: 'unit', path: 'assets/models/units/ogre_warrior.glb',    scale: 1.0, offsetY: 0 },
   // ===== 建筑 =====
-  { key: 'townhall', kind: 'building', path: 'assets/models/vendor/quaternius/ultimate-fantasy-rts/town-center.glb', scale: 2.5299, offsetY: 0 },
-  { key: 'barracks', kind: 'building', path: 'assets/models/vendor/quaternius/ultimate-fantasy-rts/barracks.glb', scale: 1.4369, offsetY: 0 },
+  { key: 'townhall', kind: 'building', path: 'assets/models/buildings/townhall.glb', scale: 1.0, offsetY: 0 },
+  { key: 'barracks', kind: 'building', path: 'assets/models/buildings/barracks.glb', scale: 1.0, offsetY: 0 },
   { key: 'blacksmith', kind: 'building', path: 'assets/models/buildings/blacksmith.glb', scale: 1.0, offsetY: 0 },
-  { key: 'farm',     kind: 'building', path: 'assets/models/vendor/quaternius/ultimate-fantasy-rts/farm.glb',        scale: 0.8123, offsetY: 0 },
-  { key: 'tower',    kind: 'building', path: 'assets/models/vendor/quaternius/ultimate-fantasy-rts/watch-tower.glb', scale: 1.8461, offsetY: 0 },
-  { key: 'goldmine', kind: 'building', path: 'assets/models/vendor/quaternius/ultimate-fantasy-rts/mine.glb',        scale: 1.7960, offsetY: 0 },
-  { key: 'goldmine_accent', kind: 'building', path: 'assets/models/vendor/quaternius/ultimate-fantasy-rts/resource-gold.glb', scale: 1.15, offsetY: 0 },
+  { key: 'lumber_mill', kind: 'building', path: 'assets/models/buildings/lumber_mill.glb', scale: 1.0, offsetY: 0 },
+  { key: 'workshop', kind: 'building', path: 'assets/models/buildings/workshop.glb', scale: 1.0, offsetY: 0 },
+  { key: 'arcane_sanctum', kind: 'building', path: 'assets/models/buildings/arcane_sanctum.glb', scale: 1.0, offsetY: 0 },
+  { key: 'altar_of_kings', kind: 'building', path: 'assets/models/buildings/altar_of_kings.glb', scale: 1.0, offsetY: 0 },
+  { key: 'arcane_vault', kind: 'building', path: 'assets/models/buildings/arcane_vault.glb', scale: 1.0, offsetY: 0 },
+  { key: 'keep', kind: 'building', path: 'assets/models/buildings/keep.glb', scale: 1.0, offsetY: 0 },
+  { key: 'castle', kind: 'building', path: 'assets/models/buildings/castle.glb', scale: 1.0, offsetY: 0 },
+  { key: 'farm',     kind: 'building', path: 'assets/models/buildings/farm.glb',     scale: 1.0, offsetY: 0 },
+  { key: 'tower',    kind: 'building', path: 'assets/models/buildings/tower.glb',    scale: 1.0, offsetY: 0 },
+  { key: 'goldmine', kind: 'building', path: 'assets/models/buildings/goldmine.glb', scale: 1.0, offsetY: 0 },
+  { key: 'goldmine_accent', kind: 'building', path: 'assets/models/buildings/goldmine_accent.glb', scale: 1.0, offsetY: 0 },
   // ===== 自然 =====
   { key: 'pine_tree', kind: 'nature',  path: 'assets/models/nature/pine_tree.glb',  scale: 1.0, offsetY: 0 },
+  // ===== 物品 =====
+  { key: 'tome_of_experience', kind: 'item', path: 'assets/models/items/tome_of_experience.glb', scale: 1.0, offsetY: 0 },
+  { key: 'healing_potion', kind: 'item', path: 'assets/models/items/healing_potion.glb', scale: 1.0, offsetY: 0 },
+  { key: 'mana_potion', kind: 'item', path: 'assets/models/items/mana_potion.glb', scale: 1.0, offsetY: 0 },
+  { key: 'boots_of_speed', kind: 'item', path: 'assets/models/items/boots_of_speed.glb', scale: 1.0, offsetY: 0 },
+  { key: 'scroll_of_town_portal', kind: 'item', path: 'assets/models/items/scroll_of_town_portal.glb', scale: 1.0, offsetY: 0 },
 ]
 
 /**

@@ -1,5 +1,5 @@
 import * as THREE from 'three'
-import type { Unit } from './Game'
+import type { Unit } from './UnitTypes'
 import { UnitState, BUILDINGS } from './GameData'
 import type { PlacementValidator } from './OccupancyGrid'
 

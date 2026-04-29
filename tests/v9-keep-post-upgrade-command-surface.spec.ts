@@ -2,7 +2,8 @@
  * V9 HN2-IMPL3 Keep Post-Upgrade Command Surface
  *
  * After Town Hall upgrades to Keep, selecting it shows worker training,
- * rally point, and the current Castle upgrade surface. This is not Knight.
+ * rally point, and the current Castle upgrade surface. Knight is a tech-gated
+ * Barracks unit seed, not a direct Keep/Castle command-card route.
  */
 import { test, expect, type Page } from '@playwright/test'
 import { BUILDINGS, UNITS, RESEARCHES, PEASANT_BUILD_MENU } from '../src/game/GameData'
@@ -162,17 +163,21 @@ test.describe('V9 Keep Post-Upgrade Command Surface', () => {
     expect(result.trainingType).toBe('worker')
   })
 
-  test('PC-3: boundary — Castle data exists, but no Knight or build-menu shortcut', async ({ page }) => {
+  test('PC-3: boundary — Castle/Knight data exists, but no direct build-menu shortcut', async ({ page }) => {
     await waitForRuntime(page)
 
     // Node-side boundary checks
     expect(BUILDINGS.castle).toBeDefined()
     expect(BUILDINGS.keep.upgradeTo).toBe('castle')
-    expect(UNITS.knight).toBeUndefined()
+    expect(UNITS.knight).toBeDefined()
+    expect(UNITS.knight.techPrereqs).toEqual(['castle', 'blacksmith', 'lumber_mill'])
+    expect(BUILDINGS.barracks.trains).toContain('knight')
     expect(Object.keys(UNITS).sort()).toEqual(KNOWN_UNITS)
     expect(Object.keys(RESEARCHES).sort()).toEqual(KNOWN_RESEARCHES)
     expect(PEASANT_BUILD_MENU.includes('keep')).toBe(false)
-    // Verify keep trains worker
+    expect(PEASANT_BUILD_MENU.includes('castle')).toBe(false)
+    // Keep/Castle command surfaces remain town-hall-line only.
     expect(BUILDINGS.keep.trains).toEqual(['worker'])
+    expect(BUILDINGS.castle.trains).toEqual(['worker'])
   })
 })

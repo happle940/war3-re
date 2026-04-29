@@ -41,6 +41,7 @@ export interface BuildingDef {
   attackRange?: number    // 0=melee (not meaningful for buildings)
   attackCooldown?: number // seconds between attacks
   researches?: string[]   // available research keys
+  shopItems?: ItemKey[]    // purchasable item keys
   attackType?: AttackType
   armorType?: ArmorType
   techPrereq?: string     // required completed building type (e.g. 'lumber_mill')
@@ -61,6 +62,79 @@ export interface ResearchEffect {
   targetUnitType: string  // unit key this effect applies to (e.g. 'rifleman')
   stat: 'attackRange' | 'attackDamage' | 'armor' | 'maxHp'
   value: number           // delta to add
+}
+
+// ===== 物品定义 =====
+export type ItemKey =
+  | 'tome_of_experience'
+  | 'healing_potion'
+  | 'mana_potion'
+  | 'boots_of_speed'
+  | 'scroll_of_town_portal'
+
+export interface ItemDef {
+  key: ItemKey
+  name: string
+  description: string
+  cost: { gold: number; lumber: number }
+  kind: 'instant' | 'consumable' | 'passive'
+  purchasable: boolean
+  healAmount?: number
+  manaAmount?: number
+  xpAmount?: number
+  speedBonus?: number
+  townPortal?: boolean
+}
+
+export const HERO_INVENTORY_MAX_ITEMS = 6
+export const SHOP_PURCHASE_RANGE = 5.5
+
+export const ITEMS: Record<ItemKey, ItemDef> = {
+  tome_of_experience: {
+    key: 'tome_of_experience',
+    name: '经验之书',
+    description: '+100XP',
+    cost: { gold: 0, lumber: 0 },
+    kind: 'instant',
+    purchasable: false,
+    xpAmount: 100,
+  },
+  healing_potion: {
+    key: 'healing_potion',
+    name: '治疗药水',
+    description: '恢复250HP',
+    cost: { gold: 150, lumber: 0 },
+    kind: 'consumable',
+    purchasable: true,
+    healAmount: 250,
+  },
+  mana_potion: {
+    key: 'mana_potion',
+    name: '魔法药水',
+    description: '恢复150MP',
+    cost: { gold: 200, lumber: 0 },
+    kind: 'consumable',
+    purchasable: true,
+    manaAmount: 150,
+  },
+  boots_of_speed: {
+    key: 'boots_of_speed',
+    name: '速度之靴',
+    description: '移动速度+0.45',
+    cost: { gold: 250, lumber: 0 },
+    kind: 'passive',
+    purchasable: true,
+    speedBonus: 0.45,
+  },
+  scroll_of_town_portal: {
+    key: 'scroll_of_town_portal',
+    name: '回城卷轴',
+    description: '英雄和附近部队回到主基地',
+    cost: { gold: 350, lumber: 0 },
+    kind: 'consumable',
+    purchasable: true,
+    townPortal: true,
+  },
 }
 
 // ===== 研究定义 =====
@@ -344,6 +418,15 @@ export const BUILDINGS: Record<string, BuildingDef> = {
     trains: ['priest', 'sorceress'],
     techPrereq: 'keep',
   },
+  arcane_vault: {
+    key: 'arcane_vault',
+    name: '奥术宝库',
+    cost: { gold: 130, lumber: 30 },
+    buildTime: 30, hp: 485, supply: 0, size: 2,
+    description: '人族商店，向靠近的英雄出售消耗品和基础装备',
+    shopItems: ['healing_potion', 'mana_potion', 'boots_of_speed', 'scroll_of_town_portal'],
+    techPrereq: 'altar_of_kings',
+  },
   keep: {
     key: 'keep',
     name: '主城',
@@ -369,7 +452,7 @@ export const BUILDINGS: Record<string, BuildingDef> = {
     cost: { gold: 180, lumber: 50 },
     buildTime: 60, hp: 900, supply: 0, size: 3,
     description: '英雄祭坛，召唤英雄',
-    trains: ['paladin'],
+    trains: ['paladin', 'archmage', 'mountain_king'],
     armor: 5,
     armorType: ArmorType.Heavy,
   },
@@ -403,6 +486,8 @@ export interface UnitDef {
   heroXP?: number      // current experience points
   heroSkillPoints?: number // available skill points
   isDead?: boolean     // death state (hero stays on field, not cleaned up)
+  unitLevel?: number   // XP value level for creeps / neutral PvE units
+  isCreep?: boolean    // neutral PvE target flag
 }
 
 export const UNITS: Record<string, UnitDef> = {
@@ -454,6 +539,34 @@ export const UNITS: Record<string, UnitDef> = {
     description: '攻城单位，AOE溅射伤害',
     attackType: AttackType.Siege,
     armorType: ArmorType.Unarmored,
+  },
+  forest_troll: {
+    key: 'forest_troll',
+    name: '森林巨魔',
+    cost: { gold: 0, lumber: 0 },
+    trainTime: 0, hp: 300, speed: 2.6, supply: 0,
+    attackDamage: 14, attackRange: 3.5, attackCooldown: 1.5,
+    armor: 1, sightRange: 8,
+    canGather: false,
+    description: '中立营地远程野怪',
+    attackType: AttackType.Piercing,
+    armorType: ArmorType.Medium,
+    unitLevel: 2,
+    isCreep: true,
+  },
+  ogre_warrior: {
+    key: 'ogre_warrior',
+    name: '食人魔战士',
+    cost: { gold: 0, lumber: 0 },
+    trainTime: 0, hp: 650, speed: 2.2, supply: 0,
+    attackDamage: 24, attackRange: 1.0, attackCooldown: 1.7,
+    armor: 2, sightRange: 8,
+    canGather: false,
+    description: '中立营地近战野怪',
+    attackType: AttackType.Normal,
+    armorType: ArmorType.Heavy,
+    unitLevel: 4,
+    isCreep: true,
   },
   priest: {
     key: 'priest',
@@ -528,6 +641,42 @@ export const UNITS: Record<string, UnitDef> = {
     heroSkillPoints: 1,
     isDead: false,
   },
+  archmage: {
+    key: 'archmage',
+    name: '大法师',
+    cost: { gold: 425, lumber: 100 },
+    trainTime: 55, hp: 450, speed: 3.2, supply: 5,
+    attackDamage: 21, attackRange: 6.0, attackCooldown: 2.13,
+    armor: 3, sightRange: 10,
+    canGather: false,
+    description: '大法师英雄',
+    attackType: AttackType.Normal,
+    armorType: ArmorType.Heavy,
+    maxMana: 285,
+    isHero: true,
+    heroLevel: 1,
+    heroXP: 0,
+    heroSkillPoints: 1,
+    isDead: false,
+  },
+  mountain_king: {
+    key: 'mountain_king',
+    name: '山丘之王',
+    cost: { gold: 425, lumber: 100 },
+    trainTime: 55, hp: 700, speed: 3.0, supply: 5,
+    attackDamage: 26, attackRange: 1.0, attackCooldown: 2.22,
+    armor: 2, sightRange: 10,
+    canGather: false,
+    description: '山丘之王英雄',
+    attackType: AttackType.Normal,
+    armorType: ArmorType.Heavy,
+    maxMana: 225,
+    isHero: true,
+    heroLevel: 1,
+    heroXP: 0,
+    heroSkillPoints: 1,
+    isDead: false,
+  },
 }
 
 // ===== 采集参数 =====
@@ -538,8 +687,9 @@ export const GOLD_PER_TRIP = 10        // 每次采金量
 export const GOLDMINE_MAX_WORKERS = 5  // 单个金矿有效采集容量（War3-like 饱和）
 export const LUMBER_PER_TRIP = 10      // 每次伐木量
 export const TREE_LUMBER = 50          // 每棵树的木材量
-export const GOLDMINE_GOLD = 2000      // 每座金矿的初始金量
+export const GOLDMINE_GOLD = 12500     // 每座金矿的初始金量（War3 melee 常用量级）
 export const GATHER_RANGE = 0.75       // 判定到达资源点的距离；覆盖建筑角点但避免出生在矿边跳过可见矿线
+export const LUMBER_GATHER_RANGE = 1.0 // 伐木按树格边缘贴近判定，不要求农民站到精确中心点
 export const BUILD_RANGE = 1.5         // 判定到达建造点的距离
 
 // ===== 战斗参数 =====
@@ -779,6 +929,79 @@ export const ABILITIES: Record<string, AbilityDef> = {
     duration: 0,
     stackingRule: 'none',
   },
+  // ===== Mountain King 能力定义（HERO23-DATA2）=====
+  // 所有值来自 Task303 (HERO23-SRC1) 锁定的 Blizzard Classic 主源采用值。
+  // 运行时消费者尚未接入；此为 source-only 数据种子。
+  storm_bolt: {
+    key: 'storm_bolt',
+    name: '风暴之锤',
+    ownerType: 'mountain_king',
+    cost: { mana: 75 },
+    cooldown: 9,
+    range: 6.0,
+    targetRule: {
+      teams: 'enemy',
+      alive: true,
+      excludeTypes: [],
+    },
+    effectType: 'single_target_stun_damage',
+    effectValue: 100,
+    duration: 5,
+    stackingRule: 'none',
+  },
+  thunder_clap: {
+    key: 'thunder_clap',
+    name: '雷霆一击',
+    ownerType: 'mountain_king',
+    cost: { mana: 90 },
+    cooldown: 6,
+    range: 0,
+    targetRule: {
+      teams: 'enemy',
+      alive: true,
+      excludeTypes: [],
+    },
+    effectType: 'self_aoe_slow_damage',
+    effectValue: 60,
+    duration: 5,
+    stackingRule: 'none',
+    aoeRadius: 2.5,
+    speedMultiplier: 0.5,
+  },
+  bash: {
+    key: 'bash',
+    name: '猛击',
+    ownerType: 'mountain_king',
+    cost: {},
+    cooldown: 0,
+    range: 0,
+    targetRule: {
+      teams: 'enemy',
+      alive: true,
+      excludeTypes: [],
+    },
+    effectType: 'passive_attack_proc',
+    effectValue: 0,
+    duration: 2,
+    stackingRule: 'none',
+  },
+  avatar: {
+    key: 'avatar',
+    name: '化身',
+    ownerType: 'mountain_king',
+    cost: { mana: 150 },
+    cooldown: 180,
+    range: 0,
+    targetRule: {
+      teams: 'self',
+      alive: true,
+      excludeTypes: [],
+    },
+    effectType: 'self_transform_spell_immunity',
+    effectValue: 0,
+    duration: 60,
+    stackingRule: 'none',
+  },
 }
 
 // ===== 英雄复活规则（源边界：V9_HERO9_REVIVE_SOURCE_BOUNDARY）=====
@@ -855,9 +1078,35 @@ export interface HeroAbilityLevelDef {
   areaRadius?: number
   /** 最大目标数（可选，群体能力使用） */
   maxTargets?: number
+  /** 法力回复加成（每秒，可选，法力回复光环使用） */
+  manaRegenBonus?: number
+  /** 波数（可选，通道 AOE 能力使用，源数据载体） */
+  waves?: number
+  /** 建筑伤害倍率（可选，如 0.5 表示 50%，源数据载体） */
+  buildingDamageMultiplier?: number
+  /** 施法延迟（秒，可选，延迟施放类能力使用，源数据载体） */
+  castDelay?: number
+  /** 眩晕持续时间（秒，可选，普通单位眩晕类能力使用，源数据载体） */
+  stunDuration?: number
+  /** 英雄眩晕持续时间（秒，可选，英雄目标眩晕类能力使用，源数据载体） */
+  heroStunDuration?: number
+  /** 被动触发概率（0-1，可选，被动触发类能力使用，源数据载体） */
+  triggerChance?: number
+  /** 额外伤害（可选，被动触发类能力的额外伤害值，源数据载体） */
+  bonusDamage?: number
+  /** 生命值加成（可选，变身类能力的临时 HP 加成，源数据载体） */
+  hpBonus?: number
+  /** 攻击伤害加成（可选，变身类能力的临时伤害加成，源数据载体） */
+  damageBonus?: number
+  /** 英雄减益持续时间（秒，可选，对英雄目标的独立持续时间，源数据载体） */
+  heroDuration?: number
+  /** 移动速度倍率（可选，减速类能力使用，源数据载体） */
+  speedMultiplier?: number
+  /** 法术免疫标记（可选，变身类能力使用，源数据载体） */
+  spellImmunity?: boolean
 }
 
-/** 英雄能力等级表（数据种子，不被运行时消费） */
+/** 英雄能力等级表 */
 export const HERO_ABILITY_LEVELS: Record<string, {
   levels: HeroAbilityLevelDef[]
   maxLevel: number
@@ -892,7 +1141,149 @@ export const HERO_ABILITY_LEVELS: Record<string, {
       { level: 1, effectValue: 6, undeadDamage: 0, mana: 200, cooldown: 240, range: 4.0, requiredHeroLevel: 6, areaRadius: 9.0, maxTargets: 6, effectType: 'resurrection' },
     ],
   },
+  // ===== Brilliance Aura（HERO19-DATA1 / HERO19-IMPL1）=====
+  // 所有值来自 Task273 (HERO19-SRC1) 锁定的 RoC 原始采用值。
+  // HERO19-IMPL1 运行时从这里读取学习门槛、半径和法力回复加成。
+  brilliance_aura: {
+    maxLevel: 3,
+    levels: [
+      { level: 1, effectValue: 0, undeadDamage: 0, mana: 0, cooldown: 0, range: 0, requiredHeroLevel: 1, auraRadius: 9.0, manaRegenBonus: 0.75, effectType: 'mana_regen_aura' },
+      { level: 2, effectValue: 0, undeadDamage: 0, mana: 0, cooldown: 0, range: 0, requiredHeroLevel: 3, auraRadius: 9.0, manaRegenBonus: 1.50, effectType: 'mana_regen_aura' },
+      { level: 3, effectValue: 0, undeadDamage: 0, mana: 0, cooldown: 0, range: 0, requiredHeroLevel: 5, auraRadius: 9.0, manaRegenBonus: 2.25, effectType: 'mana_regen_aura' },
+    ],
+  },
+  blizzard: {
+    maxLevel: 3,
+    levels: [
+      { level: 1, effectValue: 30, undeadDamage: 0, mana: 75, cooldown: 6, range: 8.0, requiredHeroLevel: 1, duration: 6, areaRadius: 2.0, maxTargets: 5, waves: 6, buildingDamageMultiplier: 0.5, effectType: 'channeled_aoe_damage' },
+      { level: 2, effectValue: 40, undeadDamage: 0, mana: 75, cooldown: 6, range: 8.0, requiredHeroLevel: 3, duration: 8, areaRadius: 2.0, maxTargets: 5, waves: 8, buildingDamageMultiplier: 0.5, effectType: 'channeled_aoe_damage' },
+      { level: 3, effectValue: 50, undeadDamage: 0, mana: 75, cooldown: 6, range: 8.0, requiredHeroLevel: 5, duration: 10, areaRadius: 2.0, maxTargets: 5, waves: 10, buildingDamageMultiplier: 0.5, effectType: 'channeled_aoe_damage' },
+    ],
+  },
+  mass_teleport: {
+    maxLevel: 1,
+    levels: [
+      { level: 1, effectValue: 0, undeadDamage: 0, mana: 100, cooldown: 20, range: Infinity, requiredHeroLevel: 6, areaRadius: 7.0, maxTargets: 24, castDelay: 3, effectType: 'delayed_teleport' },
+    ],
+  },
+  // ===== Mountain King 能力等级数据（HERO23-DATA2）=====
+  // 所有值来自 Task303 (HERO23-SRC1) 锁定的 Blizzard Classic 主源采用值。
+  // 运行时消费者尚未接入；此为 source-only 数据种子。
+  storm_bolt: {
+    maxLevel: 3,
+    levels: [
+      { level: 1, effectValue: 100, undeadDamage: 0, mana: 75, cooldown: 9, range: 6.0, requiredHeroLevel: 1, stunDuration: 5, heroStunDuration: 3, effectType: 'single_target_stun_damage' },
+      { level: 2, effectValue: 225, undeadDamage: 0, mana: 75, cooldown: 9, range: 6.0, requiredHeroLevel: 3, stunDuration: 5, heroStunDuration: 3, effectType: 'single_target_stun_damage' },
+      { level: 3, effectValue: 350, undeadDamage: 0, mana: 75, cooldown: 9, range: 6.0, requiredHeroLevel: 5, stunDuration: 5, heroStunDuration: 3, effectType: 'single_target_stun_damage' },
+    ],
+  },
+  thunder_clap: {
+    maxLevel: 3,
+    levels: [
+      { level: 1, effectValue: 60, undeadDamage: 0, mana: 90, cooldown: 6, range: 0, requiredHeroLevel: 1, areaRadius: 2.5, duration: 5, heroDuration: 3, speedMultiplier: 0.5, effectType: 'self_aoe_slow_damage' },
+      { level: 2, effectValue: 100, undeadDamage: 0, mana: 90, cooldown: 6, range: 0, requiredHeroLevel: 3, areaRadius: 3.0, duration: 5, heroDuration: 3, speedMultiplier: 0.5, effectType: 'self_aoe_slow_damage' },
+      { level: 3, effectValue: 140, undeadDamage: 0, mana: 90, cooldown: 6, range: 0, requiredHeroLevel: 5, areaRadius: 3.5, duration: 5, heroDuration: 3, speedMultiplier: 0.5, effectType: 'self_aoe_slow_damage' },
+    ],
+  },
+  bash: {
+    maxLevel: 3,
+    levels: [
+      { level: 1, effectValue: 0, undeadDamage: 0, mana: 0, cooldown: 0, range: 0, requiredHeroLevel: 1, triggerChance: 0.20, bonusDamage: 25, stunDuration: 2, heroStunDuration: 1, effectType: 'passive_attack_proc' },
+      { level: 2, effectValue: 0, undeadDamage: 0, mana: 0, cooldown: 0, range: 0, requiredHeroLevel: 3, triggerChance: 0.30, bonusDamage: 25, stunDuration: 2, heroStunDuration: 1, effectType: 'passive_attack_proc' },
+      { level: 3, effectValue: 0, undeadDamage: 0, mana: 0, cooldown: 0, range: 0, requiredHeroLevel: 5, triggerChance: 0.40, bonusDamage: 25, stunDuration: 2, heroStunDuration: 1, effectType: 'passive_attack_proc' },
+    ],
+  },
+  avatar: {
+    maxLevel: 1,
+    levels: [
+      { level: 1, effectValue: 0, undeadDamage: 0, mana: 150, cooldown: 180, range: 0, requiredHeroLevel: 6, duration: 60, armorBonus: 5, hpBonus: 500, damageBonus: 20, spellImmunity: true, effectType: 'self_transform_spell_immunity' },
+    ],
+  },
 }
 
 // ===== 建造菜单（农民可建造的建筑）=====
-export const PEASANT_BUILD_MENU = ['farm', 'barracks', 'blacksmith', 'lumber_mill', 'tower', 'workshop', 'arcane_sanctum', 'altar_of_kings']
+export const PEASANT_BUILD_MENU = ['farm', 'barracks', 'blacksmith', 'lumber_mill', 'tower', 'workshop', 'arcane_sanctum', 'altar_of_kings', 'arcane_vault']
+
+// ===== Water Elemental 召唤源数据种子（HERO18-DATA1）=====
+
+/** 单个 Water Elemental 召唤等级源数据 */
+export interface WaterElementalSummonLevel {
+  /** 能力等级 (1-based) */
+  level: 1 | 2 | 3
+  /** 法力消耗 */
+  mana: number
+  /** 冷却时间（秒） */
+  cooldown: number
+  /** 召唤持续时间（秒） */
+  duration: number
+  /** 学习该等级所需的英雄等级 */
+  requiredHeroLevel: number
+  /** 召唤单位 HP */
+  summonedHp: number
+  /** 召唤单位攻击力（固定下限） */
+  summonedAttackDamage: number
+  /** 召唤单位攻击范围（项目单位：格） */
+  summonedAttackRange: number
+  /** 召唤单位攻击类型 */
+  summonedAttackType: AttackType.Piercing
+  /** 召唤单位护甲类型 */
+  summonedArmorType: ArmorType.Heavy
+  /** 召唤单位护甲值 */
+  summonedArmor: number
+  /** 召唤单位移动速度（格/秒） */
+  summonedSpeed: number
+}
+
+/**
+ * Water Elemental 召唤源数据种子。
+ *
+ * 所有值来自 Task262 (HERO17-SRC1) 已 accepted 的来源边界。
+ * 来源未知字段不在此数据中：sightRange、attackCooldown、碰撞体积、
+ * 活跃上限、deadUnitRecords 归属、召唤单位人口。
+ *
+ * 本数据不被运行时消费；IMPL1 阶段负责接入。
+ */
+export const WATER_ELEMENTAL_SUMMON_LEVELS: readonly WaterElementalSummonLevel[] = [
+  {
+    level: 1,
+    mana: 125,
+    cooldown: 20,
+    duration: 60,
+    requiredHeroLevel: 1,
+    summonedHp: 525,
+    summonedAttackDamage: 20,
+    summonedAttackRange: 3.0,
+    summonedAttackType: AttackType.Piercing,
+    summonedArmorType: ArmorType.Heavy,
+    summonedArmor: 0,
+    summonedSpeed: 2.2,
+  },
+  {
+    level: 2,
+    mana: 125,
+    cooldown: 20,
+    duration: 60,
+    requiredHeroLevel: 3,
+    summonedHp: 675,
+    summonedAttackDamage: 35,
+    summonedAttackRange: 3.0,
+    summonedAttackType: AttackType.Piercing,
+    summonedArmorType: ArmorType.Heavy,
+    summonedArmor: 0,
+    summonedSpeed: 2.2,
+  },
+  {
+    level: 3,
+    mana: 125,
+    cooldown: 20,
+    duration: 60,
+    requiredHeroLevel: 5,
+    summonedHp: 900,
+    summonedAttackDamage: 45,
+    summonedAttackRange: 3.0,
+    summonedAttackType: AttackType.Piercing,
+    summonedArmorType: ArmorType.Heavy,
+    summonedArmor: 1,
+    summonedSpeed: 2.2,
+  },
+]

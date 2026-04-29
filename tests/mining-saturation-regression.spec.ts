@@ -11,6 +11,7 @@
  * distance to mine, worker speed, gather timing, return trip, and slot limit.
  */
 import { test, expect, type Page } from '@playwright/test'
+import { GOLDMINE_GOLD } from '../src/game/GameData'
 
 const BASE = 'http://127.0.0.1:4173/?runtimeTest=1'
 const GOLDMINE_MAX_WORKERS = 5
@@ -586,5 +587,198 @@ test.describe('Mining Saturation Regression', () => {
     expect(result.plannedBlockedTargets, 'mine approach path should not target blocked building footprint tiles').toHaveLength(0)
     expect(result.stuckFarWorkers, `workers waiting away from mine edge: states=${JSON.stringify(result.states)}`).toBe(0)
     expect(result.earnedGold, 'five starting workers should keep returning gold instead of visually jamming near the mine').toBeGreaterThanOrEqual(80)
+  })
+
+  test('five opening miners keep mining after five simulated minutes and manual reissue', async ({ page }) => {
+    await waitForGame(page)
+
+    const result = await page.evaluate(({ expectedGold }) => {
+      const g = (window as any).__war3Game
+      if (!g) return { ok: false, reason: 'no game' }
+
+      if (g.ai) {
+        if (typeof g.ai.reset === 'function') g.ai.reset()
+        g.ai.update = () => {}
+      }
+
+      const teamStore = g.resources.teams?.get?.(0)
+      const townhall = g.units.find((u: any) => u.team === 0 && u.type === 'townhall' && u.hp > 0)
+      const mine = townhall
+        ? g.units
+          .filter((u: any) => u.type === 'goldmine' && u.hp > 0 && u.remainingGold > 0)
+          .sort((a: any, b: any) =>
+            townhall.mesh.position.distanceTo(a.mesh.position) - townhall.mesh.position.distanceTo(b.mesh.position),
+          )[0]
+        : null
+      const workers = g.units
+        .filter((u: any) => u.team === 0 && u.type === 'worker' && u.hp > 0)
+        .slice(0, 5)
+      if (!teamStore || !townhall || !mine || workers.length < 5) {
+        return { ok: false, reason: 'missing resources, townhall, mine, or workers' }
+      }
+
+      const initialGold = mine.remainingGold
+      teamStore.gold = 0
+
+      for (const worker of workers) {
+        worker.moveTarget = null
+        worker.waypoints = []
+        worker.moveQueue = []
+        worker.attackTarget = null
+        worker.attackMoveTarget = null
+        worker.buildTarget = null
+        worker.carryAmount = 0
+        worker.gatherTimer = 0
+        worker.state = 0
+        worker.gatherType = null
+        worker.resourceTarget = null
+        worker.goldLoopSlotMine = null
+        worker.goldStandMine = null
+      }
+
+      g.issueCommand(workers, {
+        type: 'gather',
+        resourceType: 'gold',
+        target: mine.mesh.position.clone(),
+      })
+      for (const worker of workers) {
+        worker.resourceTarget = { type: 'goldmine', mine }
+      }
+      g.planPathForUnitsToBuildingInteraction(workers, mine)
+
+      for (let t = 0; t < 240; t += 0.05) g.update(0.05)
+      const goldAfterFourMinutes = teamStore.gold
+      const mineAfterFourMinutes = mine.remainingGold
+      const activeAfterFourMinutes = workers.filter((worker: any) =>
+        worker.gatherType === 'gold' &&
+        worker.resourceTarget?.type === 'goldmine' &&
+        worker.resourceTarget.mine === mine &&
+        (worker.state === 2 || worker.state === 3 || worker.state === 4),
+      ).length
+
+      g.issueCommand(workers, {
+        type: 'gather',
+        resourceType: 'gold',
+        target: mine.mesh.position.clone(),
+      })
+      for (const worker of workers) {
+        worker.resourceTarget = { type: 'goldmine', mine }
+      }
+      g.planPathForUnitsToBuildingInteraction(workers, mine)
+
+      for (let t = 0; t < 60; t += 0.05) g.update(0.05)
+
+      return {
+        ok: true,
+        expectedGold,
+        initialGold,
+        goldAfterFourMinutes,
+        mineAfterFourMinutes,
+        finalGold: teamStore.gold,
+        finalMineGold: mine.remainingGold,
+        activeAfterFourMinutes,
+        finalActive: workers.filter((worker: any) =>
+          worker.gatherType === 'gold' &&
+          worker.resourceTarget?.type === 'goldmine' &&
+          worker.resourceTarget.mine === mine &&
+          (worker.state === 2 || worker.state === 3 || worker.state === 4),
+        ).length,
+      }
+    }, { expectedGold: GOLDMINE_GOLD })
+
+    expect(result.ok, result.reason ?? 'five-minute mining setup failed').toBe(true)
+    expect(result.initialGold).toBe(GOLDMINE_GOLD)
+    expect(result.mineAfterFourMinutes, `mine should not be empty after four minutes: ${JSON.stringify(result)}`).toBeGreaterThan(GOLDMINE_GOLD * 0.75)
+    expect(result.activeAfterFourMinutes, `miners should still be in the gold loop after four minutes: ${JSON.stringify(result)}`).toBe(5)
+    expect(result.finalGold, `manual reissue should keep income moving: ${JSON.stringify(result)}`).toBeGreaterThan(result.goldAfterFourMinutes)
+    expect(result.finalMineGold, `mine should still have reserve after five minutes: ${JSON.stringify(result)}`).toBeGreaterThan(GOLDMINE_GOLD * 0.65)
+    expect(result.finalActive, `miners should remain assigned after manual reissue: ${JSON.stringify(result)}`).toBe(5)
+  })
+
+  test('AI opening pressure does not freeze player miners before four minutes', async ({ page }) => {
+    await waitForGame(page)
+
+    const result = await page.evaluate(() => {
+      const g = (window as any).__war3Game
+      if (!g) return { ok: false, reason: 'no game' }
+
+      const teamStore = g.resources.teams?.get?.(0)
+      const townhall = g.units.find((u: any) => u.team === 0 && u.type === 'townhall' && u.hp > 0)
+      const mine = townhall
+        ? g.units
+          .filter((u: any) => u.type === 'goldmine' && u.hp > 0 && u.remainingGold > 0)
+          .sort((a: any, b: any) =>
+            townhall.mesh.position.distanceTo(a.mesh.position) - townhall.mesh.position.distanceTo(b.mesh.position),
+          )[0]
+        : null
+      const workers = g.units
+        .filter((u: any) => u.team === 0 && u.type === 'worker' && u.hp > 0)
+        .slice(0, 5)
+      if (!teamStore || !townhall || !mine || workers.length < 5) {
+        return { ok: false, reason: 'missing setup' }
+      }
+
+      const consecutiveGathering = new Map<any, number>()
+      const maxConsecutiveGathering = new Map<any, number>()
+      for (const worker of workers) {
+        consecutiveGathering.set(worker, 0)
+        maxConsecutiveGathering.set(worker, 0)
+      }
+
+      const initialGold = teamStore.gold
+      const initialMineGold = mine.remainingGold
+      for (let t = 0; t < 240; t += 0.05) {
+        g.update(0.05)
+        for (const worker of workers) {
+          const alive = worker.hp > 0 && g.units.includes(worker)
+          if (alive && worker.state === 3) {
+            const next = (consecutiveGathering.get(worker) ?? 0) + 0.05
+            consecutiveGathering.set(worker, next)
+            maxConsecutiveGathering.set(worker, Math.max(maxConsecutiveGathering.get(worker) ?? 0, next))
+          } else {
+            consecutiveGathering.set(worker, 0)
+          }
+        }
+      }
+
+      const aliveWorkers = workers.filter((worker: any) => worker.hp > 0 && g.units.includes(worker))
+      const activeGoldWorkers = aliveWorkers.filter((worker: any) =>
+        worker.gatherType === 'gold' &&
+        worker.resourceTarget?.type === 'goldmine' &&
+        worker.resourceTarget.mine === mine &&
+        (worker.state === 2 || worker.state === 3 || worker.state === 4),
+      )
+      const maxGathering = Math.max(...workers.map((worker: any) => maxConsecutiveGathering.get(worker) ?? 0))
+
+      return {
+        ok: true,
+        gameTime: g.gameTime,
+        matchResult: typeof g.getMatchResult === 'function' ? g.getMatchResult() : null,
+        initialGold,
+        finalGold: teamStore.gold,
+        initialMineGold,
+        finalMineGold: mine.remainingGold,
+        aliveWorkers: aliveWorkers.length,
+        activeGoldWorkers: activeGoldWorkers.length,
+        maxGathering,
+        workerStates: workers.map((worker: any) => ({
+          alive: worker.hp > 0 && g.units.includes(worker),
+          hp: worker.hp,
+          state: worker.state,
+          gatherType: worker.gatherType,
+          gatherTimer: worker.gatherTimer,
+          carryAmount: worker.carryAmount,
+        })),
+      }
+    })
+
+    expect(result.ok, result.reason ?? 'AI pressure mining setup failed').toBe(true)
+    expect(result.matchResult, `match should not be over before four minutes: ${JSON.stringify(result)}`).toBeNull()
+    expect(result.gameTime, `simulation should still be running: ${JSON.stringify(result)}`).toBeGreaterThan(239)
+    expect(result.aliveWorkers, `opening workers should still be alive before four minutes: ${JSON.stringify(result)}`).toBe(5)
+    expect(result.activeGoldWorkers, `opening workers should remain in the gold loop: ${JSON.stringify(result)}`).toBe(5)
+    expect(result.finalGold, `player gold should continue increasing: ${JSON.stringify(result)}`).toBeGreaterThan(result.initialGold)
+    expect(result.finalMineGold, `mine should not be empty or stalled: ${JSON.stringify(result)}`).toBeLessThan(result.initialMineGold)
+    expect(result.maxGathering, `a miner stayed in Gathering too long: ${JSON.stringify(result)}`).toBeLessThanOrEqual(6.5)
   })
 })

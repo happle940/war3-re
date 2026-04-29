@@ -21,6 +21,44 @@
       <div id="game-time">00:00</div>
     </div>
 
+    <aside id="objective-tracker" aria-label="短局目标">
+      <div class="objective-tracker-title">短局目标</div>
+      <div id="pressure-strip" aria-label="AI 压力">
+        <div class="pressure-row">
+          <span id="pressure-stage">AI 开局运营</span>
+          <span id="pressure-wave">波次 0</span>
+        </div>
+        <div class="pressure-row pressure-row-secondary">
+          <span id="pressure-next">首波 --</span>
+          <span class="pressure-meter" aria-hidden="true"><span id="pressure-meter-fill"></span></span>
+        </div>
+        <div id="pressure-alert" data-alert="quiet">首波尚未到达</div>
+      </div>
+      <ol id="objective-list"></ol>
+    </aside>
+
+    <aside id="map-objective-radar" aria-label="战场目标">
+      <div class="map-objective-title">战场目标</div>
+      <div id="map-objective-list"></div>
+      <div id="war3-identity-status" class="war3-identity-status" data-complete="false">侦察 -- · 可见 -- · 目标 -- · 野怪 -- · 物品 --</div>
+    </aside>
+
+    <aside id="human-route-panel" aria-label="人族路线">
+      <div class="human-route-title">人族路线</div>
+      <div id="human-route-tech-summary" class="human-route-tech-summary" data-complete="false">T1 Town Hall · 解锁 --</div>
+      <div id="human-route-list"></div>
+      <div id="human-route-unlock-list" aria-label="人族科技解锁"></div>
+    </aside>
+
+    <aside id="milestone-status-panel" aria-label="战术身份">
+      <div class="milestone-status-title">战术身份</div>
+      <div id="foundation-status" class="milestone-status-row" data-complete="false">基础 --</div>
+      <div id="hero-tactics-status" class="milestone-status-row" data-complete="false">英雄 --</div>
+      <div id="hero-tactics-readiness" class="milestone-status-row" data-complete="false">技能判断 --</div>
+      <div id="ai-opponent-status" class="milestone-status-row" data-complete="false">AI --</div>
+      <div id="visual-audio-status" class="milestone-status-row" data-complete="false">反馈 --</div>
+    </aside>
+
     <div id="hud-bottom">
       <div id="unit-info">
         <!-- 单选面板 -->
@@ -74,27 +112,42 @@
   <!-- 页面壳层：菜单 / 设置 / 暂停 / 结果 -->
   <div id="menu-shell" class="page-shell" hidden aria-hidden="true">
     <section class="page-shell-panel page-shell-panel--menu" aria-labelledby="menu-shell-title">
-      <header class="page-shell-header">
-        <h1 id="menu-shell-title" class="page-shell-title">主菜单</h1>
+      <header class="page-shell-header page-shell-header--menu">
+        <div>
+          <div class="page-shell-kicker">浏览器 RTS 私有试玩</div>
+          <h1 id="menu-shell-title" class="page-shell-title">War3 RE</h1>
+        </div>
+        <div id="playtest-build-label" class="menu-build-badge">短局 Alpha · R15</div>
       </header>
       <div class="page-shell-body">
-        <div id="menu-mode-label" class="page-shell-mode-label">模式：遭遇战</div>
-        <div id="menu-map-source-label" class="page-shell-map-source-label">当前：程序化地图</div>
-        <button id="menu-mode-select-button" type="button" class="page-shell-action-button">选择模式</button>
-        <label for="menu-map-file-input" class="page-shell-action-button">加载W3X地图</label>
-        <input type="file" id="menu-map-file-input" accept=".w3x,.w3m" style="display:none" />
-        <button id="menu-reset-map-button" type="button" class="page-shell-action-button" disabled>重置为默认地图</button>
-        <button id="menu-help-button" type="button" class="page-shell-action-button">操作说明</button>
-        <button id="menu-settings-button" type="button" class="page-shell-action-button">设置</button>
-        <button id="menu-start-button" type="button" class="page-shell-action-button">开始当前地图</button>
+        <div class="menu-frontdoor-grid">
+          <div class="menu-frontdoor-brief">
+            <p class="menu-frontdoor-title">人族基地已经部署</p>
+            <p class="menu-frontdoor-copy">采集、建造、训练，守住基地并摧毁 AI。首屏先给玩家明确入口，不把试玩边界藏在文档里。</p>
+            <div class="menu-status-strip">
+              <div id="menu-mode-label" class="page-shell-mode-label">模式：遭遇战</div>
+              <div id="menu-map-source-label" class="page-shell-map-source-label">当前：程序化地图</div>
+            </div>
+            <div id="menu-last-session-summary" class="page-shell-session-summary" style="display:none"></div>
+          </div>
+          <div class="menu-action-panel">
+            <button id="menu-start-button" type="button" class="page-shell-action-button page-shell-action-button--primary">开始当前地图</button>
+            <button id="menu-mode-select-button" type="button" class="page-shell-action-button">选择模式</button>
+            <label for="menu-map-file-input" class="page-shell-action-button">加载W3X地图</label>
+            <input type="file" id="menu-map-file-input" accept=".w3x,.w3m" style="display:none" />
+            <button id="menu-reset-map-button" type="button" class="page-shell-action-button" disabled>重置为默认地图</button>
+            <button id="menu-help-button" type="button" class="page-shell-action-button">操作说明</button>
+            <button id="menu-settings-button" type="button" class="page-shell-action-button">设置</button>
+            <button id="menu-playtest-button" type="button" class="page-shell-action-button">试玩信息</button>
+          </div>
+        </div>
         <div id="menu-scope-notice" class="page-shell-scope-notice">
-          <p><strong>当前可玩：</strong>人族 vs AI 的短局切片；采集、建造、训练、基础战斗、暂停、返回、重开</p>
-          <p><strong>尚未实现：</strong>完整人族、完整科技树、英雄、商店、野怪、战役、多人、天梯、回放</p>
-          <p><strong>反馈重点：</strong>能否打开、能否开始、开局是否看得懂、控制是否可信、AI 是否像对手、返回/重开是否清楚</p>
+          <p><strong>当前可玩：</strong>人族 vs AI 短局；采集、建造、训练、英雄、野怪、掉落、商店、回城、暂停、返回、重开</p>
+          <p><strong>尚未实现：</strong>完整多族、完整战役、多人竞技服务、回放、完整 Fog 反隐/空地视野和最终美术音频</p>
+          <p><strong>反馈重点：</strong>能否打开、能否开始、开局是否看得懂、控制是否可信、AI 是否像对手、侦察/路线/返回重开是否清楚</p>
           <p><strong>反馈方式：</strong>在项目仓库提交 Issue，或把试玩版本、浏览器、复现步骤和 1-3 个阻断点发给维护者</p>
           <p><strong>边界：</strong>这不是完整 War3，也不是公开发布或最终美术版本</p>
         </div>
-        <div id="menu-last-session-summary" class="page-shell-session-summary" style="display:none"></div>
       </div>
     </section>
   </div>
@@ -110,8 +163,8 @@
           <p>左键拖拽：框选多个单位</p>
           <p>右键点击：移动 / 攻击 / 采集</p>
           <p>ESC：取消当前操作</p>
-          <p>P：暂停/继续</p>
-          <p>WASD / 方向键：移动摄像机</p>
+          <p>ESC：暂停/继续</p>
+          <p>方向键：移动摄像机</p>
           <p>鼠标滚轮：缩放</p>
           <p>中键拖拽：旋转摄像机</p>
         </div>
@@ -126,7 +179,20 @@
         <h1 id="settings-shell-title" class="page-shell-title">设置</h1>
       </header>
       <div class="page-shell-body">
-        <div class="page-shell-settings-note">当前版本无额外可配置项</div>
+        <div class="page-shell-settings-note">无额外可配置项的占位：下方只控制已实现的显示、AI 难度、音效 cue 和关闭保护。</div>
+        <div class="page-shell-settings-list">
+          <label class="page-shell-toggle"><input id="setting-objective-beacons" type="checkbox" />显示战场目标信标</label>
+          <label class="page-shell-toggle"><input id="setting-minimap-fog" type="checkbox" />显示小地图战争迷雾</label>
+          <label class="page-shell-toggle"><input id="setting-human-route-panel" type="checkbox" />显示人族路线面板</label>
+          <label class="page-shell-toggle"><input id="setting-audio-cues" type="checkbox" />启用目标 / 技能 / 压力音效 cue</label>
+          <label class="page-shell-field">AI 难度
+            <select id="setting-ai-difficulty">
+              <option value="standard">标准</option>
+              <option value="rush">压制</option>
+            </select>
+          </label>
+          <label class="page-shell-toggle"><input id="setting-close-protection" type="checkbox" />关闭或刷新页面前提醒</label>
+        </div>
         <button id="settings-close-button" type="button" class="page-shell-action-button">返回</button>
       </div>
     </section>
@@ -145,6 +211,50 @@
     </section>
   </div>
 
+  <div id="playtest-shell" class="page-shell" hidden aria-hidden="true">
+    <section class="page-shell-panel page-shell-panel--playtest" aria-labelledby="playtest-shell-title">
+      <header class="page-shell-header">
+        <h1 id="playtest-shell-title" class="page-shell-title">试玩信息</h1>
+      </header>
+      <div class="page-shell-body">
+        <div id="playtest-readiness-status" class="playtest-readiness-status" data-complete="false">R15 --</div>
+        <div id="playtest-known-issues" class="playtest-known-issues">已知问题：docs/KNOWN_ISSUES.zh-CN.md</div>
+        <div id="playtest-operational-summary" class="playtest-operational-summary">性能 / 兼容 / 错误 --</div>
+        <div class="playtest-feedback-controls" aria-label="试玩反馈分流">
+          <label class="playtest-feedback-field">问题分类
+            <select id="playtest-feedback-category">
+              <option value="startup">启动 / 进入战局</option>
+              <option value="performance">卡顿 / 性能</option>
+              <option value="controls">选择 / 命令 / 操作</option>
+              <option value="ai">AI / 压力 / 节奏</option>
+              <option value="visual">视觉 / 音效 / 可读性</option>
+              <option value="crash">报错 / 卡死 / 崩溃</option>
+              <option value="other">其他</option>
+            </select>
+          </label>
+          <label class="playtest-feedback-field">严重度
+            <select id="playtest-feedback-severity">
+              <option value="blocker">阻断试玩</option>
+              <option value="major">严重影响</option>
+              <option value="minor">一般问题</option>
+            </select>
+          </label>
+        </div>
+        <textarea id="playtest-user-notes" class="playtest-user-notes" aria-label="试玩者补充说明" placeholder="补充复现步骤、最先不清楚的操作、截图/录像编号"></textarea>
+        <div id="playtest-readiness-list" class="playtest-readiness-list"></div>
+        <div id="playtest-error-list" class="playtest-error-list">运行时异常：未捕获</div>
+        <textarea id="playtest-feedback-packet" class="playtest-feedback-packet" readonly aria-label="试玩反馈包"></textarea>
+        <div class="playtest-action-row">
+          <button id="playtest-refresh-button" type="button" class="page-shell-action-button">刷新信息</button>
+          <button id="playtest-copy-feedback-button" type="button" class="page-shell-action-button">复制反馈包</button>
+          <button id="playtest-reload-button" type="button" class="page-shell-action-button">重载当前地图</button>
+          <button id="playtest-return-menu-button" type="button" class="page-shell-action-button">回到主菜单</button>
+          <button id="playtest-close-button" type="button" class="page-shell-action-button">返回</button>
+        </div>
+      </div>
+    </section>
+  </div>
+
   <div id="briefing-shell" class="page-shell" hidden aria-hidden="true">
     <section class="page-shell-panel page-shell-panel--briefing" aria-labelledby="briefing-shell-title">
       <header class="page-shell-header">
@@ -154,7 +264,7 @@
         <div id="briefing-map-source" class="page-shell-map-source-label">当前：程序化地图</div>
         <div id="briefing-mode" class="page-shell-mode-label">模式：遭遇战</div>
         <div class="page-shell-briefing-controls-hint">
-          <p>操作：左键选择，右键指令，P暂停，ESC取消</p>
+          <p>操作：左键选择，右键指令，ESC 取消或暂停</p>
         </div>
         <button id="briefing-start-button" type="button" class="page-shell-action-button">开始战斗</button>
       </div>
@@ -181,6 +291,7 @@
       <div class="page-shell-body">
         <button id="pause-resume-button" type="button" class="page-shell-action-button">继续</button>
         <button id="pause-setup-button" type="button" class="page-shell-action-button">设置</button>
+        <button id="pause-playtest-button" type="button" class="page-shell-action-button">试玩信息</button>
         <button id="pause-reload-button" type="button" class="page-shell-action-button">重新加载当前地图</button>
         <button id="pause-return-menu-button" type="button" class="page-shell-action-button">返回主菜单</button>
       </div>
@@ -195,6 +306,12 @@
       <div class="page-shell-body">
         <div id="results-shell-message" class="page-shell-message"></div>
         <div id="results-shell-summary" class="page-shell-summary"></div>
+        <div id="results-visual-summary" class="results-visual-summary" data-complete="false">
+          <div id="results-stat-grid" class="results-stat-grid" aria-label="结果数据卡"></div>
+          <div id="results-objective-recap" class="results-objective-recap" aria-label="目标复盘"></div>
+          <div id="results-flow-recap" class="results-flow-recap" aria-label="流程复盘"></div>
+        </div>
+        <button id="results-playtest-button" type="button" class="page-shell-action-button">试玩反馈信息</button>
         <button id="results-reload-button" type="button" class="page-shell-action-button">重新加载当前地图</button>
         <button id="results-return-menu-button" type="button" class="page-shell-action-button">返回主菜单</button>
       </div>

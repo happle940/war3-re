@@ -29,6 +29,7 @@ export class CameraController {
   private mapHeight: number
 
   private keys = new Set<string>()
+  private readonly cameraKeys = new Set(['arrowup', 'arrowdown', 'arrowleft', 'arrowright'])
 
   // 边缘滚动（鼠标靠近屏幕边缘自动平移）
   private mouseEdgeX = 0  // -1 = 左, 0 = 无, 1 = 右
@@ -42,7 +43,10 @@ export class CameraController {
 
     this.target.set(mapWidth / 2, 0, mapHeight / 2)
 
-    window.addEventListener('keydown', (e) => this.keys.add(e.key.toLowerCase()))
+    window.addEventListener('keydown', (e) => {
+      const key = e.key.toLowerCase()
+      if (this.cameraKeys.has(key)) this.keys.add(key)
+    })
     window.addEventListener('keyup', (e) => this.keys.delete(e.key.toLowerCase()))
     window.addEventListener('blur', () => this.keys.clear())
 

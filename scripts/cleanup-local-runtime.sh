@@ -57,6 +57,8 @@ fi
 
 # Stop local dev/preview servers and Playwright runs launched from this repo.
 pkill -f "$ROOT_DIR/node_modules/.bin/vite" 2>/dev/null || true
+pkill -f "$ROOT_DIR/node_modules/vite/bin/vite" 2>/dev/null || true
+pkill -f "vite preview --host 127.0.0.1 --port 4173" 2>/dev/null || true
 if [[ "${FORCE_RUNTIME_CLEANUP:-0}" == "1" ]]; then
   pkill -f "bash ./scripts/run-runtime-tests.sh" 2>/dev/null || true
   pkill -f "$ROOT_DIR/scripts/run-runtime-tests.sh" 2>/dev/null || true

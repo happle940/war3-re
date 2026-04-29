@@ -6,31 +6,35 @@ import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js'
 import { CameraController } from './CameraController'
 import {
   loadAllAssets,
-  getLoadedModel,
   getAssetStatus,
+  getAssetAnimationClipNames,
   __testDeepCloneWithMaterials,
   __testInjectFakeAsset,
 } from './AssetLoader'
 import { createUnitVisual } from './UnitVisualFactory'
 import { createBuildingVisual } from './BuildingVisualFactory'
+import { createTreeVisual } from './TreeVisualFactory'
+import { createItemVisual } from './ItemVisualFactory'
+import { getAllAssetEntries } from './AssetCatalog'
 import { Terrain, TileType } from '../map/Terrain'
 import { W3XTerrainRenderer } from '../map/W3XTerrainRenderer'
 import { MapRuntime } from '../map/MapRuntime'
 import type { ParsedMap, W3ETerrain } from '../map/W3XParser'
 import { disposeObject3DDeep } from '../utils/dispose'
 import {
-  UnitState, BUILDINGS, UNITS, RESEARCHES, GOLD_GATHER_TIME, LUMBER_GATHER_TIME,
-  GOLD_PER_TRIP, GOLDMINE_MAX_WORKERS,
-  LUMBER_PER_TRIP, TREE_LUMBER, GOLDMINE_GOLD,
-  PEASANT_BUILD_MENU, MELEE_RANGE, AGGRO_RANGE, CHASE_RANGE, GATHER_RANGE, BUILD_RANGE,
-  AttackType, ArmorType, ResearchEffectType, getTypeMultiplier,
-  ATTACK_TYPE_NAMES, ARMOR_TYPE_NAMES,
+  UnitState, BUILDINGS, UNITS, RESEARCHES,
+  TREE_LUMBER, GOLDMINE_GOLD,
+  MELEE_RANGE, AGGRO_RANGE,
+  AttackType,
   ABILITIES,
   HERO_ABILITY_LEVELS,
-  HERO_REVIVE_RULES,
   HERO_XP_RULES,
+  HERO_INVENTORY_MAX_ITEMS,
+  ITEMS,
+  SHOP_PURCHASE_RANGE,
+  WATER_ELEMENTAL_SUMMON_LEVELS,
 } from './GameData'
-import type { BuildingDef, ResearchEffect } from './GameData'
+import type { BuildingDef, HeroAbilityLevelDef, ItemKey } from './GameData'
 import { TeamResources } from './TeamResources'
 import { GamePhase, Phase } from './GamePhase'
 import { issueCommand as dispatchGameCommand } from './GameCommand'
@@ -38,173 +42,315 @@ import { SelectionModel } from './SelectionModel'
 import { ControlGroupManager } from './ControlGroupManager'
 import { SelectionController } from './SelectionController'
 import { SimpleAI } from './SimpleAI'
-import type { AIContext } from './SimpleAI'
+import type { AIContext } from './AIContext'
 import { OccupancyGrid, PlacementValidator } from './OccupancyGrid'
 import { PlacementController } from './PlacementController'
 import { FeedbackEffects } from './FeedbackEffects'
 import { PathingGrid } from './PathingGrid'
-import { findPath, pathToWorldWaypoints } from './PathFinder'
 import { TreeManager } from './TreeManager'
 import type { TreeEntry } from './TreeManager'
+import type { QueuedCommand, ResourceTarget, Unit } from './UnitTypes'
+import { CommandCardPresenter } from './ui/CommandCardPresenter'
+import type { CommandCardButtonSpec } from './ui/CommandCardPresenter'
+import { buildCommandCardStateKey } from './ui/CommandCardStateKey'
+import { buildBuildingCommandButtons } from './ui/BuildingCommandButtonBuilders'
+import {
+  buildArchmageCommandButtons,
+  buildMountainKingCommandButtons,
+  buildPaladinCommandButtons,
+} from './ui/HeroCommandButtonBuilders'
+import {
+  buildBasicUnitCommandButtons,
+  buildConstructionCommandButtons,
+  buildWorkerCommandButtons,
+} from './ui/UnitCommandButtonBuilders'
+import { buildHeroInventoryCommandButtons } from './ui/InventoryCommandButtonBuilders'
+import {
+  buildMultiSelectionHudKey,
+  buildSingleSelectionHudKey,
+  SelectionHudPresenter,
+} from './ui/SelectionHudPresenter'
+import { drawMiniPortrait, drawPortrait } from './ui/PortraitDrawers'
+import { HealthBarRenderer } from './ui/HealthBarRenderer'
+import { MapObjectiveBeaconPresenter } from './ui/MapObjectiveBeaconPresenter'
+import { MinimapPresenter } from './ui/MinimapPresenter'
+import { ModeHintPresenter } from './ui/ModeHintPresenter'
+import { TrainingQueuePresenter } from './ui/TrainingQueuePresenter'
+import { buildTrainingQueueItems } from './ui/TrainingQueueViewModel'
+import {
+  asMaterialArray,
+  countRenderableMeshes,
+  createAssetPipelineFixture,
+  findNamedMaterial,
+  getFirstMesh,
+  summarizeObject3D,
+} from './testing/AssetPipelineTestUtils'
+import {
+  chooseGoldWorkerStandPoint,
+  hasSuppressedResourceLoopCollision,
+  reserveGoldLoopSlot,
+} from './systems/ResourceLoopSystem'
+import {
+  clearGatherTarget,
+  consumeCarriedResources,
+  findNearestGoldmine,
+  findNearestHarvestableTree,
+  settleGatherTrip,
+  startGatheringTrip,
+} from './systems/ResourceHarvestSystem'
+import {
+  assignGoldGatherTarget,
+  assignLumberGatherTarget,
+} from './systems/ResourceCommandSystem'
+import { findNearestEnemyTarget } from './systems/CombatTargeting'
+import {
+  getMortarSplashApplications,
+  resolveDirectAttackDamage,
+  shouldApplyMortarSplash,
+} from './systems/CombatDamageApplicationSystem'
+import {
+  beginAutoAggro,
+  faceUnitTarget,
+  getLostCombatTargetAction,
+  isAttackTargetInRange,
+  isCombatState,
+  isCombatTargetValid,
+  isStaticDefenseReady,
+  isStaticDefenseTargetValid,
+  isUnitStunned,
+  setUnitChaseTarget,
+  shouldAutoAggroUnit,
+  shouldDropChaseTarget,
+  shouldDropHoldPositionTarget,
+  shouldIgnoreOpeningWorkerAggro as shouldIgnoreOpeningWorkerAggroRule,
+  stopUnitForAttack,
+  tickAttackCooldown,
+} from './systems/CombatRuntimeSystem'
+import { createRuntimeUnitState } from './systems/UnitRuntimeFactory'
+import {
+  clearActiveUnitOrder,
+  clearPreviousUnitOrder,
+  enqueueQueuedCommand,
+  executeQueuedMovementCommand,
+  finishAttackMoveOrder,
+} from './systems/UnitOrderState'
+import { advanceBuildingUpgrade } from './systems/BuildingUpgradeSystem'
+import {
+  advanceResearchQueue,
+  advanceReviveQueue,
+  advanceTrainingQueue,
+} from './systems/ProductionQueueSystem'
+import {
+  getHeroReviveQuote as calculateHeroReviveQuote,
+  restoreHeroFromRevive,
+} from './systems/HeroReviveSystem'
+import { addHeroXp } from './systems/HeroProgressionSystem'
+import {
+  castPaladinDivineShield,
+  castPaladinHolyLight,
+  castPaladinResurrection,
+  getResurrectionEligibleRecordIndices as getPaladinResurrectionEligibleRecordIndices,
+} from './systems/PaladinAbilitySystem'
+import {
+  applyWaterElementalSummonStats,
+  castArchmageBlizzard,
+  castSummonWaterElemental as resolveWaterElementalSummon,
+  WATER_ELEMENTAL_CAST_RANGE,
+} from './systems/ArchmageAbilitySystem'
+import type { BlizzardChannel } from './systems/ArchmageAbilitySystem'
+import {
+  applyCompletedResearchesToUnit as applyCompletedResearchesToSpawnedUnit,
+  applyResearchEffectsToTeam,
+} from './systems/ResearchEffectsSystem'
+import {
+  distanceToBuildingFootprint as getDistanceToBuildingFootprint,
+  distanceToTreeFootprint as getDistanceToTreeFootprint,
+  hasReachedBuildInteraction as hasUnitReachedBuildInteraction,
+  hasReachedDropoffHall as hasUnitReachedDropoffHall,
+  hasReachedGatherInteraction as hasUnitReachedGatherInteraction,
+  isResourceTargetValid,
+} from './systems/InteractionGeometry'
+import {
+  chooseNearestApproachPoint,
+  getBuildingApproachCandidates,
+  getTreeApproachCandidates,
+} from './systems/ApproachPointSystem'
+import { getFormationMoveTargets } from './systems/FormationMoveSystem'
+import { advanceUnitMovement } from './systems/UnitMovementSystem'
+import { applyUnitSeparation } from './systems/UnitSeparationSystem'
+import { planUnitPath } from './systems/PathPlanningSystem'
+import {
+  canAssignBuilderToConstruction,
+  selectConstructionBuilder,
+} from './systems/ConstructionAssignmentSystem'
+import {
+  castMassTeleport as resolveMassTeleport,
+  findMassTeleportPlacement,
+  selectMassTeleportTransportedUnits,
+} from './systems/MassTeleportSystem'
+import type { MassTeleportPending } from './systems/MassTeleportSystem'
+import {
+  getBlizzardWaveDamage,
+  selectBlizzardWaveTargets,
+} from './systems/BlizzardSystem'
+import {
+  castStormBolt as resolveStormBolt,
+  resolveStormBoltImpact,
+} from './systems/StormBoltSystem'
+import type { StormBoltProjectile } from './systems/StormBoltSystem'
+import { castThunderClap as resolveThunderClap } from './systems/ThunderClapSystem'
+import { resolveBashProc } from './systems/BashSystem'
+import {
+  castAvatar as resolveAvatar,
+  expireAvatar,
+  isSpellImmune,
+} from './systems/AvatarSystem'
+import {
+  updateBrillianceAura as updateBrillianceAuraBonuses,
+  updateDevotionAura as updateDevotionAuraBonuses,
+} from './systems/AuraSystem'
+import {
+  findPriestAutoHealTarget,
+  findSlowAutoCastTarget,
+  isCasterAutoCastState,
+} from './systems/CasterAutoTargetSystem'
+import {
+  getRightClickUnitIntent,
+  selectGoldmineTarget,
+  selectRightClickUnitTarget,
+  splitGatherCapableUnits,
+} from './systems/InputTargetSystem'
+import {
+  getFriendlyUnitsInScreenRect,
+  isTinySelectionRect,
+  normalizeScreenRect,
+  screenPointToNdc,
+} from './systems/SelectionInputSystem'
+import { isMainHallType } from './systems/TechPredicates'
+import { getMatchOutcome } from './systems/MatchOutcomeSystem'
+import type { MatchResult } from './systems/MatchOutcomeSystem'
+import {
+  getBuildAvailability as checkBuildAvailability,
+  getCostBlockReason as checkCostBlockReason,
+  getQueuedSupply as computeQueuedSupply,
+  getResearchAvailability as checkResearchAvailability,
+  getTrainAvailability as checkTrainAvailability,
+  hasCompletedResearch as checkCompletedResearch,
+} from './systems/AvailabilityChecks'
+import {
+  buildObjectiveStateKey,
+  buildSkirmishCompletionSnapshot,
+  buildSkirmishObjectives,
+  createMatchTelemetry,
+  formatMatchResultSummary,
+  formatMenuSessionSummary,
+  recordCompletedBuilding,
+  recordItemCollected,
+  recordItemPurchased,
+  recordItemUsed,
+  recordResourceDeposit,
+  recordTrainedUnit,
+  recordUnitDeath,
+} from './systems/SkirmishProgressSystem'
+import type {
+  MatchTelemetry,
+  SkirmishCompletionSnapshot,
+  SkirmishObjectiveView,
+} from './systems/SkirmishProgressSystem'
+import {
+  buildResultPresentationSnapshot,
+} from './systems/ResultPresentationSystem'
+import type {
+  ResultPresentationSnapshot,
+} from './systems/ResultPresentationSystem'
+import type { AIPressureSnapshot } from './systems/AIPressureSystem'
+import {
+  buildBattlefieldReadabilitySnapshot,
+  buildMapObjectiveStateKey,
+  buildMapObjectives,
+} from './systems/MapObjectiveSystem'
+import type {
+  BattlefieldReadabilitySnapshot,
+  MapObjectiveView,
+} from './systems/MapObjectiveSystem'
+import {
+  buildSessionShellSnapshot,
+  loadSessionPreferences,
+  saveSessionPreferences,
+} from './systems/SessionMilestoneSystem'
+import type {
+  SessionPreferences,
+  SessionShellSnapshot,
+} from './systems/SessionMilestoneSystem'
+import { VisibilitySystem } from './systems/VisibilitySystem'
+import type { VisibilitySnapshot } from './systems/VisibilitySystem'
+import {
+  buildWar3IdentitySnapshot,
+} from './systems/War3IdentitySystem'
+import type { War3IdentitySnapshot } from './systems/War3IdentitySystem'
+import { buildHumanRouteSnapshot } from './systems/HumanRouteSystem'
+import type { HumanRouteSnapshot } from './systems/HumanRouteSystem'
+import {
+  buildHeroMilestoneSnapshot,
+} from './systems/HeroMilestoneSystem'
+import type { HeroMilestoneSnapshot } from './systems/HeroMilestoneSystem'
+import type {
+  ActiveHeroAbilityTargetMode,
+  ActiveHeroAbilityTargetEvaluation,
+} from './systems/HeroAbilityPresentationSystem'
+import {
+  buildAIOpponentSnapshot,
+} from './systems/AIOpponentMilestoneSystem'
+import type { AIOpponentSnapshot } from './systems/AIOpponentMilestoneSystem'
+import { AudioCueSystem, getAudioCueAssetPath } from './systems/AudioCueSystem'
+import type { AudioCueKind, AudioCueSnapshot } from './systems/AudioCueSystem'
+import { UnitPresentationSystem } from './systems/UnitPresentationSystem'
+import type { UnitPresentationSnapshot } from './systems/UnitPresentationSystem'
+import {
+  buildVisualAudioIdentitySnapshot,
+} from './systems/VisualAudioIdentitySystem'
+import type { VisualAudioIdentitySnapshot } from './systems/VisualAudioIdentitySystem'
+import { buildPlaytestMilestoneSignals } from './systems/MilestoneSignalSystem'
+import type { RuntimeMilestoneSnapshots } from './systems/MilestoneSignalSystem'
+import { buildWar3GapSnapshot } from './systems/War3GapSystem'
+import type { War3GapSnapshot } from './systems/War3GapSystem'
+import {
+  buildPlaytestReadinessSnapshot,
+  PLAYTEST_BUILD_LABEL,
+} from './systems/PlaytestReadinessSystem'
+import type {
+  PlaytestMilestoneSignal,
+  PlaytestReadinessSnapshot,
+  PlaytestRuntimeInfo,
+  PlaytestCompatibilitySignal,
+  PlaytestErrorSignal,
+  PlaytestFeedbackInput,
+} from './systems/PlaytestReadinessSystem'
+import {
+  buildFoundationMilestoneSnapshot,
+} from './systems/FoundationMilestoneSystem'
+import type {
+  FoundationMilestoneSnapshot,
+} from './systems/FoundationMilestoneSystem'
 
-// ===== 队列命令类型 =====
-/**
- * 最小队列命令语义
- *
- * 支持 Shift+右键追加 move 和 Shift+A+点击追加 attackMove。
- * 每个队列项是原子命令：弹出后直接执行。
- */
-export type QueuedCommand =
-  | { type: 'move'; target: THREE.Vector3 }
-  | { type: 'attackMove'; target: THREE.Vector3 }
-
-// ===== 资源目标类型 =====
-/**
- * 最小资源目标语义
- *
- * gold/lumber 对称设计：每个分支都持有真实资源对象引用。
- * 未来扩展：
- * - 中立建筑：加 { type: 'neutral', ... } 分支
- * - 完整抽象时改为 ResourceNode interface + discriminated union
- */
-export type ResourceTarget =
-  | { type: 'tree'; entry: TreeEntry }
-  | { type: 'goldmine'; mine: Unit }
-
-type MatchResult = 'victory' | 'defeat' | 'stall'
 type CurrentMapSource =
   | { kind: 'parsed'; mapData: ParsedMap }
   | { kind: 'procedural' }
 
-const COMMAND_CARD_SLOT_COUNT = 16
+type HeroTargetModeKey = 'waterElemental' | 'blizzard' | 'massTeleport' | 'stormBolt'
 
-// ===== 单位数据 =====
-export interface Unit {
-  mesh: THREE.Group
-  type: string
-  team: number
-  hp: number
-  maxHp: number
-  speed: number
-  moveTarget: THREE.Vector3 | null
-  isBuilding: boolean
-  isDead?: boolean
-  heroLevel?: number
-  heroXP?: number
-  heroSkillPoints?: number
-  abilityLevels?: Record<string, number>
-
-  // 状态机
-  state: UnitState
-  gatherType: 'gold' | 'lumber' | null
-  carryAmount: number
-  resourceTarget: ResourceTarget | null  // 明确资源目标引用，不再靠"最近邻推断"
-  goldLoopSlotMine: Unit | null           // 金矿全循环槽位预约；同一矿最多 5 个有效矿工
-  goldStandMine: Unit | null              // 已经落到矿边站位的金矿，避免等待时每帧重算
-  gatherTimer: number
-  attackTimer: number
-  attackTarget: Unit | null
-  armor: number
-  attackDamage: number
-  attackRange: number
-  attackCooldown: number
-
-  // 建造
-  buildProgress: number
-  builder: Unit | null
-  buildTarget: Unit | null
-
-  // 训练
-  trainingQueue: { type: string; remaining: number }[]
-
-  // 复活队列（祭坛专用，仅英雄）
-  reviveQueue: { heroType: string; remaining: number; totalDuration: number }[]
-
-  // 研究
-  researchQueue: { key: string; remaining: number }[]
-  completedResearches: string[]
-
-  // 资源节点数据（仅资源类 Unit 使用）
-  remainingGold: number  // 金矿剩余量，非金矿为 0
-
-  // 寻路
-  waypoints: THREE.Vector3[]
-
-  // 移动命令队列（Shift+右键追加 move，Shift+A 追加 attackMove）
-  moveQueue: QueuedCommand[]
-
-  // 攻击移动目标（仅 AttackMove 状态使用）
-  attackMoveTarget: THREE.Vector3 | null
-
-  // 集结点（建筑专用，新训练单位前往的目标）
-  rallyPoint: THREE.Vector3 | null
-  // 集结目标单位（仅 goldmine 类型，用于 townhall 自动采金）
-  rallyTarget: Unit | null
-
-  // === Order recovery: auto-aggro 中断前的命令快照 ===
-  previousState: UnitState | null       // 被中断前的状态
-  previousGatherType: 'gold' | 'lumber' | null
-  previousResourceTarget: ResourceTarget | null
-  previousMoveTarget: THREE.Vector3 | null
-  previousWaypoints: THREE.Vector3[]
-  previousMoveQueue: QueuedCommand[]
-  previousAttackMoveTarget: THREE.Vector3 | null
-
-  // === Auto-aggro suppression ===
-  // 玩家手动下达 move/stop 后，短时间内禁止 auto-aggro 抢回单位
-  // 值为 gameTime 阈值，gameTime < aggroSuppressUntil 时跳过自动索敌
-  aggroSuppressUntil: number
-
-  // === Rally Call (Human identity ability) ===
-  // gameTime threshold: unit has damage bonus while gameTime < rallyCallBoostUntil
-  rallyCallBoostUntil: number
-  // gameTime threshold: this unit cannot trigger rally call until gameTime >= rallyCallCooldownUntil
-  rallyCallCooldownUntil: number
-
-  // === Caster system (Priest V7 minimal line) ===
-  mana: number
-  maxMana: number
-  manaRegen: number           // mana per second
-  healCooldownUntil: number   // gameTime threshold: cannot heal until this passes
-
-  // === Building upgrade (HN2-IMPL2 Keep flow) ===
-  upgradeQueue: { targetType: string; remaining: number } | null
-
-  // === Militia morph (HN4-IMPL2 Call to Arms) ===
-  morphExpiresAt: number          // gameTime when morph expires; 0 = not morphed
-  morphOriginalType: string | null  // original unit type before morph (e.g. 'worker')
-
-  // === Defend toggle (HN4-IMPL5 Defend) ===
-  defendActive: boolean             // true while Footman Defend is on
-
-  // === Slow debuff (HN5-IMPL4 Slow) ===
-  slowUntil: number                 // gameTime when slow expires; 0 = not slowed
-  slowSpeedMultiplier: number       // active movement multiplier while slowUntil is in the future
-
-  // === Slow auto-cast (HN5-IMPL5) ===
-  slowAutoCastEnabled: boolean      // true while Sorceress auto-cast is on
-  slowAutoCastCooldownUntil: number // gameTime threshold before the next auto Slow attempt
-
-  // === Divine Shield (HERO12-IMPL1B) ===
-  divineShieldUntil: number           // gameTime when active DS expires; 0 = not active
-  divineShieldCooldownUntil: number   // gameTime threshold: cannot cast DS until this passes
-
-  // === Devotion Aura (HERO13-IMPL1) ===
-  devotionAuraBonus: number           // currently applied DA armor bonus; 0 = none
-
-  // === Resurrection (HERO14-IMPL1C) ===
-  resurrectionCooldownUntil: number   // gameTime threshold: cannot cast Resurrection until this passes
-  resurrectionLastRevivedCount: number // last successful Resurrection count; 0 = no recent feedback
-  resurrectionFeedbackUntil: number    // gameTime threshold: show last revived count while gameTime < this
+type WorldItem = {
+  id: number
+  type: ItemKey
+  mesh: THREE.Object3D
 }
 
-const TEAM_COLORS = [0x4488ff, 0xff4444]
+const COMMAND_CARD_SLOT_COUNT = 16
+const AI_WORKER_HARASS_GRACE_TIME = 300
+
+const TEAM_COLORS = [0x4488ff, 0xff4444, 0x8f8f7a]
 const CONSTRUCTION_CANCEL_REFUND_RATE = 0.75
 
-// Unit presence / separation constants
-const UNIT_SEPARATION_RADIUS = 0.6   // minimum distance between units (world units)
-const UNIT_SEPARATION_PUSH = 0.08    // max push per frame
-const FORMATION_SPACING = 0.7        // formation offset spacing
 const OPENING_GOLDMINE_OFFSET = { x: 8, z: -4 } as const
 const OPENING_BARRACKS_OFFSET = { x: -5, z: 5 } as const
 const OPENING_WORKER_OFFSETS: readonly { x: number; z: number }[] = [
@@ -214,6 +360,31 @@ const OPENING_WORKER_OFFSETS: readonly { x: number; z: number }[] = [
   { x: 2, z: 5 },
   { x: 3, z: 5 },
 ]
+
+function getHumanUnlockCounterText(unlockKey: string, snapshot: HumanRouteSnapshot) {
+  const profileByKey = new Map(snapshot.combat.profiles.map(profile => [profile.unitKey, profile]))
+  const counterByKey = new Map(snapshot.combat.counters.map(counter => [counter.key, counter]))
+  const profile = (unitKey: string, fallback: string) => profileByKey.get(unitKey)?.counterHint ?? fallback
+  const weakness = (unitKey: string, fallback: string) => profileByKey.get(unitKey)?.weaknessHint ?? fallback
+  const rule = (key: string, fallback: string) => counterByKey.get(key)?.detail ?? fallback
+
+  switch (unlockKey) {
+    case 't1-rifleman':
+      return `${profile('rifleman', '远程火力')}；${rule('rifleman-heavy', '穿刺克重甲')}`
+    case 't2-caster-line':
+      return `${profile('priest', '治疗续航')}；${profile('sorceress', '控制接战')}`
+    case 't2-workshop-siege':
+      return `${profile('mortar_team', '破防攻城')}；${rule('mortar-medium', '攻城不适合打中甲主力')}`
+    case 't3-knight-line':
+      return `${profile('knight', '重甲前排')}；${weakness('knight', '需要后排配合')}`
+    case 't3-upgrade-chains':
+      return `${snapshot.upgradeImpact.battleReason}；${snapshot.upgradeImpact.nextUpgradeHint}；${snapshot.combat.strongestDpsLabel}；${snapshot.combat.highestEffectiveHpLabel}`
+    case 't3-animal-war-training':
+      return `${profileByKey.get('knight')?.roleLabel ?? '三本重甲'}；${snapshot.upgradeImpact.strongestLiveImpactLabel}`
+    default:
+      return snapshot.combat.recommendedMix
+  }
+}
 
 /**
  * 游戏主类
@@ -251,6 +422,7 @@ export class Game {
   private get selectedUnits(): readonly Unit[] { return this.selectionModel.units }
   private sel!: SelectionController
   private healthBars = new Map<Unit, { bg: THREE.Mesh; fill: THREE.Mesh }>()
+  private healthBarRenderer!: HealthBarRenderer
 
   // 资源（通过 TeamResources 管理）
   private resources = new TeamResources()
@@ -265,6 +437,8 @@ export class Game {
   private pathingGrid!: PathingGrid
   // 树木运行时
   private treeManager!: TreeManager
+  // Fog / recon runtime
+  private visibility!: VisibilitySystem
 
   // 框选
   private isDragging = false
@@ -280,6 +454,9 @@ export class Game {
 
   // 反馈/视觉效果
   private feedback!: FeedbackEffects
+  private mapObjectiveBeacons!: MapObjectiveBeaconPresenter
+  private audioCues!: AudioCueSystem
+  private unitPresentation!: UnitPresentationSystem
 
   // 建造放置模式
   private placement = new PlacementController()
@@ -307,8 +484,40 @@ export class Game {
   private rallyMode = false
   private rallyBuilding: Unit | null = null
 
+  // Water Elemental ground-target mode (HERO18-IMPL1)
+  private weTargetMode = false
+  private weTargetCaster: Unit | null = null
+
+  // Blizzard ground-target mode (HERO20-IMPL1)
+  private blizzardTargetMode = false
+  private blizzardTargetCaster: Unit | null = null
+
+  // Blizzard channel state (HERO20-IMPL1)
+  private blizzardChannel: BlizzardChannel | null = null
+
+  // Blizzard AOE indicator ring (HERO20-UX1)
+  private blizzardAoeRing: THREE.Mesh | null = null
+
+  // Mass Teleport target mode (HERO21-IMPL1)
+  private massTeleportTargetMode = false
+  private massTeleportTargetCaster: Unit | null = null
+
+  // Storm Bolt unit-target mode (HERO23-IMPL1)
+  private stormBoltTargetMode = false
+  private stormBoltTargetCaster: Unit | null = null
+
+  // Storm Bolt in-flight projectiles (HERO23-IMPL1)
+  private stormBoltProjectiles: StormBoltProjectile[] = []
+
+  // Mass Teleport pending delayed cast (HERO21-IMPL1)
+  private massTeleportPending: MassTeleportPending | null = null
+
+  // Neutral creep drops / world pickups
+  private worldItems: WorldItem[] = []
+  private nextWorldItemId = 1
+
   // 模式提示文字
-  private elModeHint = document.getElementById('mode-hint')!
+  private modeHintPresenter = new ModeHintPresenter(document.getElementById('mode-hint')!)
 
   // 时间
   private lastTime = 0
@@ -319,25 +528,77 @@ export class Game {
   private elLumber = document.getElementById('lumber')!
   private elSupply = document.getElementById('supply')!
   private elTime = document.getElementById('game-time')!
-  private elUnitName = document.getElementById('unit-name')!
-  private elUnitHpFill = document.getElementById('unit-hp-fill')!
-  private elUnitHpText = document.getElementById('unit-hp-text')!
-  private elUnitState = document.getElementById('unit-state')!
-  private elUnitStats = document.getElementById('unit-stats')!
-  private elTypeBadge = document.getElementById('unit-type-badge')!
-  private elPortraitCanvas = document.getElementById('portrait-canvas') as HTMLCanvasElement
-  private elSingleSelect = document.getElementById('single-select')!
-  private elMultiSelect = document.getElementById('multi-select')!
-  private elMultiCount = document.getElementById('multi-count')!
-  private elMultiBreakdown = document.getElementById('multi-breakdown')!
-  private elMultiHpFill = document.getElementById('multi-hp-fill')!
-  private elMultiHpText = document.getElementById('multi-hp-text')!
   private elCameraPos = document.getElementById('camera-pos')!
   private elTileInfo = document.getElementById('tile-info')!
-  private elCommandCard = document.getElementById('command-card')!
+  private commandCardPresenter = new CommandCardPresenter(document.getElementById('command-card')!, COMMAND_CARD_SLOT_COUNT)
+  private minimapPresenter = new MinimapPresenter(document.getElementById('minimap-canvas') as HTMLCanvasElement | null)
+  private selectionHudPresenter = new SelectionHudPresenter({
+    singleSelect: document.getElementById('single-select')!,
+    multiSelect: document.getElementById('multi-select')!,
+    unitName: document.getElementById('unit-name')!,
+    unitHpFill: document.getElementById('unit-hp-fill')!,
+    unitHpText: document.getElementById('unit-hp-text')!,
+    unitState: document.getElementById('unit-state')!,
+    unitStats: document.getElementById('unit-stats')!,
+    typeBadge: document.getElementById('unit-type-badge')!,
+    portraitCanvas: document.getElementById('portrait-canvas') as HTMLCanvasElement,
+    multiCount: document.getElementById('multi-count')!,
+    multiBreakdown: document.getElementById('multi-breakdown')!,
+    multiHpFill: document.getElementById('multi-hp-fill')!,
+    multiHpText: document.getElementById('multi-hp-text')!,
+  }, {
+    drawPortrait,
+    drawMiniPortrait,
+  })
+  private elObjectiveList = document.getElementById('objective-list') as HTMLOListElement | null
+  private elMapObjectiveList = document.getElementById('map-objective-list') as HTMLDivElement | null
+  private elWar3IdentityStatus = document.getElementById('war3-identity-status') as HTMLDivElement | null
+  private elHumanRoutePanel = document.getElementById('human-route-panel') as HTMLElement | null
+  private elHumanRouteList = document.getElementById('human-route-list') as HTMLDivElement | null
+  private elHumanRouteTechSummary = document.getElementById('human-route-tech-summary') as HTMLDivElement | null
+  private elHumanRouteUnlockList = document.getElementById('human-route-unlock-list') as HTMLDivElement | null
+  private elHeroTacticsStatus = document.getElementById('hero-tactics-status') as HTMLDivElement | null
+  private elHeroTacticsReadiness = document.getElementById('hero-tactics-readiness') as HTMLDivElement | null
+  private elAiOpponentStatus = document.getElementById('ai-opponent-status') as HTMLDivElement | null
+  private elVisualAudioStatus = document.getElementById('visual-audio-status') as HTMLDivElement | null
+  private elFoundationStatus = document.getElementById('foundation-status') as HTMLDivElement | null
+  private elPressureStage = document.getElementById('pressure-stage') as HTMLSpanElement | null
+  private elPressureWave = document.getElementById('pressure-wave') as HTMLSpanElement | null
+  private elPressureNext = document.getElementById('pressure-next') as HTMLSpanElement | null
+  private elPressureMeterFill = document.getElementById('pressure-meter-fill') as HTMLSpanElement | null
+  private elPressureAlert = document.getElementById('pressure-alert') as HTMLDivElement | null
+  private elPlaytestReadinessStatus = document.getElementById('playtest-readiness-status') as HTMLDivElement | null
+  private elPlaytestReadinessList = document.getElementById('playtest-readiness-list') as HTMLDivElement | null
+  private elPlaytestFeedbackPacket = document.getElementById('playtest-feedback-packet') as HTMLTextAreaElement | null
+  private elPlaytestOperationalSummary = document.getElementById('playtest-operational-summary') as HTMLDivElement | null
+  private elPlaytestErrorList = document.getElementById('playtest-error-list') as HTMLDivElement | null
+  private elPlaytestFeedbackCategory = document.getElementById('playtest-feedback-category') as HTMLSelectElement | null
+  private elPlaytestFeedbackSeverity = document.getElementById('playtest-feedback-severity') as HTMLSelectElement | null
+  private elPlaytestUserNotes = document.getElementById('playtest-user-notes') as HTMLTextAreaElement | null
+  private elPlaytestRefreshButton = document.getElementById('playtest-refresh-button') as HTMLButtonElement | null
+  private elPlaytestCopyButton = document.getElementById('playtest-copy-feedback-button') as HTMLButtonElement | null
   private _lastCmdKey = ''  // 命令卡缓存，只在选择变化时重建
   private _lastSelKey = ''  // 选择HUD缓存
-  private elTrainQueue = document.getElementById('train-queue')!
+  private _lastObjectiveKey = ''
+  private _lastPressureKey = ''
+  private _lastMapObjectiveKey = ''
+  private _lastWar3IdentityKey = ''
+  private _lastHumanRouteKey = ''
+  private _lastMilestoneStatusKey = ''
+  private _lastPlaytestReadinessKey = ''
+  private _lastPressureCueKey = ''
+  private _lastCommandCardPrimary: Unit | null = null
+  private trainingQueuePresenter = new TrainingQueuePresenter(document.getElementById('train-queue')!)
+  private sessionPreferences: SessionPreferences = loadSessionPreferences()
+  private matchTelemetry: MatchTelemetry = createMatchTelemetry()
+  private playtestRuntimeErrors: PlaytestErrorSignal[] = []
+  private objectiveTrackerPrimed = false
+  private completedObjectiveKeys = new Set<string>()
+  private objectiveHintTimer = 0
+  private humanRouteFeedbackPrimed = false
+  private completedHumanRouteKeys = new Set<string>()
+  private humanRouteCompletionCueCount = 0
+  private lastHumanRouteCompletionKeys: string[] = []
 
   // 胜利/失败
   private gameOverResult: MatchResult | null = null
@@ -355,6 +616,10 @@ export class Game {
   private elResultsReloadButton = document.getElementById('results-reload-button') as HTMLButtonElement
   private elResultsShellMessage = document.getElementById('results-shell-message') as HTMLDivElement
   private elResultsShellSummary = document.getElementById('results-shell-summary') as HTMLDivElement
+  private elResultsVisualSummary = document.getElementById('results-visual-summary') as HTMLDivElement | null
+  private elResultsStatGrid = document.getElementById('results-stat-grid') as HTMLDivElement | null
+  private elResultsObjectiveRecap = document.getElementById('results-objective-recap') as HTMLDivElement | null
+  private elResultsFlowRecap = document.getElementById('results-flow-recap') as HTMLDivElement | null
   private currentMapSource: CurrentMapSource | null = null
   private proceduralGroundPlane!: THREE.Mesh
 
@@ -365,6 +630,7 @@ export class Game {
     this.scene.fog = new THREE.Fog(0x1a2218, 50, 120)
     // FOV 45° — war3 风格压缩透视，减少畸变，更像经典 RTS
     this.camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 2000)
+    this.healthBarRenderer = new HealthBarRenderer(this.scene, this.camera, this.healthBars)
 
     const canvas = document.getElementById('game-canvas') as HTMLCanvasElement
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, preserveDrawingBuffer: true })
@@ -400,6 +666,15 @@ export class Game {
       camera: this.camera,
       getWorldHeight: (wx, wz) => this.getWorldHeight(wx, wz),
     })
+    this.audioCues = new AudioCueSystem({
+      enabled: this.sessionPreferences.audioCues,
+      getTime: () => this.gameTime,
+    })
+    this.unitPresentation = new UnitPresentationSystem()
+    this.mapObjectiveBeacons = new MapObjectiveBeaconPresenter({
+      scene: this.scene,
+      getWorldHeight: (wx, wz) => this.getWorldHeight(wx, wz),
+    })
     this.scene.add(this.terrain.mesh)
     this.scene.add(this.terrain.groundPlane)
     this.terrain.mesh.traverse((child) => {
@@ -417,6 +692,7 @@ export class Game {
     // 树木运行时
     this.treeManager = new TreeManager(MAP_SIZE, MAP_SIZE)
     this.pathingGrid.setTreeManager(this.treeManager)
+    this.visibility = new VisibilitySystem(MAP_SIZE, MAP_SIZE)
 
     this.scene.add(new THREE.AmbientLight(0xb5b090, 1.15))
     // 暖色阳光，从西南方斜照，产生自然阴影感
@@ -457,6 +733,10 @@ export class Game {
     this.spawnTrees()
     this.spawnStartingUnits()
     this.setupInput()
+    this.attachPreferenceControls()
+    this.attachPlaytestControls()
+    this.attachPlaytestRuntimeErrorCapture()
+    window.addEventListener('beforeunload', this.handleBeforeUnload)
     this.elSetupReturnButton.addEventListener('click', () => this.closeSetupShell())
     this.elSetupStartButton.addEventListener('click', () => {
       this.reloadCurrentMap()
@@ -512,23 +792,156 @@ export class Game {
     this.updateUnits(dt)
     this.updateCombat(dt)
     this.updateStaticDefense(dt)
+    this.updateBrillianceAura()
+    this.updateBlizzardChannel()
+    this.updateMassTeleportPending()
     this.updateCasterAbilities(dt)
     this.updateSlowExpiry()
+    this.updateStunExpiry()
+    this.updateAvatarExpiry()
+    this.updateStormBoltProjectiles()
+    this.updateWorldItemPickups()
     this.updateDevotionAura()
     this.updateAutoAggro()
+    this.unitPresentation.update(this.units, dt, this.gameTime)
     this.updateHealthBars()
     this.sel.updateSelectionRings()
     this.feedback.updateMoveIndicators(dt)
     this.feedback.updateImpactRings(dt)
+    this.feedback.updateAbilityEffectBursts(dt)
     this.updateGhostPlacement()
+    this.handleSummonExpirations()
     this.handleDeadUnits()
     this.checkGameOver()
+    this.updateVisibilityState()
     this.updateHUD(dt)
     this.updateMinimap()
   }
 
   private render() {
     this.composer.render()
+  }
+
+  private attachPreferenceControls() {
+    const bind = (
+      id: string,
+      key: Exclude<keyof SessionPreferences, 'aiDifficulty'>,
+      onChange?: () => void,
+    ) => {
+      const input = document.getElementById(id) as HTMLInputElement | null
+      if (!input) return
+      input.checked = this.sessionPreferences[key]
+      input.addEventListener('change', () => {
+        this.sessionPreferences = {
+          ...this.sessionPreferences,
+          [key]: input.checked,
+        }
+        saveSessionPreferences(this.sessionPreferences)
+        onChange?.()
+      })
+    }
+
+    bind('setting-objective-beacons', 'objectiveBeacons', () => {
+      if (!this.sessionPreferences.objectiveBeacons) this.mapObjectiveBeacons.render([])
+      else this.renderMapObjectiveRadar(true)
+    })
+    bind('setting-minimap-fog', 'minimapFog', () => this.updateMinimap())
+    bind('setting-close-protection', 'closeProtection')
+    bind('setting-human-route-panel', 'humanRoutePanel', () => this.renderHumanRoutePanel(true))
+    bind('setting-audio-cues', 'audioCues', () => {
+      this.audioCues.setEnabled(this.sessionPreferences.audioCues)
+      this.renderMilestoneStatusPanel(true)
+    })
+    const difficultySelect = document.getElementById('setting-ai-difficulty') as HTMLSelectElement | null
+    if (difficultySelect) {
+      difficultySelect.value = this.sessionPreferences.aiDifficulty
+      difficultySelect.addEventListener('change', () => {
+        const value = difficultySelect.value === 'rush' ? 'rush' : 'standard'
+        this.sessionPreferences = { ...this.sessionPreferences, aiDifficulty: value }
+        saveSessionPreferences(this.sessionPreferences)
+        if (this.ai) this.createAI()
+        this.renderPressureTracker(true)
+        this.renderMilestoneStatusPanel(true)
+      })
+    }
+    this.renderHumanRoutePanel(true)
+    this.renderMilestoneStatusPanel(true)
+    this.renderPlaytestReadinessPanel(true)
+  }
+
+  private attachPlaytestControls() {
+    this.elPlaytestRefreshButton?.addEventListener('click', () => {
+      this.renderPlaytestReadinessPanel(true)
+    })
+
+    this.elPlaytestFeedbackCategory?.addEventListener('change', () => {
+      this.renderPlaytestReadinessPanel(true)
+    })
+    this.elPlaytestFeedbackSeverity?.addEventListener('change', () => {
+      this.renderPlaytestReadinessPanel(true)
+    })
+    this.elPlaytestUserNotes?.addEventListener('input', () => {
+      this.renderPlaytestReadinessPanel(true)
+    })
+
+    this.elPlaytestCopyButton?.addEventListener('click', () => {
+      const button = this.elPlaytestCopyButton
+      const packet = this.getPlaytestReadinessSnapshot().feedbackPacket
+      if (this.elPlaytestFeedbackPacket) {
+        this.elPlaytestFeedbackPacket.value = packet
+      }
+      if (!button) return
+
+      button.dataset.copyState = 'pending'
+      const clipboard = navigator.clipboard
+      if (clipboard?.writeText) {
+        void clipboard.writeText(packet)
+          .then(() => {
+            if (this.elPlaytestCopyButton) this.elPlaytestCopyButton.dataset.copyState = 'copied'
+          })
+          .catch(() => {
+            if (this.elPlaytestCopyButton) this.elPlaytestCopyButton.dataset.copyState = 'unavailable'
+          })
+      } else {
+        this.elPlaytestFeedbackPacket?.select()
+        button.dataset.copyState = 'unavailable'
+      }
+    })
+  }
+
+  private attachPlaytestRuntimeErrorCapture() {
+    window.addEventListener('error', (event) => {
+      this.recordPlaytestRuntimeError('error', event.message || 'unknown error', event.filename || 'window')
+    })
+    window.addEventListener('unhandledrejection', (event) => {
+      const reason = event.reason instanceof Error ? event.reason.message : String(event.reason ?? 'unknown rejection')
+      this.recordPlaytestRuntimeError('unhandledrejection', reason, 'promise')
+    })
+  }
+
+  private recordPlaytestRuntimeError(kind: string, message: string, source: string) {
+    const min = Math.floor(this.gameTime / 60).toString().padStart(2, '0')
+    const sec = Math.floor(this.gameTime % 60).toString().padStart(2, '0')
+    this.playtestRuntimeErrors.push({
+      kind,
+      message: message.slice(0, 180),
+      source: source.slice(0, 120),
+      timeLabel: `${min}:${sec}`,
+    })
+    if (this.playtestRuntimeErrors.length > 8) this.playtestRuntimeErrors.shift()
+    this.renderPlaytestReadinessPanel(true)
+  }
+
+  private handleBeforeUnload = (event: BeforeUnloadEvent) => {
+    if (!this.isBeforeUnloadGuardActive()) return
+    event.preventDefault()
+    event.returnValue = ''
+    return ''
+  }
+
+  private isBeforeUnloadGuardActive() {
+    return this.sessionPreferences.closeProtection &&
+      (this.phase.isPlaying() || this.phase.isPaused() || this.phase.isGameOver())
   }
 
   private setPageShellVisible(shell: HTMLElement, visible: boolean) {
@@ -557,6 +970,7 @@ export class Game {
     this.elGameOverOverlay.classList.remove('victory', 'defeat', 'stall')
     this.elGameOverText.textContent = ''
     this.elResultsShellSummary.textContent = ''
+    this.clearResultPresentation()
   }
 
   private resetTransientInputState() {
@@ -565,6 +979,7 @@ export class Game {
     this.shiftHeld = false
     this.lastClickTime = 0
     this.lastClickUnit = null
+    this.clearHeroTargetModes()
   }
 
   private clearHeldCameraInputs() {
@@ -577,16 +992,36 @@ export class Game {
       cancelable: true,
     }))
 
-    for (const key of ['w', 'a', 's', 'd', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright', 'Shift']) {
+    for (const key of ['arrowup', 'arrowdown', 'arrowleft', 'arrowright', 'Shift']) {
       window.dispatchEvent(new KeyboardEvent('keyup', { key, bubbles: true, cancelable: true }))
     }
   }
 
   private resetSessionStateForMapLoad() {
     this.gameOverResult = null
+    this.matchTelemetry = createMatchTelemetry()
+    this._lastObjectiveKey = ''
+    this._lastPressureKey = ''
+    this._lastMapObjectiveKey = ''
+    this._lastWar3IdentityKey = ''
+    this._lastHumanRouteKey = ''
+    this._lastMilestoneStatusKey = ''
+    this._lastPlaytestReadinessKey = ''
+    this._lastPressureCueKey = ''
+    this.objectiveTrackerPrimed = false
+    this.completedObjectiveKeys.clear()
+    this.objectiveHintTimer = 0
+    this.humanRouteFeedbackPrimed = false
+    this.completedHumanRouteKeys.clear()
+    this.humanRouteCompletionCueCount = 0
+    this.lastHumanRouteCompletionKeys = []
     this.gameTime = 0
     this.elTime.textContent = '00:00'
     this.clearGameOverOverlay()
+    this.clearWorldItems()
+    this.audioCues.reset()
+    this.visibility.reset()
+    this.mapObjectiveBeacons.render([])
     this.cancelAllModes()
     this.resetTransientInputState()
     this.syncSessionOverlays()
@@ -667,92 +1102,13 @@ export class Game {
     this.applySeparation()
   }
 
-  /**
-   * Lightweight post-move separation pass.
-   *
-   * For each non-building unit that is too close to another non-building unit,
-   * push them apart by a small amount per frame. This prevents permanent stacking
-   * without requiring a full physics engine.
-   *
-   * Respects blockers: never pushes a unit into a blocked tile.
-   * Deterministic: exact-overlap pairs get a deterministic direction from pair indexes.
-   */
   private applySeparation() {
-    const mobileUnits: Unit[] = []
-    for (const u of this.units) {
-      if (!u.isBuilding && u.hp > 0 && !this.hasSuppressedUnitCollision(u)) mobileUnits.push(u)
-    }
-
-    for (let i = 0; i < mobileUnits.length; i++) {
-      const a = mobileUnits[i]
-
-      for (let j = i + 1; j < mobileUnits.length; j++) {
-        const b = mobileUnits[j]
-        // Read A's current position each iteration (may have been pushed by earlier pairs)
-        const ax = a.mesh.position.x
-        const az = a.mesh.position.z
-        const bx = b.mesh.position.x
-        const bz = b.mesh.position.z
-
-        let dx = ax - bx
-        let dz = az - bz
-        let dist = Math.sqrt(dx * dx + dz * dz)
-
-        if (dist >= UNIT_SEPARATION_RADIUS) continue
-
-        // Handle exact overlap: use deterministic direction from pair indexes.
-        const exactOverlap = dist <= 0.001
-        if (exactOverlap) {
-          const angle = ((i * 92821 + j * 68917) % 360) * Math.PI / 180
-          dx = Math.cos(angle)
-          dz = Math.sin(angle)
-        }
-
-        // Push each unit away by half the overlap, capped at max push per frame
-        const effectiveDist = exactOverlap ? 0 : dist
-        const overlap = (UNIT_SEPARATION_RADIUS - effectiveDist) * 0.5
-        const pushAmount = Math.min(overlap, UNIT_SEPARATION_PUSH)
-        // Normalize: exact-overlap dx/dz are already unit length.
-        const normDist = exactOverlap ? 1 : dist
-        const pushX = (dx / normDist) * pushAmount
-        const pushZ = (dz / normDist) * pushAmount
-
-        // Apply to A if not blocked
-        const newAx = ax + pushX
-        const newAz = az + pushZ
-        if (!this.isPositionBlocked(newAx, newAz)) {
-          a.mesh.position.x = newAx
-          a.mesh.position.z = newAz
-          a.mesh.position.y = this.getWorldHeight(newAx - 0.5, newAz - 0.5)
-        }
-
-        // Apply to B (opposite direction)
-        const newBx = bx - pushX
-        const newBz = bz - pushZ
-        if (!this.isPositionBlocked(newBx, newBz)) {
-          b.mesh.position.x = newBx
-          b.mesh.position.z = newBz
-          b.mesh.position.y = this.getWorldHeight(newBx - 0.5, newBz - 0.5)
-        }
-      }
-    }
-  }
-
-  /**
-   * Gold workers use a dedicated economy lane.
-   *
-   * Applying ordinary unit separation to five miners makes them push each other
-   * away from the mine mouth / dropoff edge, which creates visible jitter and
-   * unstable income. Combat and normal movement still collide; the exception is
-   * scoped to the active gold loop only.
-   */
-  private hasSuppressedUnitCollision(unit: Unit): boolean {
-    const rt = unit.resourceTarget
-    if (unit.gatherType !== 'gold' || rt?.type !== 'goldmine') return false
-    return this.hasGoldLoopSlot(unit, rt.mine) &&
-      (unit.state === UnitState.MovingToGather ||
-        unit.state === UnitState.Gathering ||
-        unit.state === UnitState.MovingToReturn)
+    applyUnitSeparation(
+      this.units,
+      (wx, wz) => this.isPositionBlocked(wx, wz),
+      (wx, wz) => this.getWorldHeight(wx, wz),
+      hasSuppressedResourceLoopCollision,
+    )
   }
 
   /** Check if a world position falls on a blocked tile */
@@ -777,27 +1133,11 @@ export class Game {
       return
     }
 
-    const pos = unit.mesh.position
-    let dx = unit.moveTarget.x - pos.x
-    let dz = unit.moveTarget.z - pos.z
-    let dist = Math.sqrt(dx * dx + dz * dz)
-
-    // 到达当前 waypoint → 推进到下一个
-    while (dist < 0.15 && unit.waypoints.length > 0) {
-      unit.moveTarget = unit.waypoints.shift()!
-      dx = unit.moveTarget.x - pos.x
-      dz = unit.moveTarget.z - pos.z
-      dist = Math.sqrt(dx * dx + dz * dz)
-    }
-
-    if (dist < 0.1) {
+    if (advanceUnitMovement(unit, dt, this.gameTime, (wx, wz) => this.getWorldHeight(wx, wz)) === 'arrived') {
       // 到达最终目标
-      pos.x = unit.moveTarget.x
-      pos.z = unit.moveTarget.z
-      unit.moveTarget = null
       // 攻击移动到达终点 → 转为空闲
       if (unit.state === UnitState.AttackMove) {
-        this.finishAttackMove(unit)
+        finishAttackMoveOrder(unit)
         return
       }
       // 移动队列：如果还有排队的目标，弹出下一个并继续
@@ -807,19 +1147,6 @@ export class Game {
       }
       return
     }
-
-    const step = Math.min(this.getEffectiveMovementSpeed(unit) * dt, dist)
-    pos.x += (dx / dist) * step
-    pos.z += (dz / dist) * step
-    pos.y = this.getWorldHeight(pos.x - 0.5, pos.z - 0.5)
-    unit.mesh.rotation.y = Math.atan2(dx, dz)
-  }
-
-  private getEffectiveMovementSpeed(unit: Unit): number {
-    if (unit.slowUntil > this.gameTime) {
-      return unit.speed * unit.slowSpeedMultiplier
-    }
-    return unit.speed
   }
 
   /** 状态机 */
@@ -830,9 +1157,7 @@ export class Game {
       && !UNITS[unit.type]?.canGather) {
       unit.state = UnitState.Idle
       unit.gatherType = null
-      unit.resourceTarget = null
-      unit.goldLoopSlotMine = null
-      unit.goldStandMine = null
+      clearGatherTarget(unit)
       unit.moveTarget = null
       unit.waypoints = []
       return
@@ -840,11 +1165,11 @@ export class Game {
 
     switch (unit.state) {
       case UnitState.MovingToGather: {
-        if (!this.validateResourceTarget(unit)) {
+        if (!isResourceTargetValid(unit)) {
           this.startGatherNearest(unit)
           break
         }
-        const reachedGatherInteraction = this.hasReachedGatherInteraction(unit)
+        const reachedGatherInteraction = hasUnitReachedGatherInteraction(unit)
         if (unit.moveTarget && !reachedGatherInteraction) return
         if (unit.moveTarget) {
           unit.moveTarget = null
@@ -854,12 +1179,12 @@ export class Game {
           const rt = unit.resourceTarget
           if (rt?.type === 'goldmine') {
             this.planPathToBuildingInteraction(unit, rt.mine)
-            if (!unit.moveTarget && this.distanceToBuildingFootprint(unit, rt.mine) <= 2.5) {
+            if (!unit.moveTarget && getDistanceToBuildingFootprint(unit, rt.mine) <= 2.5) {
               this.placeGoldWorkerAtMineEdge(unit, rt.mine)
               unit.goldStandMine = rt.mine
             }
           } else if (rt?.type === 'tree') {
-            this.planPath(unit, rt.entry.mesh.position)
+            this.planPathToTreeInteraction(unit, rt.entry)
           }
           return
         }
@@ -871,18 +1196,20 @@ export class Game {
           unit.goldStandMine = unit.resourceTarget.mine
         }
         // 到达资源点 → 验证资源目标仍有效
-        if (!this.validateResourceTarget(unit)) {
+        if (!isResourceTargetValid(unit)) {
           this.startGatherNearest(unit)
           break
         }
-        if (!this.canStartGoldGather(unit)) {
+        const rt = unit.resourceTarget
+        if (unit.gatherType === 'gold' &&
+          rt?.type === 'goldmine' &&
+          !reserveGoldLoopSlot(unit, rt.mine, this.units)) {
           // Gold mines are saturated at five active workers. Extra workers
           // wait at the mine until a gathering slot opens.
           unit.gatherTimer = 0
           break
         }
-        unit.state = UnitState.Gathering
-        unit.gatherTimer = unit.gatherType === 'gold' ? GOLD_GATHER_TIME : LUMBER_GATHER_TIME
+        startGatheringTrip(unit)
         break
       }
 
@@ -890,7 +1217,7 @@ export class Game {
         unit.gatherTimer -= dt
         if (unit.gatherTimer <= 0) {
           // 统一结算：基于明确资源目标扣减，不允许凭空产资源
-          unit.carryAmount = this.settleGather(unit)
+          unit.carryAmount = settleGatherTrip(unit, (tree) => this.depleteTree(tree))
 
           // 只有拿到了资源才走回基地
           if (unit.carryAmount > 0) {
@@ -912,7 +1239,7 @@ export class Game {
 
       case UnitState.MovingToReturn: {
         const hall = this.findNearest(unit, 'townhall', unit.team)
-        if (unit.moveTarget && !this.hasReachedDropoffHall(unit, hall)) return
+        if (unit.moveTarget && !hasUnitReachedDropoffHall(unit, hall)) return
         if (unit.moveTarget) {
           unit.moveTarget = null
           unit.waypoints = []
@@ -923,12 +1250,11 @@ export class Game {
           break
         }
         // 到达主基地，存入资源
-        if (unit.gatherType === 'gold') {
-          this.resources.earn(unit.team, unit.carryAmount, 0)
-        } else {
-          this.resources.earn(unit.team, 0, unit.carryAmount)
+        const deposit = consumeCarriedResources(unit)
+        if (deposit) {
+          this.resources.earn(unit.team, deposit.gold, deposit.lumber)
+          recordResourceDeposit(this.matchTelemetry, unit.team, deposit.gold, deposit.lumber)
         }
-        unit.carryAmount = 0
         // 自动返回资源点继续采集
         this.startGatherNearest(unit)
         break
@@ -943,7 +1269,7 @@ export class Game {
           unit.waypoints = []
           break
         }
-        if (unit.moveTarget && !this.hasReachedBuildInteraction(unit, target)) return
+        if (unit.moveTarget && !hasUnitReachedBuildInteraction(unit, target)) return
         unit.moveTarget = null
         unit.waypoints = []
         unit.state = UnitState.Building
@@ -983,6 +1309,8 @@ export class Game {
 
       // 完成反馈：短弹 + 亮度提亮回落
       this.feedback.playBuildCompleteEffect(unit)
+      this.playAudioCue('construction', '建造完成')
+      recordCompletedBuilding(this.matchTelemetry, unit.team)
     }
 
     // 缩放动画：从0.3到1
@@ -992,127 +1320,73 @@ export class Game {
 
   /** 训练队列 */
   private updateTrainingQueue(unit: Unit, dt: number) {
-    if (!unit.isBuilding || unit.trainingQueue.length === 0) return
-    if (unit.buildProgress < 1) return // 建筑未完成
+    const completed = advanceTrainingQueue(unit, dt)
+    if (!completed) return
 
-    const item = unit.trainingQueue[0]
-    item.remaining -= dt
-    if (item.remaining <= 0) {
-      unit.trainingQueue.shift()
-      // 出兵
-      const def = UNITS[item.type]
-      if (def) {
-        const angle = Math.random() * Math.PI * 2
-        const spawnX = unit.mesh.position.x + Math.cos(angle) * 2
-        const spawnZ = unit.mesh.position.z + Math.sin(angle) * 2
-        const spawned = this.spawnUnit(item.type, unit.team, spawnX - 0.5, spawnZ - 0.5)
+    const def = UNITS[completed.unitType]
+    if (!def) return
 
-        // 集结点逻辑
-        if (unit.rallyPoint) {
-          if (unit.rallyTarget && unit.rallyTarget.type === 'goldmine'
-            && UNITS[spawned.type]?.canGather) {
-            // 城镇大厅集结到金矿 → 自动采金
-            spawned.gatherType = 'gold'
-            spawned.resourceTarget = { type: 'goldmine', mine: unit.rallyTarget }
-            spawned.state = UnitState.MovingToGather
-            this.planPathToBuildingInteraction(spawned, unit.rallyTarget)
-          } else {
-            // 普通位置集结 → 移动到集结点
-            dispatchGameCommand([spawned], { type: 'move', target: unit.rallyPoint })
-            this.planPath(spawned, unit.rallyPoint)
-          }
-        }
-      }
+    const angle = Math.random() * Math.PI * 2
+    const spawnX = unit.mesh.position.x + Math.cos(angle) * 2
+    const spawnZ = unit.mesh.position.z + Math.sin(angle) * 2
+    const spawned = this.spawnUnit(completed.unitType, unit.team, spawnX - 0.5, spawnZ - 0.5)
+    recordTrainedUnit(this.matchTelemetry, unit.team, completed.unitType)
+
+    if (!unit.rallyPoint) return
+
+    if (unit.rallyTarget && unit.rallyTarget.type === 'goldmine'
+      && UNITS[spawned.type]?.canGather) {
+      spawned.gatherType = 'gold'
+      assignGoldGatherTarget([spawned], unit.rallyTarget)
+      spawned.state = UnitState.MovingToGather
+      this.planPathToBuildingInteraction(spawned, unit.rallyTarget)
+      return
     }
+
+    this.issueCommand([spawned], { type: 'move', target: unit.rallyPoint })
+    this.planPath(spawned, unit.rallyPoint)
   }
 
   /** 复活队列（祭坛专用） */
   private updateReviveQueue(unit: Unit, dt: number) {
-    if (!unit.isBuilding || unit.reviveQueue.length === 0) return
-    if (unit.buildProgress < 1) return
+    const completed = advanceReviveQueue(unit, dt)
+    if (!completed) return
 
-    const item = unit.reviveQueue[0]
-    item.remaining -= dt
-    if (item.remaining <= 0) {
-      unit.reviveQueue.shift()
-      // Restore the dead hero
-      const hero = this.units.find(
-        u => u.team === unit.team && u.type === item.heroType && !u.isBuilding && u.isDead,
-      )
-      if (hero) {
-        const heroDef = UNITS[item.heroType]
-        if (!heroDef) return
-        hero.isDead = false
-        hero.hp = Math.min(hero.maxHp, Math.floor(hero.maxHp * HERO_REVIVE_RULES.lifeFactor))
-        hero.mana = HERO_REVIVE_RULES.simplifiedManaMapping === 'maxMana'
-          ? hero.maxMana
-          : Math.min(hero.maxMana, Math.floor(hero.maxMana * HERO_REVIVE_RULES.manaStartFactor))
-        hero.state = UnitState.Idle
-        hero.attackTarget = null
-        hero.moveTarget = null
-        hero.gatherType = null
-        hero.resourceTarget = null
-        hero.goldLoopSlotMine = null
-        hero.goldStandMine = null
-        hero.waypoints = []
-        hero.moveQueue = []
-        hero.attackMoveTarget = null
-        hero.previousState = null
-        hero.previousGatherType = null
-        hero.previousResourceTarget = null
-        hero.previousMoveTarget = null
-        hero.previousWaypoints = []
-        hero.previousMoveQueue = []
-        hero.previousAttackMoveTarget = null
-        hero.buildTarget = null
-        hero.slowUntil = 0
-        hero.slowSpeedMultiplier = 1
-        hero.healCooldownUntil = 0
-        hero.divineShieldUntil = 0
-        hero.divineShieldCooldownUntil = 0
-        hero.resurrectionCooldownUntil = 0
-        hero.resurrectionLastRevivedCount = 0
-        hero.resurrectionFeedbackUntil = 0
-        hero.aggroSuppressUntil = Math.max(hero.aggroSuppressUntil, this.gameTime + 1)
-        hero.mesh.visible = true
-        // Place hero near altar
-        const angle = Math.random() * Math.PI * 2
-        const reviveX = unit.mesh.position.x + Math.cos(angle) * 2
-        const reviveZ = unit.mesh.position.z + Math.sin(angle) * 2
-        hero.mesh.position.set(
-          reviveX,
-          this.getWorldHeight(reviveX - 0.5, reviveZ - 0.5),
-          reviveZ,
-        )
-        if (!this.outlineObjects.includes(hero.mesh)) {
-          this.outlineObjects.push(hero.mesh)
-        }
-        if (!this.healthBars.has(hero)) {
-          this.createHealthBar(hero)
-        }
-      }
+    const hero = this.units.find(
+      u => u.team === unit.team && u.type === completed.heroType && !u.isBuilding && u.isDead,
+    )
+    if (!hero) return
+
+    const heroDef = UNITS[completed.heroType]
+    if (!heroDef) return
+
+    restoreHeroFromRevive(hero, this.gameTime)
+
+    const angle = Math.random() * Math.PI * 2
+    const reviveX = unit.mesh.position.x + Math.cos(angle) * 2
+    const reviveZ = unit.mesh.position.z + Math.sin(angle) * 2
+    hero.mesh.position.set(
+      reviveX,
+      this.getWorldHeight(reviveX - 0.5, reviveZ - 0.5),
+      reviveZ,
+    )
+    if (!this.outlineObjects.includes(hero.mesh)) {
+      this.outlineObjects.push(hero.mesh)
+    }
+    if (!this.healthBars.has(hero)) {
+      this.createHealthBar(hero)
     }
   }
 
   /** 研究队列更新 */
   private updateResearchQueue(unit: Unit, dt: number) {
-    if (!unit.isBuilding || unit.researchQueue.length === 0) return
-    if (unit.buildProgress < 1) return
+    const completed = advanceResearchQueue(unit, dt)
+    if (!completed) return
 
-    const item = unit.researchQueue[0]
-    item.remaining -= dt
-    if (item.remaining <= 0) {
-      unit.researchQueue.shift()
-      if (!this.hasCompletedResearch(item.key, unit.team)) {
-        unit.completedResearches.push(item.key)
-        this.applyResearchEffects(item.key, unit.team)
-      }
+    if (!checkCompletedResearch(this.units, completed.researchKey, unit.team)) {
+      unit.completedResearches.push(completed.researchKey)
+      this.applyResearchEffects(completed.researchKey, unit.team)
     }
-  }
-
-  /** Returns true if the type is a main hall (townhall / keep / castle) */
-  private isMainHall(type: string): boolean {
-    return type === 'townhall' || type === 'keep' || type === 'castle'
   }
 
   /** Building upgrade progress for data-driven main hall upgrades. */
@@ -1120,81 +1394,19 @@ export class Game {
     if (!unit.isBuilding || !unit.upgradeQueue) return
     if (unit.buildProgress < 1) return
 
-    unit.upgradeQueue.remaining -= dt
-    if (unit.upgradeQueue.remaining <= 0) {
-      const targetKey = unit.upgradeQueue.targetType
-      const targetDef = BUILDINGS[targetKey]
-      unit.upgradeQueue = null
-      if (!targetDef) return
-
-      // Swap building type
-      unit.type = targetKey
-      unit.maxHp = targetDef.hp
-      unit.hp = targetDef.hp
-      // Keep position, team, selection semantics — do not touch mesh position
-
-      // Force HUD refresh
+    if (advanceBuildingUpgrade(unit, dt)) {
       this._lastCmdKey = ''
     }
   }
 
   /** Apply data-driven research effects to existing units on the researching team */
   private applyResearchEffects(researchKey: string, team: number) {
-    const rDef = RESEARCHES[researchKey]
-    if (!rDef?.effects) return
-    for (const effect of rDef.effects) {
-      for (const u of this.units) {
-        if (u.type !== effect.targetUnitType) continue
-        if (u.team !== team) continue
-        if (u.isBuilding || u.hp <= 0) continue
-        this.applyFlatDeltaEffect(u, effect)
-      }
-    }
-  }
-
-  /** Apply a single FlatDelta effect to a unit's stat */
-  private applyFlatDeltaEffect(unit: Unit, effect: ResearchEffect) {
-    if (effect.type !== ResearchEffectType.FlatDelta) return
-    switch (effect.stat) {
-      case 'attackRange':
-        unit.attackRange += effect.value
-        break
-      case 'attackDamage':
-        unit.attackDamage += effect.value
-        break
-      case 'armor':
-        unit.armor += effect.value
-        break
-      case 'maxHp':
-        unit.maxHp += effect.value
-        unit.hp += effect.value
-        break
-    }
+    applyResearchEffectsToTeam(this.units, researchKey, team)
   }
 
   /** Apply data-driven research effects to a newly spawned unit */
   private applyCompletedResearchesToUnit(unit: Unit) {
-    const appliedResearches = new Set<string>()
-    for (const building of this.units) {
-      if (building.team !== unit.team || !building.isBuilding) continue
-      for (const rKey of building.completedResearches) {
-        if (appliedResearches.has(rKey)) continue
-        appliedResearches.add(rKey)
-        const rDef = RESEARCHES[rKey]
-        if (!rDef?.effects) continue
-        for (const effect of rDef.effects) {
-          if (effect.targetUnitType !== unit.type) continue
-          this.applyFlatDeltaEffect(unit, effect)
-        }
-      }
-    }
-  }
-
-  /** Check if a team has completed a specific research */
-  private hasCompletedResearch(researchKey: string, team: number): boolean {
-    return this.units.some(
-      u => u.team === team && u.isBuilding && u.completedResearches.includes(researchKey),
-    )
+    applyCompletedResearchesToSpawnedUnit(unit, this.units)
   }
 
   // ==================== 战斗系统 ====================
@@ -1202,9 +1414,10 @@ export class Game {
   /** 战斗状态更新（Attacking / AttackMove / HoldPosition） */
   private updateCombat(dt: number) {
     for (const unit of this.units) {
-      if (unit.state !== UnitState.Attacking
-        && unit.state !== UnitState.AttackMove
-        && unit.state !== UnitState.HoldPosition) continue
+      if (!isCombatState(unit.state)) continue
+
+      // Stunned units cannot attack
+      if (isUnitStunned(unit, this.gameTime)) continue
 
       // AttackMove 无 attackTarget → 正常前进中，不需要战斗逻辑
       // 路径已在 issueCommand 或 resumeAttackMove() 中设好
@@ -1212,13 +1425,11 @@ export class Game {
 
       // HoldPosition 无 attackTarget → 扫描范围内敌人
       if (unit.state === UnitState.HoldPosition && !unit.attackTarget) {
-        let nearest: Unit | null = null
-        let nearDist = unit.attackRange + 0.5
-        for (const other of this.units) {
-          if (other.team === unit.team || other.hp <= 0 || other.type === 'goldmine') continue
-          const d = unit.mesh.position.distanceTo(other.mesh.position)
-          if (d < nearDist) { nearDist = d; nearest = other }
-        }
+        const nearest = findNearestEnemyTarget({
+          units: this.units,
+          source: unit,
+          maxDistance: unit.attackRange + 0.5,
+        })
         if (nearest) {
           unit.attackTarget = nearest
         }
@@ -1226,69 +1437,57 @@ export class Game {
       }
 
       const target = unit.attackTarget
-      const isAttackMove = unit.state === UnitState.AttackMove
 
       // 目标死亡/无效
-      if (!target || target.hp <= 0 || !this.units.includes(target)) {
+      if (!isCombatTargetValid(target, this.units)) {
         unit.attackTarget = null
-        if (isAttackMove) {
-          // 攻击移动：恢复继续走（仅在目标刚丢失时重规划）
-          this.resumeAttackMove(unit)
-        } else if (unit.state === UnitState.HoldPosition) {
-          // 驻守：保持驻守
-        } else {
-          // 尝试恢复被 auto-aggro 中断的原始命令
-          this.restorePreviousOrder(unit)
-        }
+        this.handleLostCombatTarget(unit, getLostCombatTargetAction(unit))
         continue
       }
-
-      const dist = unit.mesh.position.distanceTo(target.mesh.position)
 
       // 驻守：只在攻击范围内打，超出范围就放弃（不追，也不恢复成 Idle）
       // This must run before the generic CHASE_RANGE branch, otherwise hold
       // position incorrectly falls through to restorePreviousOrder().
-      if (unit.state === UnitState.HoldPosition && dist > unit.attackRange + 0.3) {
+      if (shouldDropHoldPositionTarget(unit, target)) {
         unit.attackTarget = null
-        unit.moveTarget = null
-        unit.waypoints = []
+        stopUnitForAttack(unit)
         continue
       }
 
       // 超出追击范围
-      if (dist > CHASE_RANGE && !isAttackMove) {
+      const chaseLossAction = shouldDropChaseTarget(unit, target)
+      if (chaseLossAction !== 'none') {
         unit.attackTarget = null
-        this.restorePreviousOrder(unit)
-        continue
-      }
-
-      // 攻击移动时超出追击范围 → 放弃目标，恢复移动
-      if (isAttackMove && dist > CHASE_RANGE) {
-        unit.attackTarget = null
-        this.resumeAttackMove(unit)
+        this.handleLostCombatTarget(unit, chaseLossAction)
         continue
       }
 
       // 超出攻击范围 → 追上去
-      if (dist > unit.attackRange + 0.3) {
-        if (unit.waypoints.length === 0) {
-          unit.moveTarget = target.mesh.position.clone()
-        }
+      if (!isAttackTargetInRange(unit, target)) {
+        setUnitChaseTarget(unit, target)
       } else {
         // 在攻击范围内 → 停下打
-        unit.moveTarget = null
-        unit.waypoints = []
-        unit.mesh.rotation.y = Math.atan2(
-          target.mesh.position.x - unit.mesh.position.x,
-          target.mesh.position.z - unit.mesh.position.z,
-        )
+        stopUnitForAttack(unit)
+        faceUnitTarget(unit, target)
 
-        unit.attackTimer -= dt
-        if (unit.attackTimer <= 0) {
-          unit.attackTimer = unit.attackCooldown
+        if (tickAttackCooldown(unit, dt, this.gameTime)) {
           this.dealDamage(unit, target)
         }
       }
+    }
+  }
+
+  private handleLostCombatTarget(unit: Unit, action: 'resumeAttackMove' | 'restorePreviousOrder' | 'holdPosition' | 'none') {
+    switch (action) {
+      case 'resumeAttackMove':
+        this.resumeAttackMove(unit)
+        return
+      case 'restorePreviousOrder':
+        this.restorePreviousOrder(unit)
+        return
+      case 'holdPosition':
+      case 'none':
+        return
     }
   }
 
@@ -1304,30 +1503,21 @@ export class Game {
   private updateStaticDefense(dt: number) {
     for (const unit of this.units) {
       // Only process completed buildings with a weapon
-      if (!unit.isBuilding) continue
-      if (unit.attackDamage <= 0) continue
-      if (unit.buildProgress < 1) continue
-      if (unit.hp <= 0) continue
+      if (!isStaticDefenseReady(unit)) continue
 
       // Validate existing target
-      const target = unit.attackTarget
-      if (target) {
-        if (target.hp <= 0 || !this.units.includes(target)) {
-          unit.attackTarget = null
-        }
+      if (unit.attackTarget && !isStaticDefenseTargetValid(unit, unit.attackTarget, this.units)) {
+        unit.attackTarget = null
       }
 
       // Acquire target if none
       if (!unit.attackTarget) {
-        let nearest: Unit | null = null
-        let nearDist = unit.attackRange
-        for (const other of this.units) {
-          if (other.team === unit.team || other.hp <= 0) continue
-          if (other.type === 'goldmine') continue
-          if (other.isBuilding) continue // towers target units only
-          const d = unit.mesh.position.distanceTo(other.mesh.position)
-          if (d < nearDist) { nearDist = d; nearest = other }
-        }
+        const nearest = findNearestEnemyTarget({
+          units: this.units,
+          source: unit,
+          maxDistance: unit.attackRange,
+          includeBuildings: false,
+        })
         if (nearest) unit.attackTarget = nearest
       }
 
@@ -1335,23 +1525,11 @@ export class Game {
       const currentTarget = unit.attackTarget
       if (!currentTarget) continue
 
-      const dist = unit.mesh.position.distanceTo(currentTarget.mesh.position)
-      if (dist > unit.attackRange) {
-        // Target moved out of range — drop it, will reacquire next frame
-        unit.attackTarget = null
-        continue
-      }
-
       // Face target
-      unit.mesh.rotation.y = Math.atan2(
-        currentTarget.mesh.position.x - unit.mesh.position.x,
-        currentTarget.mesh.position.z - unit.mesh.position.z,
-      )
+      faceUnitTarget(unit, currentTarget)
 
       // Attack on cooldown
-      unit.attackTimer -= dt
-      if (unit.attackTimer <= 0) {
-        unit.attackTimer = unit.attackCooldown
+      if (tickAttackCooldown(unit, dt, this.gameTime)) {
         this.dealDamage(unit, currentTarget)
       }
     }
@@ -1410,7 +1588,7 @@ export class Game {
     const cta = ABILITIES.call_to_arms
     // Must be near a completed friendly main hall (townhall / keep / castle)
     const nearHall = this.units.some(u =>
-      this.isMainHall(u.type) &&
+      isMainHallType(u.type) &&
       u.team === unit.team &&
       u.buildProgress >= 1 &&
       u.hp > 0 &&
@@ -1438,7 +1616,7 @@ export class Game {
     unit.waypoints = []
     unit.attackMoveTarget = null
     unit.state = UnitState.Idle
-    this.clearPreviousOrder(unit)
+    clearPreviousUnitOrder(unit)
 
     // Morph stats
     unit.morphOriginalType = unit.type
@@ -1517,7 +1695,7 @@ export class Game {
     for (const unit of this.units) {
       // Mana regeneration for all units with maxMana > 0
       if (unit.maxMana > 0 && unit.mana < unit.maxMana) {
-        unit.mana = Math.min(unit.maxMana, unit.mana + unit.manaRegen * dt)
+        unit.mana = Math.min(unit.maxMana, unit.mana + (unit.manaRegen + unit.brillianceAuraBonus) * dt)
       }
 
       // Sorceress auto-cast Slow
@@ -1525,9 +1703,8 @@ export class Game {
         const slowDef = ABILITIES.slow
         if (unit.mana >= (slowDef.cost.mana ?? 0) && this.gameTime >= unit.slowAutoCastCooldownUntil) {
           // Only auto-cast in combat-ready states
-          if (unit.state === UnitState.Idle || unit.state === UnitState.Attacking
-            || unit.state === UnitState.AttackMove || unit.state === UnitState.HoldPosition) {
-            const bestAutoTarget = this.findSlowAutoTarget(unit)
+          if (isCasterAutoCastState(unit.state)) {
+            const bestAutoTarget = findSlowAutoCastTarget(unit, this.units, slowDef.range, this.gameTime)
             if (bestAutoTarget) {
               const casted = this.castSlow(unit, bestAutoTarget)
               if (casted) {
@@ -1544,56 +1721,13 @@ export class Game {
       if (unit.mana < (healDef.cost.mana ?? 0)) continue
       if (this.gameTime < unit.healCooldownUntil) continue
       // Only auto-heal when in these states (not moving, gathering, building)
-      if (unit.state !== UnitState.Idle && unit.state !== UnitState.Attacking
-        && unit.state !== UnitState.AttackMove && unit.state !== UnitState.HoldPosition) continue
+      if (!isCasterAutoCastState(unit.state)) continue
 
-      // Find lowest-HP injured friendly within heal range
-      let bestTarget: Unit | null = null
-      let bestMissing = 0
-      for (const other of this.units) {
-        if (other.team !== unit.team || other.hp <= 0 || other.isBuilding) continue
-        if (other.hp >= other.maxHp) continue
-        const dist = unit.mesh.position.distanceTo(other.mesh.position)
-        if (dist > healDef.range) continue
-        const missing = other.maxHp - other.hp
-        if (missing > bestMissing) {
-          bestMissing = missing
-          bestTarget = other
-        }
-      }
-
+      const bestTarget = findPriestAutoHealTarget(unit, this.units, healDef.range)
       if (bestTarget) {
         this.castHeal(unit, bestTarget)
       }
     }
-  }
-
-  private findSlowAutoTarget(caster: Unit): Unit | null {
-    const slowDef = ABILITIES.slow
-    let bestTarget: Unit | null = null
-    let bestPriority = Number.POSITIVE_INFINITY
-    let bestDistance = Number.POSITIVE_INFINITY
-
-    for (const other of this.units) {
-      if (other.team === caster.team || other.hp <= 0 || other.isBuilding) continue
-      const distance = caster.mesh.position.distanceTo(other.mesh.position)
-      if (distance > slowDef.range) continue
-
-      let priority = 0
-      if (other.slowUntil > this.gameTime) {
-        const remaining = other.slowUntil - this.gameTime
-        if (remaining > 3) continue
-        priority = 1
-      }
-
-      if (priority < bestPriority || (priority === bestPriority && distance < bestDistance)) {
-        bestTarget = other
-        bestPriority = priority
-        bestDistance = distance
-      }
-    }
-
-    return bestTarget
   }
 
   /**
@@ -1622,40 +1756,39 @@ export class Game {
     // Visual feedback
     this.feedback.spawnDamageNumber(target, healed)
     this.feedback.spawnImpactRing(target.mesh.position)
+    this.feedback.spawnAbilityEffectBurst({
+      x: target.mesh.position.x,
+      z: target.mesh.position.z,
+      tone: 'heal',
+      radius: 0.85,
+    })
+    this.playAudioCue('ability', '治疗')
 
     return true
   }
 
   /** Holy Light — Paladin heal (not self), uses learned level */
   private castHolyLight(paladin: Unit, target: Unit): boolean {
-    const learnedLevel = paladin.abilityLevels?.holy_light ?? 0
-    if (learnedLevel < 1) return false
-    const hlDef = HERO_ABILITY_LEVELS.holy_light
-    const castLevel = Math.min(learnedLevel, hlDef.maxLevel)
-    const levelData = hlDef.levels[castLevel - 1]
-    if (!levelData) return false
-    const manaCost = levelData.mana
-    if (paladin.type !== 'paladin') return false
-    if (paladin.isDead) return false
-    if (target.team !== paladin.team) return false
-    if (target === paladin) return false
-    if (paladin.mana < manaCost) return false
-    if (this.gameTime < paladin.healCooldownUntil) return false
-    if (target.hp <= 0 || target.hp >= target.maxHp) return false
-    if (target.isBuilding) return false
-    if (paladin.mesh.position.distanceTo(target.mesh.position) > levelData.range) return false
+    const result = castPaladinHolyLight(paladin, target, this.gameTime)
+    if (!result) return false
 
-    paladin.mana -= manaCost
-    paladin.healCooldownUntil = this.gameTime + levelData.cooldown
-
-    const before = target.hp
-    target.hp = Math.min(target.maxHp, target.hp + levelData.effectValue)
-    const healed = target.hp - before
-
-    this.feedback.spawnDamageNumber(target, healed)
+    this.feedback.spawnDamageNumber(target, result.healed)
     this.feedback.spawnImpactRing(target.mesh.position)
+    this.feedback.spawnAbilityEffectBurst({
+      x: target.mesh.position.x,
+      z: target.mesh.position.z,
+      tone: 'heal',
+      radius: 1.0,
+    })
+    this.setAbilityFeedback(paladin, `圣光术 +${result.healed}`)
+    this.playAudioCue('ability', '圣光术')
 
     return true
+  }
+
+  private setAbilityFeedback(unit: Unit, text: string, duration = 3) {
+    unit.abilityFeedbackText = text
+    unit.abilityFeedbackUntil = this.gameTime + duration
   }
 
   /** AI-safe Holy Light wrapper — delegates to private castHolyLight */
@@ -1673,57 +1806,82 @@ export class Game {
     return this.castResurrection(caster)
   }
 
+  /** AI-safe Water Elemental summon wrapper — delegates to castSummonWaterElemental */
+  aiCastSummonWaterElemental(caster: Unit, targetX: number, targetZ: number): boolean {
+    return this.castSummonWaterElemental(caster, targetX, targetZ)
+  }
+
+  /** AI-facing thin wrapper for Blizzard cast — delegates to existing runtime */
+  aiCastBlizzard(caster: Unit, targetX: number, targetZ: number): boolean {
+    const friendliesInZone = this.units.filter(unit => {
+      if (unit === caster || unit.team !== caster.team || unit.hp <= 0 || unit.isBuilding) return false
+      const dx = unit.mesh.position.x - targetX
+      const dz = unit.mesh.position.z - targetZ
+      return Math.sqrt(dx * dx + dz * dz) <= 3.0
+    }).length
+    if (friendliesInZone > 2) return false
+    return this.castBlizzard(caster, targetX, targetZ)
+  }
+
+  /** AI-facing thin wrapper for Storm Bolt cast */
+  aiCastStormBolt(caster: Unit, target: Unit): boolean {
+    return this.castStormBolt(caster, target)
+  }
+
+  /** AI-facing thin wrapper for Thunder Clap cast */
+  aiCastThunderClap(caster: Unit): boolean {
+    return this.castThunderClap(caster)
+  }
+
+  /** AI-facing thin wrapper for Avatar cast */
+  aiCastAvatar(caster: Unit): boolean {
+    return this.castAvatar(caster)
+  }
+
   /** Divine Shield — Paladin self-cast invulnerability, uses learned level */
   private castDivineShield(paladin: Unit): boolean {
-    const learnedLevel = paladin.abilityLevels?.divine_shield ?? 0
-    if (learnedLevel < 1) return false
-    const dsDef = HERO_ABILITY_LEVELS.divine_shield
-    const castLevel = Math.min(learnedLevel, dsDef.maxLevel)
-    const levelData = dsDef.levels[castLevel - 1]
-    if (!levelData) return false
-    if (paladin.type !== 'paladin') return false
-    if (paladin.isDead) return false
-    if (paladin.mana < levelData.mana) return false
-    if (this.gameTime < paladin.divineShieldCooldownUntil) return false
-
-    paladin.mana -= levelData.mana
-    paladin.divineShieldUntil = this.gameTime + (levelData.duration ?? 0)
-    paladin.divineShieldCooldownUntil = this.gameTime + levelData.cooldown
-    return true
+    const ok = castPaladinDivineShield(paladin, this.gameTime)
+    if (ok) {
+      this.feedback.spawnAbilityEffectBurst({
+        x: paladin.mesh.position.x,
+        z: paladin.mesh.position.z,
+        tone: 'shield',
+        radius: 1.2,
+        life: 1.1,
+      })
+      this.setAbilityFeedback(paladin, '神圣护盾')
+      this.playAudioCue('ability', '神圣护盾')
+    }
+    return ok
   }
 
   /** Resurrection — Paladin ultimate: revive up to maxTargets dead friendly units */
   castResurrection(paladin: Unit): boolean {
-    const learnedLevel = paladin.abilityLevels?.resurrection ?? 0
-    if (learnedLevel < 1) return false
-    const resDef = HERO_ABILITY_LEVELS.resurrection
-    const castLevel = Math.min(learnedLevel, resDef.maxLevel)
-    const levelData = resDef.levels[castLevel - 1]
-    if (!levelData) return false
-    const manaCost = levelData.mana
-    if (paladin.type !== 'paladin') return false
-    if (paladin.isDead) return false
-    if (paladin.mana < manaCost) return false
-    if (this.gameTime < paladin.resurrectionCooldownUntil) return false
+    const result = castPaladinResurrection(paladin, this.deadUnitRecords, this.gameTime)
+    if (!result) return false
 
-    const eligible = this.getResurrectionEligibleRecordIndices(paladin, levelData)
-    if (eligible.length === 0) return false
-
-    const revivedRecords = eligible.map(idx => this.deadUnitRecords[idx])
-    paladin.mana -= manaCost
-    paladin.resurrectionCooldownUntil = this.gameTime + levelData.cooldown
-
-    for (const rec of revivedRecords) {
+    for (const rec of result.revivedRecords) {
       this.spawnUnit(rec.type, rec.team, rec.x - 0.5, rec.z - 0.5)
-    }
-    for (const idx of [...eligible].sort((a, b) => b - a)) {
-      this.deadUnitRecords.splice(idx, 1)
+      this.feedback.spawnAbilityEffectBurst({
+        x: rec.x,
+        z: rec.z,
+        tone: 'resurrection',
+        radius: 0.95,
+        life: 1.1,
+      })
     }
 
-    if (revivedRecords.length > 0) {
-      paladin.resurrectionLastRevivedCount = revivedRecords.length
-      paladin.resurrectionFeedbackUntil = this.gameTime + 5
-      this.feedback.spawnDamageNumber(paladin, revivedRecords.length)
+    if (result.revivedRecords.length > 0) {
+      this.feedback.spawnDamageNumber(paladin, result.revivedRecords.length)
+      this.feedback.spawnAbilityEffectBurst({
+        x: paladin.mesh.position.x,
+        z: paladin.mesh.position.z,
+        tone: 'resurrection',
+        radius: 2.2,
+        life: 1.2,
+      })
+      this.setAbilityFeedback(paladin, `复活 ${result.revivedRecords.length}`)
+      this.playAudioCue('ability', '复活')
     }
 
     return true
@@ -1733,26 +1891,300 @@ export class Game {
     paladin: Unit,
     levelData: { areaRadius?: number; maxTargets?: number },
   ): number[] {
-    const radius = levelData.areaRadius ?? 0
-    const maxTargets = levelData.maxTargets ?? 0
-    if (radius <= 0 || maxTargets <= 0) return []
-    const radiusSq = radius * radius
-    const px = paladin.mesh.position.x
-    const pz = paladin.mesh.position.z
+    return getPaladinResurrectionEligibleRecordIndices(this.deadUnitRecords, paladin, levelData)
+  }
 
-    return this.deadUnitRecords
-      .map((rec, index) => ({ rec, index }))
-      .filter(({ rec }) => {
-        if (rec.team !== paladin.team) return false
-        const uDef = UNITS[rec.type]
-        if (!uDef || uDef.isHero) return false
-        const dx = rec.x - px
-        const dz = rec.z - pz
-        return dx * dx + dz * dz <= radiusSq
-      })
-      .sort((a, b) => (a.rec.diedAt - b.rec.diedAt) || (a.index - b.index))
-      .slice(0, maxTargets)
-      .map(({ index }) => index)
+  // === Water Elemental (HERO18-IMPL1) ===
+
+  private castSummonWaterElemental(archmage: Unit, targetX: number, targetZ: number): boolean {
+    const summon = resolveWaterElementalSummon(
+      archmage,
+      targetX,
+      targetZ,
+      this.gameTime,
+      (tileX, tileZ) => this.pathingGrid.isBlocked(tileX, tileZ),
+    )
+    if (!summon) return false
+
+    const we = this.spawnUnit('water_elemental', archmage.team, summon.targetX, summon.targetZ)
+    applyWaterElementalSummonStats(we, summon)
+    this.feedback.spawnDamageNumber(we, summon.levelData.summonedHp)
+    this.feedback.spawnAbilityEffectBurst({
+      x: summon.targetX,
+      z: summon.targetZ,
+      tone: 'summon',
+      radius: 1.05,
+      life: 1.0,
+    })
+    this.setAbilityFeedback(archmage, '水元素')
+    this.playAudioCue('ability', '水元素')
+
+    return true
+  }
+
+  // === Blizzard cast (HERO20-IMPL1) ===
+
+  /** Cast Blizzard at target position */
+  private castBlizzard(archmage: Unit, targetX: number, targetZ: number): boolean {
+    const channel = castArchmageBlizzard(
+      archmage,
+      targetX,
+      targetZ,
+      this.gameTime,
+      this.blizzardChannel?.caster === archmage,
+    )
+    if (!channel) return false
+    this.blizzardChannel = channel
+
+    // Create AOE indicator ring at target (HERO20-UX1)
+    this.removeBlizzardAoeRing()
+    const radius = channel.levelData.areaRadius ?? 2.0
+    const ringGeo = new THREE.RingGeometry(radius - 0.15, radius, 32)
+    ringGeo.rotateX(-Math.PI / 2)
+    const ringMat = new THREE.MeshBasicMaterial({
+      color: 0x66ccff, side: THREE.DoubleSide, transparent: true, opacity: 0.5,
+      depthTest: false,
+    })
+    const ring = new THREE.Mesh(ringGeo, ringMat)
+    const h = this.getWorldHeight(channel.targetX, channel.targetZ) + 0.08
+    ring.position.set(channel.targetX, h, channel.targetZ)
+    ring.renderOrder = 998
+    this.scene.add(ring)
+    this.blizzardAoeRing = ring
+    this.feedback.spawnAbilityEffectBurst({
+      x: channel.targetX,
+      z: channel.targetZ,
+      tone: 'area',
+      radius,
+      opacity: 0.58,
+      life: 1.0,
+    })
+    this.setAbilityFeedback(archmage, '暴风雪引导')
+    this.playAudioCue('ability', '暴风雪')
+
+    return true
+  }
+
+  /** Update active Blizzard channel: execute waves */
+  private updateBlizzardChannel() {
+    if (!this.blizzardChannel) return
+    const ch = this.blizzardChannel
+
+    // Stop if caster is dead
+    if (ch.caster.isDead || ch.caster.hp <= 0) {
+      this.blizzardChannel = null
+      this.removeBlizzardAoeRing()
+      return
+    }
+
+    // Execute waves as their time arrives
+    while (this.gameTime >= ch.nextWaveTime && ch.wavesRemaining > 0) {
+      this.executeBlizzardWave(ch)
+      ch.wavesRemaining -= 1
+      ch.nextWaveTime += ch.waveInterval
+    }
+
+    // Channel complete
+    if (ch.wavesRemaining <= 0) {
+      this.blizzardChannel = null
+      this.removeBlizzardAoeRing()
+    }
+  }
+
+  /** Execute a single Blizzard wave at channel target */
+  private executeBlizzardWave(ch: { caster: Unit; targetX: number; targetZ: number; levelData: HeroAbilityLevelDef }) {
+    const radius = ch.levelData.areaRadius ?? 2.0
+    const maxTargets = ch.levelData.maxTargets ?? 5
+    const damage = ch.levelData.effectValue
+    const buildingMult = ch.levelData.buildingDamageMultiplier ?? 1
+
+    const targets = selectBlizzardWaveTargets(
+      this.units,
+      ch.caster,
+      ch.targetX,
+      ch.targetZ,
+      radius,
+      maxTargets,
+      this.gameTime,
+    )
+
+    for (const target of targets) {
+      const finalDamage = getBlizzardWaveDamage(target, damage, buildingMult)
+      target.hp = Math.max(0, target.hp - finalDamage)
+      this.feedback.flashHit(target)
+      this.feedback.spawnDamageNumber(target, -finalDamage)
+    }
+
+    // Spawn impact ring at wave center (HERO20-UX1)
+    this.feedback.spawnImpactRing(new THREE.Vector3(ch.targetX, 0, ch.targetZ))
+    this.feedback.spawnAbilityEffectBurst({
+      x: ch.targetX,
+      z: ch.targetZ,
+      tone: 'area',
+      radius,
+      opacity: 0.48,
+      life: 0.55,
+    })
+  }
+
+  /** Interrupt active Blizzard channel for a given caster */
+  private interruptBlizzardChannel(caster: Unit) {
+    if (this.blizzardChannel && this.blizzardChannel.caster === caster) {
+      this.blizzardChannel = null
+      this.removeBlizzardAoeRing()
+    }
+  }
+
+  /** Remove the Blizzard AOE indicator ring (HERO20-UX1) */
+  private removeBlizzardAoeRing() {
+    if (this.blizzardAoeRing) {
+      this.scene.remove(this.blizzardAoeRing)
+      this.blizzardAoeRing.geometry.dispose()
+      ;(this.blizzardAoeRing.material as THREE.Material).dispose()
+      this.blizzardAoeRing = null
+    }
+  }
+
+  /** Blizzard ground-target mode: enter */
+  private enterBlizzardTargetMode(caster: Unit) {
+    this.enterHeroTargetMode('blizzard', caster, '暴风雪 — 左键点击目标位置，右键/Esc取消')
+  }
+
+  /** Blizzard ground-target mode: handle click */
+  private handleBlizzardTargetClick() {
+    if (!this.blizzardTargetCaster) return false
+    this.raycaster.setFromCamera(this.mouseNDC, this.camera)
+    const target = this.resolvePointerGroundPoint()
+    if (!target) {
+      this.showHeroTargetInvalid(this.blizzardTargetCaster, '暴风雪：没有选中地面')
+      return false
+    }
+    const ok = this.castBlizzard(this.blizzardTargetCaster, target.x, target.z)
+    if (!ok) {
+      this.showHeroTargetInvalid(this.blizzardTargetCaster, '暴风雪：目标超出距离、法力不足或正在冷却')
+    }
+    return ok
+  }
+
+  // ==================== Mass Teleport (HERO21-IMPL1) ====================
+
+  /** Cast Mass Teleport: start delayed teleport to a friendly unit/building target */
+  private castMassTeleport(caster: Unit, targetUnit: Unit): boolean {
+    const pending = resolveMassTeleport(
+      caster,
+      targetUnit,
+      this.gameTime,
+      this.massTeleportPending?.caster === caster,
+    )
+    if (!pending) return false
+    this.massTeleportPending = pending
+    this.feedback.spawnAbilityEffectBurst({
+      x: caster.mesh.position.x,
+      z: caster.mesh.position.z,
+      tone: 'teleport',
+      radius: pending.levelData.areaRadius ?? 7.0,
+      opacity: 0.24,
+      life: 1.0,
+    })
+    this.setAbilityFeedback(caster, '群体传送准备')
+    this.playAudioCue('ability', '群体传送准备')
+    return true
+  }
+
+  /** Update Mass Teleport pending state: check completion and interrupts */
+  private updateMassTeleportPending() {
+    if (!this.massTeleportPending) return
+    const p = this.massTeleportPending
+
+    // Interrupt: caster death
+    if (p.caster.isDead || p.caster.hp <= 0) {
+      this.massTeleportPending = null
+      return
+    }
+
+    // Interrupt: target invalid or dead at completion check
+    if (p.targetUnit.isDead || p.targetUnit.hp <= 0 || !p.targetUnit.mesh?.position) {
+      this.massTeleportPending = null
+      return
+    }
+
+    // Check if delay has completed
+    if (this.gameTime >= p.completeTime) {
+      this.executeMassTeleport(p)
+      this.massTeleportPending = null
+    }
+  }
+
+  /** Execute the teleport: move caster and nearby units to target position */
+  private executeMassTeleport(p: { caster: Unit; targetUnit: Unit; levelData: HeroAbilityLevelDef }) {
+    const { caster, targetUnit, levelData } = p
+    const targetPos = targetUnit.mesh.position
+    const radius = levelData.areaRadius ?? 7.0
+    const maxTargets = levelData.maxTargets ?? 24
+
+    const transported = selectMassTeleportTransportedUnits(this.units, caster, radius, maxTargets)
+    if (transported.length === 0) return
+
+    // Place units around target using deterministic non-overlap offsets
+    const placed: { x: number; z: number }[] = []
+    // Reserve the target unit's position
+    placed.push({ x: targetPos.x, z: targetPos.z })
+
+    for (const u of transported) {
+      const pos = findMassTeleportPlacement(targetPos.x, targetPos.z, placed, targetUnit)
+      const h = this.getWorldHeight(pos.x, pos.z)
+      u.mesh.position.set(pos.x, h, pos.z)
+      placed.push(pos)
+      // Clear move target so unit doesn't walk back
+      u.moveTarget = null
+      u.waypoints = []
+      u.moveQueue = []
+      // Reset state to Idle
+      if (u.state !== UnitState.Idle) {
+        u.state = UnitState.Idle
+      }
+      u.attackTarget = null
+    }
+
+    // Lightweight completion feedback: impact ring at target position
+    this.feedback.spawnImpactRing(targetPos)
+    this.feedback.spawnAbilityEffectBurst({
+      x: targetPos.x,
+      z: targetPos.z,
+      tone: 'teleport',
+      radius: 1.7,
+      life: 1.0,
+    })
+    this.setAbilityFeedback(caster, `群体传送 ${transported.length}`)
+    this.playAudioCue('ability', '群体传送')
+  }
+
+  /** Interrupt pending Mass Teleport (on stop/move/another command) */
+  private interruptMassTeleportPending(caster: Unit) {
+    if (this.massTeleportPending && this.massTeleportPending.caster === caster) {
+      this.massTeleportPending = null
+    }
+  }
+
+  /** Mass Teleport unit-target mode: enter */
+  private enterMassTeleportTargetMode(caster: Unit) {
+    this.enterHeroTargetMode('massTeleport', caster, '群体传送 — 左键点击友方单位或建筑，右键/Esc取消')
+  }
+
+  /** Mass Teleport unit-target mode: handle click on a friendly unit/building */
+  private handleMassTeleportTargetClick() {
+    if (!this.massTeleportTargetCaster) return false
+    this.raycaster.setFromCamera(this.mouseNDC, this.camera)
+    const hitUnit = this.resolvePointerAbilityTargetUnit(this.resolvePointerGroundPoint())
+    if (!hitUnit) {
+      this.showHeroTargetInvalid(this.massTeleportTargetCaster, '群体传送：请选择友方单位或建筑')
+      return false
+    }
+    const ok = this.castMassTeleport(this.massTeleportTargetCaster, hitUnit)
+    if (!ok) {
+      this.showHeroTargetInvalid(this.massTeleportTargetCaster, '群体传送：目标非法、法力不足或正在冷却')
+    }
+    return ok
   }
 
   /** Slow — Sorceress speed debuff on enemy */
@@ -1774,6 +2206,13 @@ export class Game {
     target.slowSpeedMultiplier = slowDef.speedMultiplier ?? 1
 
     this.feedback.spawnImpactRing(target.mesh.position)
+    this.feedback.spawnAbilityEffectBurst({
+      x: target.mesh.position.x,
+      z: target.mesh.position.z,
+      tone: 'debuff',
+      radius: 0.8,
+    })
+    this.playAudioCue('ability', '减速')
     return true
   }
 
@@ -1784,57 +2223,141 @@ export class Game {
         unit.slowUntil = 0
         unit.slowSpeedMultiplier = 1
       }
+      if (unit.attackSlowUntil > 0 && unit.attackSlowUntil <= this.gameTime) {
+        unit.attackSlowUntil = 0
+        unit.attackSpeedMultiplier = 1
+      }
+    }
+  }
+
+  // ==================== Storm Bolt (HERO23-IMPL1) ====================
+
+  /** Cast Storm Bolt: validate, deduct mana, start cooldown, launch projectile */
+  private castStormBolt(caster: Unit, target: Unit): boolean {
+    const projectile = resolveStormBolt(caster, target, this.gameTime)
+    if (!projectile) return false
+    this.stormBoltProjectiles.push(projectile)
+    this.feedback.spawnAbilityEffectBurst({
+      x: caster.mesh.position.x,
+      z: caster.mesh.position.z,
+      tone: 'stun',
+      radius: 0.95,
+    })
+    this.setAbilityFeedback(caster, '风暴之锤')
+    this.playAudioCue('ability', '风暴之锤')
+    return true
+  }
+
+  /** Storm Bolt unit-target mode: enter */
+  private enterStormBoltTargetMode(caster: Unit) {
+    this.enterHeroTargetMode('stormBolt', caster, '风暴之锤 — 左键点击敌方单位，右键/Esc取消')
+  }
+
+  /** Cast Thunder Clap: instant self-centered AOE damage and slow */
+  private castThunderClap(caster: Unit): boolean {
+    const result = resolveThunderClap(caster, this.units, this.gameTime)
+    if (!result) return false
+
+    this.feedback.spawnImpactRing(caster.mesh.position)
+    this.feedback.spawnAbilityEffectBurst({
+      x: caster.mesh.position.x,
+      z: caster.mesh.position.z,
+      tone: 'area',
+      radius: result.levelData.areaRadius ?? 3.0,
+      opacity: 0.62,
+      life: 1.0,
+    })
+    for (const impact of result.impacts) {
+      this.feedback.spawnDamageNumber(impact.target, -impact.damage)
+      this.feedback.spawnImpactRing(impact.target.mesh.position)
+    }
+    this.setAbilityFeedback(caster, `雷霆一击 ${result.impacts.length}`)
+    this.playAudioCue('ability', '雷霆一击')
+    return true
+  }
+
+  /** Cast Avatar: Mountain King self-buff ultimate */
+  private castAvatar(caster: Unit): boolean {
+    const result = resolveAvatar(caster, this.gameTime)
+    if (!result) return false
+
+    this.feedback.spawnImpactRing(caster.mesh.position)
+    this.feedback.spawnDamageNumber(caster, result.levelData.hpBonus ?? 0)
+    this.feedback.spawnAbilityEffectBurst({
+      x: caster.mesh.position.x,
+      z: caster.mesh.position.z,
+      tone: 'buff',
+      radius: 1.3,
+      life: 1.2,
+    })
+    this.setAbilityFeedback(caster, '化身')
+    this.playAudioCue('ability', '化身')
+    return true
+  }
+
+  /** Storm Bolt unit-target mode: handle click */
+  private handleStormBoltTargetClick() {
+    if (!this.stormBoltTargetCaster) return false
+    this.raycaster.setFromCamera(this.mouseNDC, this.camera)
+    const hitUnit = this.resolvePointerAbilityTargetUnit(this.resolvePointerGroundPoint())
+    if (!hitUnit) {
+      this.showHeroTargetInvalid(this.stormBoltTargetCaster, '风暴之锤：请选择敌方非建筑单位')
+      return false
+    }
+    const ok = this.castStormBolt(this.stormBoltTargetCaster, hitUnit)
+    if (!ok) {
+      this.showHeroTargetInvalid(this.stormBoltTargetCaster, '风暴之锤：目标非法、超出距离、法力不足或正在冷却')
+    }
+    return ok
+  }
+
+  /** Update Storm Bolt projectiles: apply damage/stun on hit */
+  private updateStormBoltProjectiles() {
+    if (this.stormBoltProjectiles.length === 0) return
+    const remaining = []
+    for (const proj of this.stormBoltProjectiles) {
+      if (this.gameTime < proj.hitTime) {
+        remaining.push(proj)
+        continue
+      }
+      const impact = resolveStormBoltImpact(proj, this.gameTime)
+      if (!impact) continue
+      this.feedback.spawnDamageNumber(impact.target, -impact.damage)
+      this.feedback.spawnImpactRing(impact.target.mesh.position)
+      this.feedback.spawnAbilityEffectBurst({
+        x: impact.target.mesh.position.x,
+        z: impact.target.mesh.position.z,
+        tone: 'stun',
+        radius: 0.9,
+      })
+    }
+    this.stormBoltProjectiles = remaining
+  }
+
+  /** Update stun expiry — clear stun state when duration ends */
+  private updateStunExpiry() {
+    for (const unit of this.units) {
+      if (unit.stunUntil > 0 && unit.stunUntil <= this.gameTime) {
+        unit.stunUntil = 0
+      }
+    }
+  }
+
+  /** Update Avatar expiry — remove temporary stats when the ultimate ends */
+  private updateAvatarExpiry() {
+    for (const unit of this.units) {
+      expireAvatar(unit, this.gameTime)
     }
   }
 
   /** Update Devotion Aura — apply/remove passive armor bonus */
   private updateDevotionAura() {
-    // Step 1: Remove all existing DA bonuses
-    for (const unit of this.units) {
-      if (unit.devotionAuraBonus > 0) {
-        unit.armor -= unit.devotionAuraBonus
-        unit.devotionAuraBonus = 0
-      }
-    }
-    // Step 2: For each alive Paladin with learned DA, apply bonus to self + nearby friendlies
-    for (const paladin of this.units) {
-      if (paladin.type !== 'paladin') continue
-      if (paladin.isDead || paladin.hp <= 0) continue
-      const daLevel = paladin.abilityLevels?.devotion_aura ?? 0
-      if (daLevel < 1) continue
-      const daDef = HERO_ABILITY_LEVELS.devotion_aura
-      const castLevel = Math.min(daLevel, daDef.maxLevel)
-      const levelData = daDef.levels[castLevel - 1]
-      if (!levelData) continue
-      const bonus = levelData.armorBonus ?? 0
-      const radius = levelData.auraRadius ?? 0
-      if (bonus <= 0) continue
-      // Apply to self
-      paladin.armor += bonus
-      paladin.devotionAuraBonus = bonus
-      // Apply to nearby friendly non-building units
-      for (const unit of this.units) {
-        if (unit === paladin) continue
-        if (unit.isDead || unit.hp <= 0) continue
-        if (unit.isBuilding) continue
-        if (unit.team !== paladin.team) continue
-        if (unit.devotionAuraBonus > 0) continue // already affected by another source
-        const dist = paladin.mesh.position.distanceTo(unit.mesh.position)
-        if (dist <= radius) {
-          unit.armor += bonus
-          unit.devotionAuraBonus = bonus
-        }
-      }
-    }
+    updateDevotionAuraBonuses(this.units)
   }
 
-  /** 攻击移动完成：清理所有 attack-move 状态，回到 Idle */
-  private finishAttackMove(unit: Unit) {
-    unit.state = UnitState.Idle
-    unit.attackMoveTarget = null
-    unit.attackTarget = null
-    unit.moveTarget = null
-    unit.waypoints = []
+  /** Update Brilliance Aura — apply passive mana regen bonus (HERO19-IMPL1) */
+  private updateBrillianceAura() {
+    updateBrillianceAuraBonuses(this.units)
   }
 
   /** 统一的 attack-move 路径规划：有路就走，没路就结束
@@ -1846,7 +2369,7 @@ export class Game {
    */
   private planAttackMovePath(unit: Unit, target: THREE.Vector3): void {
     if (!this.planPath(unit, target)) {
-      this.finishAttackMove(unit)
+      finishAttackMoveOrder(unit)
     }
   }
 
@@ -1855,7 +2378,7 @@ export class Game {
     if (unit.attackMoveTarget) {
       this.planAttackMovePath(unit, unit.attackMoveTarget)
     } else {
-      this.finishAttackMove(unit)
+      finishAttackMoveOrder(unit)
     }
   }
 
@@ -1904,32 +2427,19 @@ export class Game {
     // 对于采集状态，需要重新验证资源目标是否仍有效
     if (prev === UnitState.MovingToGather || prev === UnitState.Gathering
       || prev === UnitState.MovingToReturn) {
-      if (!this.validateResourceTarget(unit)) {
+      if (!isResourceTargetValid(unit)) {
         // 资源目标已失效，尝试找新资源
         if (unit.gatherType) {
           this.startGatherNearest(unit)
         } else {
           unit.state = UnitState.Idle
-          unit.resourceTarget = null
-          unit.goldLoopSlotMine = null
-          unit.goldStandMine = null
+          clearGatherTarget(unit)
         }
       }
     }
 
     // 清除 previous 快照（已恢复）
-    this.clearPreviousOrder(unit)
-  }
-
-  /** 清除 previous order 快照 */
-  private clearPreviousOrder(unit: Unit) {
-    unit.previousState = null
-    unit.previousGatherType = null
-    unit.previousResourceTarget = null
-    unit.previousMoveTarget = null
-    unit.previousWaypoints = []
-    unit.previousMoveQueue = []
-    unit.previousAttackMoveTarget = null
+    clearPreviousUnitOrder(unit)
   }
 
   /**
@@ -1939,28 +2449,10 @@ export class Game {
    * 这是所有队列命令的统一消费者。
    */
   private executeQueuedCommand(unit: Unit, cmd: QueuedCommand) {
-    // 队列命令切换时，清理采集/建造相关状态
-    unit.gatherType = null
-    unit.resourceTarget = null
-    unit.goldLoopSlotMine = null
-    unit.goldStandMine = null
-    unit.buildTarget = null
-    unit.carryAmount = 0
-    unit.attackTarget = null
-
-    switch (cmd.type) {
-      case 'move':
-        unit.state = UnitState.Moving
-        unit.moveTarget = null
-        this.planPath(unit, cmd.target)
-        break
-      case 'attackMove':
-        unit.state = UnitState.AttackMove
-        unit.attackMoveTarget = cmd.target.clone()
-        unit.moveTarget = null
-        this.planAttackMovePath(unit, cmd.target)
-        break
-    }
+    executeQueuedMovementCommand(unit, cmd, {
+      planMove: (targetUnit, target) => { this.planPath(targetUnit, target) },
+      planAttackMove: (targetUnit, target) => { this.planAttackMovePath(targetUnit, target) },
+    })
   }
 
   setDefend(unit: Unit, active: boolean): boolean {
@@ -1984,35 +2476,14 @@ export class Game {
 
   /** 计算伤害（含攻击类型倍率 + 护甲减伤 + AOE 溅射）*/
   private dealDamage(attacker: Unit, target: Unit) {
-    // Divine Shield: invulnerable while active
-    if (target.divineShieldUntil > this.gameTime) return
-    let rawDamage = attacker.attackDamage
-    // Rally Call buff: temporary damage bonus
-    if (attacker.rallyCallBoostUntil > this.gameTime) {
-      rawDamage += ABILITIES.rally_call.effectValue
-    }
-    // 攻击类型 × 护甲类型 倍率（查表，未命中返回 1.0）
-    const atkType = UNITS[attacker.type]?.attackType ?? BUILDINGS[attacker.type]?.attackType ?? AttackType.Normal
-    const armType = UNITS[target.type]?.armorType ?? BUILDINGS[target.type]?.armorType ?? ArmorType.Medium
-    const typeMultiplier = getTypeMultiplier(atkType, armType)
-    const defend = ABILITIES.defend
-    const isDefendOwner = Array.isArray(defend.ownerType)
-      ? defend.ownerType.includes(target.type)
-      : target.type === defend.ownerType
-    const defendMultiplier = target.defendActive && isDefendOwner && atkType === defend.affectedAttackType
-      ? (defend.damageReduction ?? 1)
-      : 1
-    // war3护甲公式: 减伤 = (armor * 0.06) / (1 + 0.06 * armor)
-    const armor = target.armor
-    const reduction = armor > 0
-      ? (armor * 0.06) / (1 + 0.06 * armor)
-      : 0
-    const finalDamage = Math.max(1, Math.round(rawDamage * typeMultiplier * defendMultiplier * (1 - reduction)))
+    const damage = resolveDirectAttackDamage(attacker, target, this.gameTime)
+    if (!damage) return
+    const finalDamage = damage.finalDamage
     target.hp -= finalDamage
 
     // AOE splash for Siege attack type (mortar team)
-    if (atkType === AttackType.Siege && (ABILITIES.mortar_aoe.aoeRadius ?? 0) > 0) {
-      this.dealAoeSplash(attacker, target, rawDamage, atkType)
+    if (shouldApplyMortarSplash(damage)) {
+      this.dealAoeSplash(attacker, target, damage.rawDamage, damage.attackType)
     }
 
     // 攻击动画不能把 glTF/root asset scale 重置成 1。
@@ -2029,19 +2500,17 @@ export class Game {
     // 浮动伤害数字
     this.feedback.spawnDamageNumber(target, finalDamage)
 
-    // 血条闪烁反馈（短暂提亮血条边框）
-    const bars = this.healthBars.get(target)
-    if (bars) {
-      const borderObj = bars.bg.parent?.children[0]
-      if (borderObj instanceof THREE.Mesh) {
-        const borderMat = borderObj.material as THREE.MeshBasicMaterial | undefined
-        if (borderMat && 'color' in borderMat && borderMat.color) {
-          const origBorder = borderMat.color.getHex()
-          borderMat.color.setHex(0xffffff)
-          setTimeout(() => { borderMat.color.setHex(origBorder) }, 150)
-        }
-      }
+    const bash = resolveBashProc(attacker, target, this.gameTime)
+    if (bash) {
+      this.feedback.flashHit(target)
+      this.feedback.spawnImpactRing(target.mesh.position)
+      this.feedback.spawnDamageNumber(target, bash.bonusDamage)
+      this.setAbilityFeedback(attacker, '猛击')
     }
+
+    // 血条闪烁反馈（短暂提亮血条边框）
+    this.healthBarRenderer.flashHit(target)
+    this.playAudioCue('combat', '命中')
   }
 
   /**
@@ -2052,162 +2521,86 @@ export class Game {
    * (already took full damage). Goldmine units are filtered out.
    */
   private dealAoeSplash(attacker: Unit, primaryTarget: Unit, rawDamage: number, atkType: AttackType) {
-    const ma = ABILITIES.mortar_aoe
-    const aoeRadius = ma.aoeRadius ?? 0
-    const aoeFalloff = ma.aoeFalloff ?? 0
-    const splashPos = primaryTarget.mesh.position
-    for (const unit of this.units) {
-      // Skip self, primary target, same team, dead units, and neutral goldmines.
-      if (unit === primaryTarget) continue
-      if (unit === attacker) continue
-      if (unit.team === attacker.team) continue
-      if (unit.hp <= 0) continue
-      if (unit.type === 'goldmine') continue
-
-      const dist = splashPos.distanceTo(unit.mesh.position)
-      if (dist > aoeRadius) continue
-
-      // Linear falloff: 1.0 at center → aoeFalloff at edge
-      const falloff = 1.0 - (1.0 - aoeFalloff) * (dist / aoeRadius)
-      const armType = UNITS[unit.type]?.armorType ?? BUILDINGS[unit.type]?.armorType ?? ArmorType.Medium
-      const typeMultiplier = getTypeMultiplier(atkType, armType)
-      const armor = unit.armor
-      const reduction = armor > 0 ? (armor * 0.06) / (1 + 0.06 * armor) : 0
-      const splashDamage = Math.max(1, Math.round(rawDamage * falloff * typeMultiplier * (1 - reduction)))
-      unit.hp -= splashDamage
-
+    for (const application of getMortarSplashApplications(this.units, attacker, primaryTarget, rawDamage, atkType)) {
+      application.target.hp -= application.damage
       // Visual feedback for splash victims
-      this.feedback.flashHit(unit)
-      this.feedback.spawnDamageNumber(unit, splashDamage)
+      this.feedback.flashHit(application.target)
+      this.feedback.spawnDamageNumber(application.target, application.damage)
     }
   }
 
   /** 自动反击：侦测附近的敌人 */
   private updateAutoAggro() {
     for (const unit of this.units) {
-      if (unit.isBuilding || unit.hp <= 0 || unit.isDead || unit.attackTarget) continue
-      // 只有 Idle / AttackMove 的单位才走自动 aggro
-      // Moving 单位不被 auto-aggro 打断——war3 行为：玩家显式移动优先级高于自动反击
-      if (unit.state !== UnitState.Idle && unit.state !== UnitState.AttackMove) continue
-      // 玩家手动 stop/move 后的 suppression 窗口：短时间内不会被 auto-aggro 抢回
-      if (this.gameTime < unit.aggroSuppressUntil) continue
+      if (!shouldAutoAggroUnit(unit, this.gameTime)) continue
 
       // 搜索最近的敌方单位
-      let nearestEnemy: Unit | null = null
-      let nearestDist = AGGRO_RANGE
-      for (const other of this.units) {
-        if (other.team === unit.team || other.hp <= 0) continue
-        if (other.type === 'goldmine') continue
-        const d = unit.mesh.position.distanceTo(other.mesh.position)
-        if (d < nearestDist) {
-          nearestDist = d
-          nearestEnemy = other
-        }
-      }
+      const nearestEnemy = findNearestEnemyTarget({
+        units: this.units,
+        source: unit,
+        maxDistance: AGGRO_RANGE,
+        shouldIgnore: (source, target) => this.shouldIgnoreOpeningWorkerAggro(source, target),
+      })
       if (nearestEnemy) {
-        unit.attackTarget = nearestEnemy
-        if (unit.state === UnitState.AttackMove) {
-          // 攻击移动中遇敌：保持 AttackMove 状态，暂停移动
-          unit.moveTarget = null
-          unit.waypoints = []
-        } else {
-          // 保存中断前的命令，用于战斗结束后恢复
-          unit.previousState = unit.state
-          unit.previousGatherType = unit.gatherType
-          unit.previousResourceTarget = unit.resourceTarget
-          unit.previousMoveTarget = unit.moveTarget ? unit.moveTarget.clone() : null
-          unit.previousWaypoints = [...unit.waypoints]
-          unit.previousMoveQueue = [...unit.moveQueue]
-          unit.previousAttackMoveTarget = unit.attackMoveTarget ? unit.attackMoveTarget.clone() : null
-
-          unit.state = UnitState.Attacking
-          unit.moveTarget = null
-          unit.waypoints = []
-        }
+        beginAutoAggro(unit, nearestEnemy)
       }
     }
+  }
+
+  private shouldIgnoreOpeningWorkerAggro(unit: Unit, other: Unit): boolean {
+    return shouldIgnoreOpeningWorkerAggroRule(unit, other, this.gameTime, AI_WORKER_HARASS_GRACE_TIME)
   }
 
   // ==================== 血条 ====================
 
   /** 创建血条（war3 风格：金色边框 + 暗底 + 彩色填充）*/
   private createHealthBar(unit: Unit) {
-    const group = new THREE.Group()
-
-    const barWidth = unit.isBuilding ? 2.0 : unit.type === 'worker' ? 0.95 : 1.2
-    const barHeight = unit.type === 'worker' ? 0.10 : 0.14
-
-    // 金色边框（略大于血条本身）
-    const borderGeo = new THREE.PlaneGeometry(barWidth + 0.1, barHeight + 0.1)
-    const borderMat = new THREE.MeshBasicMaterial({ color: 0xb09030, side: THREE.DoubleSide, depthTest: false })
-    const border = new THREE.Mesh(borderGeo, borderMat)
-    group.add(border)
-
-    // 暗底
-    const bgGeo = new THREE.PlaneGeometry(barWidth, barHeight)
-    const bgMat = new THREE.MeshBasicMaterial({ color: 0x1a1208, side: THREE.DoubleSide, depthTest: false })
-    const bg = new THREE.Mesh(bgGeo, bgMat)
-    bg.position.z = 0.001
-    group.add(bg)
-
-    // 彩色填充
-    const fillGeo = new THREE.PlaneGeometry(barWidth, barHeight)
-    const fillMat = new THREE.MeshBasicMaterial({ color: 0x00cc00, side: THREE.DoubleSide, depthTest: false })
-    const fill = new THREE.Mesh(fillGeo, fillMat)
-    fill.position.z = 0.002
-    group.add(fill)
-
-    // 定位在单位头顶
-    const yPos = this.getHealthBarHeight(unit)
-    group.position.copy(unit.mesh.position)
-    group.position.y += yPos
-
-    this.scene.add(group)
-    this.healthBars.set(unit, { bg, fill })
+    this.healthBarRenderer.create(unit)
   }
 
   /** 更新所有血条位置和填充 */
   private updateHealthBars() {
-    const toDelete: Unit[] = []
-    for (const [unit, bars] of this.healthBars) {
-      if (!this.units.includes(unit)) {
-        toDelete.push(unit)
-        continue
-      }
-
-      const pct = Math.max(0, unit.hp / unit.maxHp)
-      const yPos = this.getHealthBarHeight(unit)
-
-      // 位置跟随单位
-      bars.bg.parent!.position.copy(unit.mesh.position)
-      bars.bg.parent!.position.y += yPos
-
-      // 朝向摄像机（billboard）
-      bars.bg.parent!.quaternion.copy(this.camera.quaternion)
-
-      // 缩放填充条
-      const halfWidth = (unit.isBuilding ? 0.9 : 0.55)
-      bars.fill.scale.x = pct
-      bars.fill.position.x = -(1 - pct) * halfWidth
-
-      // 颜色
-      const fillMat = bars.fill.material as THREE.MeshBasicMaterial
-      fillMat.color.setHex(pct > 0.6 ? 0x00cc00 : pct > 0.3 ? 0xcccc00 : 0xcc0000)
-    }
-    for (const u of toDelete) {
-      const bars = this.healthBars.get(u)!
-      this.scene.remove(bars.bg.parent!)
-      this.healthBars.delete(u)
-    }
+    this.healthBarRenderer.update(this.units)
   }
 
-  private getHealthBarHeight(unit: Unit): number {
-    if (unit.isBuilding) {
-      return (BUILDINGS[unit.type]?.size ?? 1) * 0.5 + 0.5
-    }
+  // ==================== 召唤单位到期处理 ====================
 
-    const visualHeight = unit.mesh.userData.healthBarY
-    return typeof visualHeight === 'number' ? visualHeight : 1.6
+  private handleSummonExpirations() {
+    const expired = this.units.filter(u =>
+      u.summonExpireAt > 0 && this.gameTime >= u.summonExpireAt && u.hp > 0,
+    )
+    for (const summon of expired) {
+      // Remove without entering deadUnitRecords (summons don't leave corpses)
+      summon.hp = 0 // Mark for cleanup below
+    }
+    // Clean up expired summons like normal deaths (but skip deadUnitRecords)
+    if (expired.length > 0) {
+      const expiredSet = new Set(expired)
+      for (const unit of expired) {
+        const selIdx = this.selectedUnits.indexOf(unit)
+        if (selIdx >= 0) {
+          this.selectionModel.remove(unit)
+          this.sel.removeSelectionRingAt(selIdx)
+        }
+        for (const other of this.units) {
+          if (other === unit) continue
+          if (other.attackTarget === unit) {
+            other.attackTarget = null
+            if (other.state === UnitState.AttackMove) {
+              this.resumeAttackMove(other)
+            } else {
+              this.restorePreviousOrder(other)
+            }
+          }
+        }
+        this.healthBarRenderer.remove(unit)
+        const oi = this.outlineObjects.indexOf(unit.mesh)
+        if (oi >= 0) this.outlineObjects.splice(oi, 1)
+        disposeObject3DDeep(unit.mesh)
+        this.scene.remove(unit.mesh)
+      }
+      this.units = this.units.filter(u => !expiredSet.has(u))
+    }
   }
 
   // ==================== 死亡处理 ====================
@@ -2218,20 +2611,18 @@ export class Game {
 
     // Separate heroes from normal dead units
     const deadHeroes = dead.filter(u => !u.isBuilding && UNITS[u.type]?.isHero)
+    const newlyDeadHeroes = deadHeroes.filter(hero => !hero.isDead)
+    const normalDead = dead.filter(u => !deadHeroes.includes(u))
+    if (newlyDeadHeroes.length + normalDead.length > 0) {
+      this.playAudioCue('death', `死亡 ${newlyDeadHeroes.length + normalDead.length}`)
+    }
     for (const hero of deadHeroes) {
       if (hero.isDead) continue // already processed
+      recordUnitDeath(this.matchTelemetry, hero)
+      expireAvatar(hero, this.gameTime, true)
       hero.hp = 0
       hero.isDead = true
-      hero.attackTarget = null
-      hero.moveTarget = null
-      hero.gatherType = null
-      hero.resourceTarget = null
-      hero.goldLoopSlotMine = null
-      hero.goldStandMine = null
-      hero.state = UnitState.Idle
-      hero.waypoints = []
-      hero.moveQueue = []
-      hero.attackMoveTarget = null
+      clearActiveUnitOrder(hero)
       // Hide visual
       hero.mesh.visible = false
     }
@@ -2255,37 +2646,44 @@ export class Game {
         }
       }
       // Remove health bar
-      const bars = this.healthBars.get(hero)
-      if (bars) {
-        disposeObject3DDeep(bars.bg.parent!)
-        this.healthBars.delete(hero)
-      }
+      this.healthBarRenderer.remove(hero)
       const oi = this.outlineObjects.indexOf(hero.mesh)
       if (oi >= 0) this.outlineObjects.splice(oi, 1)
     }
 
     // Normal dead units (non-heroes)
-    const normalDead = dead.filter(u => !deadHeroes.includes(u))
     const deadSet = new Set(normalDead)
+    for (const unit of normalDead) {
+      recordUnitDeath(this.matchTelemetry, unit)
+    }
 
-    // HERO10-IMPL1: only player-team normal unit deaths award minimal XP.
-    // Neutral/creep XP is source-bounded data but intentionally not wired yet.
     for (const unit of normalDead) {
       if (unit.isBuilding) continue
-      if (unit.team !== 0 && unit.team !== 1) continue
       const uDef = UNITS[unit.type]
       if (!uDef || uDef.isHero) continue
-      const xpGain = HERO_XP_RULES.normalUnitXpByLevel[1] ?? 0
+      const unitLevel = uDef.unitLevel ?? 1
+      const baseXp = HERO_XP_RULES.normalUnitXpByLevel[unitLevel] ?? HERO_XP_RULES.normalUnitXpByLevel[1] ?? 0
+      let xpGain = baseXp
+      let hero: Unit | undefined
+
+      if (unit.team === 0 || unit.team === 1) {
+        const opposingTeam = unit.team === 0 ? 1 : 0
+        hero = this.units.find(
+          u => u.team === opposingTeam && !u.isBuilding && UNITS[u.type]?.isHero && !u.isDead && u.hp > 0,
+        )
+      } else if (uDef.isCreep) {
+        hero = this.findNearestLivingHero(unit, 14)
+        const heroLevel = hero?.heroLevel ?? 1
+        const rateLevel = Math.min(heroLevel, 5)
+        const rate = HERO_XP_RULES.creepXpRateByHeroLevel[rateLevel] ?? 0
+        xpGain = Math.floor(baseXp * rate)
+      } else {
+        continue
+      }
+
       if (xpGain <= 0) continue
-      const opposingTeam = unit.team === 0 ? 1 : 0
-      const hero = this.units.find(
-        u => u.team === opposingTeam && !u.isBuilding && UNITS[u.type]?.isHero && !u.isDead && u.hp > 0,
-      )
       if (!hero) continue
-      if ((hero.heroLevel ?? 1) >= HERO_XP_RULES.maxHeroLevel) continue
-      hero.heroXP = (hero.heroXP ?? 0) + xpGain
-      // Check level-up
-      this.checkHeroLevelUp(hero)
+      addHeroXp(hero, xpGain)
     }
 
     // HERO14/16: record Resurrection-eligible dead units before mesh disposal.
@@ -2344,11 +2742,13 @@ export class Game {
         }
       }
       // 移除血条（deep dispose）
-      const bars = this.healthBars.get(unit)
-      if (bars) {
-        disposeObject3DDeep(bars.bg.parent!)
-        this.healthBars.delete(unit)
+      if (UNITS[unit.type]?.isCreep) {
+        const itemType: WorldItem['type'] = unit.type === 'ogre_warrior'
+          ? 'healing_potion'
+          : 'tome_of_experience'
+        this.dropWorldItem(itemType, unit.mesh.position)
       }
+      this.healthBarRenderer.remove(unit)
       // 释放建筑占用
       if (unit.isBuilding) {
         this.unmarkBuildingOccupancy(unit)
@@ -2364,29 +2764,265 @@ export class Game {
     this.units = this.units.filter(u => !deadSet.has(u))
   }
 
+  private findNearestLivingHero(source: Unit, maxDistance: number): Unit | undefined {
+    let best: Unit | undefined
+    let bestDistance = maxDistance
+    for (const unit of this.units) {
+      if (unit.team !== 0 && unit.team !== 1) continue
+      if (unit.isBuilding || unit.isDead || unit.hp <= 0) continue
+      if (!UNITS[unit.type]?.isHero) continue
+      const distance = unit.mesh.position.distanceTo(source.mesh.position)
+      if (distance <= bestDistance) {
+        best = unit
+        bestDistance = distance
+      }
+    }
+    return best
+  }
+
+  private dropWorldItem(type: WorldItem['type'], position: THREE.Vector3): WorldItem {
+    const group = createItemVisual(type)
+    group.position.set(position.x, this.getWorldHeight(position.x, position.z), position.z)
+    group.userData.itemType = type
+    this.scene.add(group)
+
+    const item = {
+      id: this.nextWorldItemId++,
+      type,
+      mesh: group,
+    }
+    this.worldItems.push(item)
+    return item
+  }
+
+  private updateWorldItemPickups() {
+    if (this.worldItems.length === 0) return
+    const picked = new Set<WorldItem>()
+    for (const item of this.worldItems) {
+      const hero = this.units.find(unit =>
+        (unit.team === 0 || unit.team === 1) &&
+        !unit.isBuilding &&
+        !unit.isDead &&
+        unit.hp > 0 &&
+        !!UNITS[unit.type]?.isHero &&
+        unit.mesh.position.distanceTo(item.mesh.position) <= 1.25,
+      )
+      if (!hero) continue
+
+      if (!this.collectWorldItem(hero, item.type)) continue
+      picked.add(item)
+    }
+
+    if (picked.size === 0) return
+    for (const item of picked) {
+      this.scene.remove(item.mesh)
+      disposeObject3DDeep(item.mesh)
+    }
+    this.worldItems = this.worldItems.filter(item => !picked.has(item))
+  }
+
+  private clearWorldItems() {
+    if (this.worldItems.length === 0) {
+      this.nextWorldItemId = 1
+      return
+    }
+
+    for (const item of this.worldItems) {
+      this.scene.remove(item.mesh)
+      disposeObject3DDeep(item.mesh)
+    }
+    this.worldItems = []
+    this.nextWorldItemId = 1
+  }
+
+  private collectWorldItem(hero: Unit, itemKey: ItemKey): boolean {
+    const item = ITEMS[itemKey]
+    if (!item) return false
+
+    if (item.kind === 'instant') {
+      if (item.xpAmount) {
+        addHeroXp(hero, item.xpAmount)
+        this.setAbilityFeedback(hero, `拾取 ${item.name} +${item.xpAmount}XP`)
+      }
+      recordItemCollected(this.matchTelemetry, hero.team)
+      this.playAudioCue('shop', `拾取 ${item.name}`)
+      return true
+    }
+
+    if (!this.addHeroInventoryItem(hero, itemKey)) return false
+    this.setAbilityFeedback(hero, `拾取 ${item.name}`)
+    recordItemCollected(this.matchTelemetry, hero.team)
+    this.playAudioCue('shop', `拾取 ${item.name}`)
+    return true
+  }
+
+  private addHeroInventoryItem(hero: Unit, itemKey: ItemKey): boolean {
+    if (hero.isDead || hero.hp <= 0 || !UNITS[hero.type]?.isHero) return false
+    if ((hero.inventoryItems?.length ?? 0) >= HERO_INVENTORY_MAX_ITEMS) return false
+    const item = ITEMS[itemKey]
+    if (!item) return false
+    if (item.kind === 'passive' && hero.inventoryItems.includes(itemKey)) return false
+
+    hero.inventoryItems.push(itemKey)
+    if (item.kind === 'passive') {
+      this.applyHeroPassiveItem(hero, itemKey)
+    }
+    return true
+  }
+
+  private applyHeroPassiveItem(hero: Unit, itemKey: ItemKey) {
+    const item = ITEMS[itemKey]
+    if (!item) return
+    if (item.speedBonus) {
+      hero.speed += item.speedBonus
+      this.setAbilityFeedback(hero, `${item.name} 速度+${item.speedBonus}`)
+    }
+  }
+
+  private findShopPurchaseHero(shop: Unit): Unit | null {
+    let best: Unit | null = null
+    let bestDistance = SHOP_PURCHASE_RANGE
+
+    for (const unit of this.units) {
+      if (unit.team !== shop.team) continue
+      if (unit.isBuilding || unit.isDead || unit.hp <= 0) continue
+      if (!UNITS[unit.type]?.isHero) continue
+
+      const distance = unit.mesh.position.distanceTo(shop.mesh.position)
+      if (distance <= bestDistance) {
+        best = unit
+        bestDistance = distance
+      }
+    }
+
+    return best
+  }
+
+  private getShopItemAvailability(shop: Unit, itemKey: ItemKey): { ok: boolean; reason: string } {
+    const item = ITEMS[itemKey]
+    if (!item || !item.purchasable) return { ok: false, reason: '不可购买' }
+    if (!shop.isBuilding || shop.buildProgress < 1 || shop.hp <= 0) return { ok: false, reason: '商店未就绪' }
+
+    const costReason = checkCostBlockReason(this.resources, shop.team, item.cost)
+    if (costReason) return { ok: false, reason: costReason }
+
+    const hero = this.findShopPurchaseHero(shop)
+    if (!hero) return { ok: false, reason: '需要英雄靠近' }
+    if ((hero.inventoryItems?.length ?? 0) >= HERO_INVENTORY_MAX_ITEMS) return { ok: false, reason: '背包已满' }
+    if (item.kind === 'passive' && hero.inventoryItems.includes(itemKey)) return { ok: false, reason: '已拥有' }
+
+    return { ok: true, reason: '' }
+  }
+
+  public getResearchAvailability(researchKey: string, team = 0) {
+    return checkResearchAvailability(this.units, this.resources, researchKey, team)
+  }
+
+  private purchaseShopItem(shop: Unit, itemKey: ItemKey): boolean {
+    const availability = this.getShopItemAvailability(shop, itemKey)
+    if (!availability.ok) return false
+
+    const item = ITEMS[itemKey]
+    const hero = this.findShopPurchaseHero(shop)
+    if (!item || !hero) return false
+
+    this.resources.spend(shop.team, item.cost)
+    if (!this.addHeroInventoryItem(hero, itemKey)) return false
+    this.setAbilityFeedback(hero, `购买 ${item.name}`)
+    recordItemPurchased(this.matchTelemetry, shop.team)
+    this.playAudioCue('shop', `购买 ${item.name}`)
+    return true
+  }
+
+  private useInventoryItem(hero: Unit, index: number): boolean {
+    if (hero.isDead || hero.hp <= 0) return false
+    const itemType = hero.inventoryItems[index]
+    if (!itemType) return false
+    const item = ITEMS[itemType as ItemKey]
+    if (!item || item.kind !== 'consumable') return false
+
+    if (item.townPortal) {
+      if (!this.castTownPortal(hero)) return false
+      hero.inventoryItems.splice(index, 1)
+      recordItemUsed(this.matchTelemetry, hero.team)
+      this.setAbilityFeedback(hero, `使用 ${item.name}`)
+      this.playAudioCue('portal', `使用 ${item.name}`)
+      return true
+    }
+
+    if (item.healAmount) {
+      if (hero.hp >= hero.maxHp) return false
+      const before = hero.hp
+      hero.hp = Math.min(hero.maxHp, hero.hp + item.healAmount)
+      const healed = hero.hp - before
+      hero.inventoryItems.splice(index, 1)
+      recordItemUsed(this.matchTelemetry, hero.team)
+      this.feedback.spawnDamageNumber(hero, healed)
+      this.setAbilityFeedback(hero, `使用 ${item.name} +${healed}`)
+      this.playAudioCue('shop', `使用 ${item.name}`)
+      return true
+    }
+
+    if (item.manaAmount) {
+      if (hero.mana >= hero.maxMana) return false
+      const before = hero.mana
+      hero.mana = Math.min(hero.maxMana, hero.mana + item.manaAmount)
+      const restored = Math.floor(hero.mana - before)
+      hero.inventoryItems.splice(index, 1)
+      recordItemUsed(this.matchTelemetry, hero.team)
+      this.feedback.spawnDamageNumber(hero, restored)
+      this.setAbilityFeedback(hero, `使用 ${item.name} +${restored}MP`)
+      this.playAudioCue('shop', `使用 ${item.name}`)
+      return true
+    }
+
+    return false
+  }
+
+  private castTownPortal(hero: Unit): boolean {
+    const hall = this.units.find(unit =>
+      unit.team === hero.team &&
+      unit.isBuilding &&
+      isMainHallType(unit.type) &&
+      unit.hp > 0 &&
+      unit.buildProgress >= 1,
+    )
+    if (!hall) return false
+
+    const source = hero.mesh.position.clone()
+    const allies = this.units.filter(unit =>
+      unit.team === hero.team &&
+      !unit.isBuilding &&
+      unit.hp > 0 &&
+      !unit.isDead &&
+      unit.mesh.position.distanceTo(source) <= 7,
+    )
+    allies.forEach((unit, index) => {
+      const angle = (index / Math.max(1, allies.length)) * Math.PI * 2
+      const radius = unit === hero ? 2.0 : 2.6 + (index % 3) * 0.45
+      const x = hall.mesh.position.x + Math.cos(angle) * radius
+      const z = hall.mesh.position.z + Math.sin(angle) * radius
+      unit.mesh.position.set(x, this.getWorldHeight(x, z), z)
+      unit.moveTarget = null
+      unit.waypoints = []
+      unit.moveQueue = []
+      unit.attackTarget = null
+      unit.state = UnitState.Idle
+    })
+    this.feedback.playBuildCompleteEffect(hall)
+    this.updateModeHint(`回城：${allies.length}个单位返回基地`)
+    this.playAudioCue('portal', `回城 ${allies.length}`)
+    return true
+  }
+
   // ==================== 胜利/失败检测 ====================
 
   /** 检查胜利/失败条件：一方主基地全毁则判负 */
   private checkGameOver() {
     if (this.gameOverResult) return
 
-    // Player 0 (human) defeat: no living main hall
-    const playerTH = this.units.some(u => u.team === 0 && this.isMainHall(u.type) && u.isBuilding && u.hp > 0)
-    if (!playerTH) {
-      this.endGame('defeat')
-      return
-    }
-
-    // Player 1 (AI) defeat: no living main hall
-    const aiTH = this.units.some(u => u.team === 1 && this.isMainHall(u.type) && u.isBuilding && u.hp > 0)
-    if (!aiTH) {
-      this.endGame('victory')
-      return
-    }
-
-    if (this.gameTime >= Game.STALL_VERDICT_SECONDS) {
-      this.endGame('stall')
-    }
+    const outcome = getMatchOutcome(this.units, this.gameTime, Game.STALL_VERDICT_SECONDS)
+    if (outcome) this.endGame(outcome)
   }
 
   private endGame(result: MatchResult) {
@@ -2402,26 +3038,328 @@ export class Game {
     const label = result === 'victory' ? '胜利' : result === 'defeat' ? '失败' : '僵局'
     this.elGameOverText.textContent = label
     this.elResultsShellMessage.textContent = label
+    this.playAudioCue('result', `战斗结果：${label}`)
 
-    // Populate summary from real match state
-    const alive = (team: number) => this.units.filter((u: any) => u.team === team && u.hp > 0)
-    const p0Units = alive(0).filter((u: any) => !u.isBuilding).length
-    const p0Buildings = alive(0).filter((u: any) => u.isBuilding).length
-    const p1Units = alive(1).filter((u: any) => !u.isBuilding).length
-    const p1Buildings = alive(1).filter((u: any) => u.isBuilding).length
-    const min = Math.floor(this.gameTime / 60).toString().padStart(2, '0')
-    const sec = Math.floor(this.gameTime % 60).toString().padStart(2, '0')
-    this.elResultsShellSummary.textContent =
-      `时长 ${min}:${sec}\n` +
-      `我方 单位:${p0Units} 建筑:${p0Buildings}\n` +
-      `敌方 单位:${p1Units} 建筑:${p1Buildings}`
+    const aiPressure = this.getAIPressureSnapshot()
+    const objectives = this.buildCurrentSkirmishObjectives(aiPressure)
+    this.elResultsShellSummary.textContent = formatMatchResultSummary({
+      result,
+      gameTime: this.gameTime,
+      units: this.units,
+      telemetry: this.matchTelemetry,
+      objectives,
+      aiPressure,
+    })
+    this.renderResultPresentation(this.getResultPresentationSnapshot())
 
+    this.renderObjectiveTracker(true)
+    this.renderPressureTracker(true)
+    this.renderMapObjectiveRadar(true)
+    this.renderWar3IdentityStatus(true)
+    this.renderHumanRoutePanel(true)
+    this.renderMilestoneStatusPanel(true)
+    this.renderPlaytestReadinessPanel(true)
     this.syncSessionOverlays()
+  }
+
+  private clearResultPresentation() {
+    this.elResultsVisualSummary?.setAttribute('data-complete', 'false')
+    this.elResultsStatGrid?.replaceChildren()
+    this.elResultsObjectiveRecap?.replaceChildren()
+    this.elResultsFlowRecap?.replaceChildren()
+  }
+
+  private renderResultPresentation(snapshot: ResultPresentationSnapshot) {
+    if (!this.elResultsVisualSummary || !this.elResultsStatGrid || !this.elResultsObjectiveRecap || !this.elResultsFlowRecap) return
+    this.elResultsVisualSummary.dataset.complete = snapshot.completed ? 'true' : 'false'
+    this.elResultsVisualSummary.dataset.result = snapshot.outcomeTone
+
+    this.elResultsStatGrid.replaceChildren(...snapshot.cards.map((card) => {
+      const item = document.createElement('div')
+      item.className = 'result-stat-card'
+      item.dataset.key = card.key
+      item.dataset.tone = card.tone
+      item.title = card.detail
+
+      const label = document.createElement('div')
+      label.className = 'result-stat-label'
+      label.textContent = card.label
+
+      const value = document.createElement('div')
+      value.className = 'result-stat-value'
+      value.textContent = card.value
+
+      const detail = document.createElement('div')
+      detail.className = 'result-stat-detail'
+      detail.textContent = card.detail
+
+      item.append(label, value, detail)
+      return item
+    }))
+
+    this.elResultsObjectiveRecap.replaceChildren(...snapshot.objectives.map((objective) => {
+      const item = document.createElement('div')
+      item.className = 'result-objective-chip'
+      item.dataset.key = objective.key
+      item.dataset.tone = objective.tone
+      item.dataset.complete = objective.completed ? 'true' : 'false'
+
+      const icon = document.createElement('span')
+      icon.className = 'result-objective-icon'
+      icon.textContent = objective.completed ? '✓' : objective.icon
+
+      const body = document.createElement('span')
+      const label = document.createElement('span')
+      label.className = 'result-objective-label'
+      label.textContent = objective.label
+
+      const progress = document.createElement('span')
+      progress.className = 'result-objective-progress'
+      progress.textContent = objective.progressText
+
+      body.append(label, progress)
+      item.append(icon, body)
+      return item
+    }))
+
+    this.elResultsFlowRecap.replaceChildren(...snapshot.flowSteps.map((step) => {
+      const item = document.createElement('div')
+      item.className = 'result-flow-step'
+      item.dataset.key = step.key
+      item.dataset.complete = step.completed ? 'true' : 'false'
+
+      const label = document.createElement('div')
+      label.className = 'result-flow-label'
+      label.textContent = `${step.completed ? '✓' : '·'} ${step.label}`
+
+      const detail = document.createElement('div')
+      detail.className = 'result-flow-detail'
+      detail.textContent = step.detail
+
+      item.append(label, detail)
+      return item
+    }))
   }
 
   /** Public accessor for runtime tests */
   getMatchResult(): MatchResult | null {
     return this.gameOverResult
+  }
+
+  getMatchTelemetry(): MatchTelemetry {
+    return { ...this.matchTelemetry }
+  }
+
+  getSkirmishObjectiveSnapshot(): SkirmishObjectiveView[] {
+    return this.buildCurrentSkirmishObjectives()
+  }
+
+  getSkirmishCompletionSnapshot(): SkirmishCompletionSnapshot {
+    const aiPressure = this.getAIPressureSnapshot()
+    return buildSkirmishCompletionSnapshot({
+      result: this.gameOverResult,
+      telemetry: this.matchTelemetry,
+      objectives: this.buildCurrentSkirmishObjectives(aiPressure),
+      aiPressure,
+    })
+  }
+
+  getResultPresentationSnapshot(): ResultPresentationSnapshot {
+    const aiPressure = this.getAIPressureSnapshot()
+    return buildResultPresentationSnapshot({
+      result: this.gameOverResult,
+      gameTime: this.gameTime,
+      units: this.units,
+      telemetry: this.matchTelemetry,
+      objectives: this.buildCurrentSkirmishObjectives(aiPressure),
+      aiPressure,
+    })
+  }
+
+  getMapObjectiveSnapshot(): MapObjectiveView[] {
+    return this.buildCurrentMapObjectives()
+  }
+
+  getBattlefieldReadabilitySnapshot(): BattlefieldReadabilitySnapshot {
+    const objectives = this.buildCurrentMapObjectives()
+    const minimapTargetCount = objectives.filter(objective =>
+      objective.targetX !== null &&
+      objective.targetZ !== null,
+    ).length
+    return buildBattlefieldReadabilitySnapshot({
+      objectives,
+      worldBeaconCount: this.mapObjectiveBeacons.getVisibleCount(),
+      minimapTargetCount,
+    })
+  }
+
+  getSessionShellSnapshot(): SessionShellSnapshot {
+    return buildSessionShellSnapshot({
+      preferences: this.sessionPreferences,
+      hasCurrentMap: !!this.currentMapSource,
+      hasLastSummary: !!this.getLastSessionMenuSummary(),
+      beforeUnloadGuardActive: this.isBeforeUnloadGuardActive(),
+    })
+  }
+
+  getVisibilitySnapshot(): VisibilitySnapshot {
+    this.updateVisibilityState()
+    return this.visibility.getSnapshot()
+  }
+
+  getWar3IdentitySnapshot(): War3IdentitySnapshot {
+    this.updateVisibilityState()
+    return buildWar3IdentitySnapshot({
+      units: this.units,
+      objectives: this.buildCurrentMapObjectives(),
+      visibilitySystem: this.visibility,
+      worldItems: this.worldItems,
+    })
+  }
+
+  getHumanRouteSnapshot(): HumanRouteSnapshot {
+    return buildHumanRouteSnapshot(this.units)
+  }
+
+  getHumanRouteFeedbackSnapshot() {
+    return {
+      primed: this.humanRouteFeedbackPrimed,
+      completedKeyCount: this.completedHumanRouteKeys.size,
+      completionCueCount: this.humanRouteCompletionCueCount,
+      lastCompletedKeys: [...this.lastHumanRouteCompletionKeys],
+    }
+  }
+
+  getHeroMilestoneSnapshot(): HeroMilestoneSnapshot {
+    return buildHeroMilestoneSnapshot({
+      units: this.units,
+      deadUnitRecords: this.deadUnitRecords,
+      gameTime: this.gameTime,
+      blizzardChannelActive: !!this.blizzardChannel,
+      blizzardChannelCaster: this.blizzardChannel?.caster ?? null,
+      massTeleportPendingActive: !!this.massTeleportPending,
+      massTeleportPendingCaster: this.massTeleportPending?.caster ?? null,
+      selectedUnits: this.selectedUnits,
+      activeHeroTargetMode: this.getActiveHeroTargetModeSnapshot(),
+      activeHeroTargetEvaluation: this.getActiveHeroTargetEvaluation(),
+      pointerGround: this.getHeroTargetPointerGround(),
+    })
+  }
+
+  getAIPressureSnapshot(): AIPressureSnapshot | null {
+    if (!this.ai || typeof this.ai.getPressureSnapshot !== 'function') return null
+    return this.ai.getPressureSnapshot()
+  }
+
+  getAIOpponentSnapshot(): AIOpponentSnapshot {
+    return buildAIOpponentSnapshot({
+      units: this.units,
+      aiTeam: 1,
+      pressure: this.getAIPressureSnapshot(),
+      difficultyControlExists: !!document.getElementById('setting-ai-difficulty'),
+    })
+  }
+
+  getAudioCueSnapshot(): AudioCueSnapshot {
+    return this.audioCues.getSnapshot()
+  }
+
+  getUnitPresentationSnapshot(): UnitPresentationSnapshot {
+    return this.unitPresentation.getSnapshot()
+  }
+
+  getVisualAudioIdentitySnapshot(): VisualAudioIdentitySnapshot {
+    const minimapCanvas = document.getElementById('minimap-canvas') as HTMLCanvasElement | null
+    const hero = this.getHeroMilestoneSnapshot()
+    return buildVisualAudioIdentitySnapshot({
+      units: this.units,
+      audio: this.getAudioCueSnapshot(),
+      getAssetStatus,
+      getAssetAnimationClipNames,
+      getAudioCueAssetPath,
+      feedback: this.feedback.getSnapshot(),
+      unitPresentation: this.getUnitPresentationSnapshot(),
+      heroAbilityPresentation: hero.abilityPresentation,
+      resurrectionReadability: hero.resurrectionReadability,
+      resultPresentation: this.getResultPresentationSnapshot(),
+      selectedCount: this.selectedUnits.length,
+      selectionRingCount: this.sel.selectionRings.length,
+      healthBarCount: this.healthBars.size,
+      deadRecordCount: this.deadUnitRecords.length,
+      minimapReady: !!minimapCanvas && minimapCanvas.width > 0 && minimapCanvas.height > 0,
+      objectiveRadarReady: !!this.elMapObjectiveList,
+      fogReady: !!this.visibility.getSnapshot(),
+    })
+  }
+
+  getFoundationMilestoneSnapshot(): FoundationMilestoneSnapshot {
+    const rendererSize = new THREE.Vector2()
+    this.renderer.getSize(rendererSize)
+    const resources = this.resources.get(0)
+    const source = this.currentMapSource
+    return buildFoundationMilestoneSnapshot({
+      units: this.units,
+      treeCount: this.treeManager.entries.length,
+      hasCurrentMap: !!source,
+      mapKind: source?.kind ?? 'missing',
+      isPlayingOrPaused: this.phase.isPlaying() || this.phase.isPaused() || this.phase.isGameOver(),
+      rendererReady: rendererSize.x > 0 && rendererSize.y > 0,
+      viewport: `${window.innerWidth}x${window.innerHeight}`,
+      hasAI: !!this.ai,
+      playerResources: { gold: resources.gold, lumber: resources.lumber },
+      playerSupply: this.resources.computeSupply(0, this.units),
+      telemetry: this.matchTelemetry,
+      aiPressureReady: !!this.getAIPressureSnapshot(),
+      commandRuntimeReady: typeof this.issueCommand === 'function' &&
+        typeof this.enterPlacementMode === 'function' &&
+        typeof this.enterAttackMoveMode === 'function',
+      combatRuntimeReady: typeof this.dealDamage === 'function' &&
+        typeof this.updateCombat === 'function' &&
+        typeof this.updateStaticDefense === 'function',
+    })
+  }
+
+  getPlaytestReadinessSnapshot(): PlaytestReadinessSnapshot {
+    return buildPlaytestReadinessSnapshot({
+      runtime: this.getPlaytestRuntimeInfo(),
+      milestones: this.getPlaytestMilestoneSignals(),
+      beforeUnloadGuardActive: this.isBeforeUnloadGuardActive(),
+      compatibility: this.getPlaytestCompatibilitySignals(),
+      recentErrors: this.getPlaytestRecentErrors(),
+      feedback: this.getPlaytestFeedbackInput(),
+      war3Gap: this.getWar3GapSnapshot(),
+    })
+  }
+
+  getWar3GapSnapshot(): War3GapSnapshot {
+    return buildWar3GapSnapshot(this.getRuntimeMilestoneSnapshots())
+  }
+
+  getLastSessionMenuSummary(): string | null {
+    if (!this.gameOverResult) return null
+    return formatMenuSessionSummary({
+      result: this.gameOverResult,
+      gameTime: this.gameTime,
+      telemetry: this.matchTelemetry,
+      objectives: this.buildCurrentSkirmishObjectives(),
+      aiPressure: this.getAIPressureSnapshot(),
+    })
+  }
+
+  private buildCurrentSkirmishObjectives(
+    aiPressure: AIPressureSnapshot | null = this.getAIPressureSnapshot(),
+  ): SkirmishObjectiveView[] {
+    return buildSkirmishObjectives(this.units, this.matchTelemetry, this.gameOverResult, aiPressure)
+  }
+
+  private buildCurrentMapObjectives(
+    aiPressure: AIPressureSnapshot | null = this.getAIPressureSnapshot(),
+  ): MapObjectiveView[] {
+    return buildMapObjectives(this.units, aiPressure, this.treeManager.entries)
+  }
+
+  private updateVisibilityState() {
+    this.visibility.update(this.units, 0)
   }
 
   /** 树木耗尽：移除 mesh + 释放 blocker */
@@ -2430,145 +3368,18 @@ export class Game {
     disposeObject3DDeep(tree.mesh)
   }
 
-  /** 验证资源目标是否仍有效（gold/lumber 统一） */
-  private validateResourceTarget(unit: Unit): boolean {
-    const rt = unit.resourceTarget
-    if (!rt) return false
-    if (rt.type === 'tree') {
-      return rt.entry.remainingLumber > 0
-    }
-    if (rt.type === 'goldmine') {
-      return rt.mine.hp > 0 && rt.mine.remainingGold > 0
-    }
-    return false
-  }
-
-  /** 建筑 footprint 使用 tile 占用矩形，而不是 mesh 锚点。 */
-  private getBuildingFootprint(target: Unit) {
-    const size = Math.ceil(BUILDINGS[target.type]?.size ?? 1)
-    const tx = Math.round(target.mesh.position.x - 0.5)
-    const tz = Math.round(target.mesh.position.z - 0.5)
-    return {
-      tx,
-      tz,
-      size,
-      minX: tx,
-      minZ: tz,
-      maxX: tx + size,
-      maxZ: tz + size,
-    }
-  }
-
-  /** 点到建筑 footprint 边界的 2D 距离。位于占用矩形内时为 0。 */
-  private distanceToBuildingFootprint(unit: Unit, target: Unit): number {
-    const fp = this.getBuildingFootprint(target)
-    const x = unit.mesh.position.x
-    const z = unit.mesh.position.z
-    const dx = x < fp.minX ? fp.minX - x : x > fp.maxX ? x - fp.maxX : 0
-    const dz = z < fp.minZ ? fp.minZ - z : z > fp.maxZ ? z - fp.maxZ : 0
-    return Math.sqrt(dx * dx + dz * dz)
-  }
-
-  /** 采集型交互使用资源节点边界，而不是精确 path target。 */
-  private hasReachedGatherInteraction(unit: Unit): boolean {
-    const rt = unit.resourceTarget
-    if (!rt) return false
-    if (rt.type === 'tree') {
-      return unit.mesh.position.distanceTo(rt.entry.mesh.position) <= GATHER_RANGE
-    }
-    if (rt.type === 'goldmine') {
-      return this.distanceToBuildingFootprint(unit, rt.mine) <= GATHER_RANGE
-    }
-    return false
-  }
-
-  /** 回本同样按 Town Hall 边界判定，避免多工人卡在中心点/编队落点。 */
-  private hasReachedDropoffHall(unit: Unit, hall: Unit | null): boolean {
-    if (!hall) return false
-    return this.distanceToBuildingFootprint(unit, hall) <= GATHER_RANGE
-  }
-
-  /** 建造同样按建筑边界交互，不要求工人走到占用中的中心点。 */
-  private hasReachedBuildInteraction(unit: Unit, target: Unit): boolean {
-    return this.distanceToBuildingFootprint(unit, target) <= BUILD_RANGE
-  }
-
-  /** 建筑外圈可站立格，供采矿/回本/建造路径使用。 */
-  private getBuildingApproachCandidates(target: Unit, maxRing = 3): THREE.Vector3[] {
-    const fp = this.getBuildingFootprint(target)
-    const candidates: THREE.Vector3[] = []
-    const seen = new Set<string>()
-
-    for (let ring = 1; ring <= maxRing; ring++) {
-      const minTx = fp.tx - ring
-      const maxTx = fp.tx + fp.size - 1 + ring
-      const minTz = fp.tz - ring
-      const maxTz = fp.tz + fp.size - 1 + ring
-
-      for (let tz = minTz; tz <= maxTz; tz++) {
-        for (let tx = minTx; tx <= maxTx; tx++) {
-          const onRing = tx === minTx || tx === maxTx || tz === minTz || tz === maxTz
-          if (!onRing) continue
-
-          const insideFootprint = tx >= fp.tx && tx < fp.tx + fp.size
-            && tz >= fp.tz && tz < fp.tz + fp.size
-          if (insideFootprint) continue
-          if (!this.pathingGrid.isInside(tx, tz) || this.pathingGrid.isBlocked(tx, tz)) continue
-
-          const key = `${tx}:${tz}`
-          if (seen.has(key)) continue
-          seen.add(key)
-
-          const wx = tx + 0.5
-          const wz = tz + 0.5
-          candidates.push(new THREE.Vector3(wx, this.getWorldHeight(wx - 0.5, wz - 0.5), wz))
-        }
-      }
-
-      if (candidates.length > 0) return candidates
-    }
-
-    return candidates
-  }
-
-  /** 金矿采集槽位：同一座金矿最多 5 个有效矿工保留完整往返循环。 */
-  private canStartGoldGather(unit: Unit): boolean {
-    const rt = unit.resourceTarget
-    if (unit.gatherType !== 'gold' || rt?.type !== 'goldmine') return true
-
-    return this.reserveGoldLoopSlot(unit, rt.mine)
-  }
-
-  /**
-   * Default mining saturation is a whole-loop contract, not only an in-mine
-   * timer cap. A sixth worker should wait unless one of the five assigned
-   * workers leaves the gold loop, otherwise long travel gaps become linear
-   * extra income.
-   */
-  private reserveGoldLoopSlot(unit: Unit, mine: Unit): boolean {
-    if (this.hasGoldLoopSlot(unit, mine)) return true
-
-    const reservedLoopWorkers = this.units.filter(other =>
-      other !== unit && this.hasGoldLoopSlot(other, mine),
-    ).length
-
-    if (reservedLoopWorkers >= GOLDMINE_MAX_WORKERS) return false
-    unit.goldLoopSlotMine = mine
-    return true
-  }
-
-  private hasGoldLoopSlot(unit: Unit, mine: Unit): boolean {
-    return unit.goldLoopSlotMine === mine && this.isAssignedToGoldLoop(unit, mine)
-  }
-
-  private isAssignedToGoldLoop(unit: Unit, mine: Unit): boolean {
-    return unit.hp > 0 &&
-      unit.gatherType === 'gold' &&
-      unit.resourceTarget?.type === 'goldmine' &&
-      unit.resourceTarget.mine === mine &&
-      (unit.state === UnitState.MovingToGather ||
-        unit.state === UnitState.Gathering ||
-        unit.state === UnitState.MovingToReturn)
+  /** 自动续采只选择当前边缘可站立的树，避免盯上森林内部不可接触的树。 */
+  private findNearestReachableTree(pos: THREE.Vector3, maxDist: number = Infinity): TreeEntry | null {
+    return findNearestHarvestableTree(
+      pos,
+      this.treeManager.entries,
+      (tree) => getTreeApproachCandidates(
+        tree,
+        this.pathingGrid,
+        (tx, tz) => this.getWorldHeight(tx, tz),
+      ).length > 0,
+      maxDist,
+    )
   }
 
   /**
@@ -2578,37 +3389,16 @@ export class Game {
    * the same mine-center coordinate.
    */
   private placeGoldWorkerAtMineEdge(unit: Unit, mine: Unit): void {
-    const candidates = this.getBuildingApproachCandidates(mine, 2).sort((a, b) =>
-      a.z === b.z ? a.x - b.x : a.z - b.z,
-    )
+    const candidates = getBuildingApproachCandidates(
+      mine,
+      this.pathingGrid,
+      (tx, tz) => this.getWorldHeight(tx, tz),
+      2,
+    ).sort((a, b) => a.z === b.z ? a.x - b.x : a.z - b.z)
     if (candidates.length === 0) return
 
-    const peers = this.units
-      .filter(other => this.isAssignedToGoldLoop(other, mine))
-      .sort((a, b) => this.units.indexOf(a) - this.units.indexOf(b))
-    if (!peers.includes(unit)) peers.push(unit)
-
-    const used = new Set<number>()
-    let target = candidates[0]
-    for (const peer of peers) {
-      const peerPos = peer.mesh.position
-      let bestIndex = 0
-      let bestDist = Infinity
-      for (let i = 0; i < candidates.length; i++) {
-        if (used.has(i) && used.size < candidates.length) continue
-        const c = candidates[i]
-        const d = Math.hypot(c.x - peerPos.x, c.z - peerPos.z)
-        if (d < bestDist) {
-          bestDist = d
-          bestIndex = i
-        }
-      }
-      used.add(bestIndex)
-      if (peer === unit) {
-        target = candidates[bestIndex]
-        break
-      }
-    }
+    const target = chooseGoldWorkerStandPoint(unit, mine, this.units, candidates)
+    if (!target) return
 
     const pos = unit.mesh.position
     pos.x = target.x
@@ -2617,48 +3407,13 @@ export class Game {
     unit.mesh.rotation.y = Math.atan2(mine.mesh.position.x - pos.x, mine.mesh.position.z - pos.z)
   }
 
-  /**
-   * 统一采集结算：扣减真实资源对象，返回本次携带量
-   * gold/lumber 对称处理：
-   * - 有有效目标 → 扣减资源 + 返回携带量
-   * - 目标无效/耗尽 → 返回 0
-   */
-  private settleGather(unit: Unit): number {
-    const rt = unit.resourceTarget
-    if (!rt) return 0
-
-    if (unit.gatherType === 'lumber' && rt.type === 'tree') {
-      const tree = rt.entry
-      if (tree.remainingLumber > 0) {
-        tree.remainingLumber -= LUMBER_PER_TRIP
-        if (tree.remainingLumber <= 0) {
-          this.depleteTree(tree)
-        }
-        return LUMBER_PER_TRIP
-      }
-      return 0
-    }
-
-    if (unit.gatherType === 'gold' && rt.type === 'goldmine') {
-      const mine = rt.mine
-      if (mine.hp > 0 && mine.remainingGold > 0) {
-        const take = Math.min(GOLD_PER_TRIP, mine.remainingGold)
-        mine.remainingGold -= take
-        return take
-      }
-      return 0
-    }
-
-    return 0
-  }
-
   /** 让农民去采最近的资源（自动回采 / 采集失败重试入口） */
   private startGatherNearest(unit: Unit) {
     if (unit.gatherType === 'gold') {
-      const mine = this.findNearestGoldmine(unit)
+      const mine = findNearestGoldmine(unit.mesh.position, this.units)
       if (mine && mine.remainingGold > 0) {
         unit.state = UnitState.MovingToGather
-        unit.resourceTarget = { type: 'goldmine', mine }
+        assignGoldGatherTarget([unit], mine)
         unit.goldStandMine = null
         this.planPathToBuildingInteraction(unit, mine)
         return
@@ -2666,31 +3421,45 @@ export class Game {
     }
     // 伐木：走向最近的树（通过 TreeManager 统一查询）
     if (unit.gatherType === 'lumber') {
-      const tree = this.treeManager.findNearest(unit.mesh.position, 30)
+      const tree = this.findNearestReachableTree(unit.mesh.position, 30)
       if (tree) {
         unit.state = UnitState.MovingToGather
-        unit.resourceTarget = { type: 'tree', entry: tree }
-        this.planPath(unit, tree.mesh.position)
+        assignLumberGatherTarget([unit], tree)
+        this.planPathToTreeInteraction(unit, tree)
         return
       }
     }
     // 找不到资源 → 空闲，清除资源目标
     unit.state = UnitState.Idle
-    unit.resourceTarget = null
-    unit.goldLoopSlotMine = null
-    unit.goldStandMine = null
+    clearGatherTarget(unit)
   }
 
-  /** 找最近的未耗尽金矿 */
-  private findNearestGoldmine(unit: Unit): Unit | null {
-    let best: Unit | null = null
-    let bestDist = Infinity
-    for (const u of this.units) {
-      if (u.type !== 'goldmine' || u.hp <= 0 || u.remainingGold <= 0) continue
-      const d = unit.mesh.position.distanceTo(u.mesh.position)
-      if (d < bestDist) { bestDist = d; best = u }
-    }
-    return best
+  /** 开局入口统一：玩家初始农民自动去最近金矿，避免不同地图入口行为分叉。 */
+  private autoAssignOpeningGoldWorkers(team: number) {
+    const hall = this.units.find(
+      (u) => u.team === team && isMainHallType(u.type) && u.hp > 0,
+    )
+    if (!hall) return
+
+    const mine = findNearestGoldmine(hall.mesh.position, this.units)
+    if (!mine || mine.remainingGold <= 0) return
+
+    const workers = this.units.filter(
+      (u) => u.team === team &&
+        u.type === 'worker' &&
+        u.hp > 0 &&
+        u.state === UnitState.Idle &&
+        !u.moveTarget,
+    )
+    if (workers.length === 0) return
+
+    this.issueCommand(workers, {
+      type: 'gather',
+      resourceType: 'gold',
+      target: mine.mesh.position.clone(),
+    })
+    assignGoldGatherTarget(workers, mine)
+    this.planPathForUnitsToBuildingInteraction(workers, mine)
   }
 
   // ==================== 建造系统 ====================
@@ -2729,8 +3498,7 @@ export class Game {
     if (!this.placement.mode || !this.placement.currentGhost) return
 
     this.raycaster.setFromCamera(this.mouseNDC, this.camera)
-    const hits = this.raycaster.intersectObject(this.terrain.groundPlane)
-    const hitPoint = hits.length > 0 ? hits[0].point : null
+    const hitPoint = this.resolvePointerGroundPoint()
     this.placement.updatePreview(
       hitPoint,
       (wx, wz) => this.getWorldHeight(wx, wz),
@@ -2764,20 +3532,8 @@ export class Game {
     const bMat = bMesh?.material as THREE.MeshLambertMaterial | undefined
     if (bMat) { bMat.transparent = true; bMat.opacity = 0.5 }
 
-    // 优先使用进入建造模式时选中的 worker（玩家指定建造者）
-    // 只有在没有选中 worker 时才 fallback 到最近空闲农民
-    let peasant: Unit | null = null
-
-    // 从已保存的选中 worker 中找：优先 primary（第一个），然后其他选中的
     const savedWorkers = this.placement.aliveWorkers(this.units)
-    if (savedWorkers.length > 0) {
-      // 如果只有一个选中的 worker → 它就是建造者
-      // 如果多个选中的 → 用 primary（第一个）
-      peasant = savedWorkers[0]
-    } else {
-      // Fallback：没有选中 worker（从命令卡直接点击建造按钮时，选中可能是建筑）
-      peasant = this.findNearestIdlePeasant(pos)
-    }
+    const peasant = selectConstructionBuilder(savedWorkers, () => this.findNearestIdlePeasant(pos))
 
     if (peasant) this.assignBuilderToConstruction(peasant, building)
 
@@ -2797,23 +3553,10 @@ export class Game {
    * multi-builder model. It only makes interrupted construction resumable.
    */
   private assignBuilderToConstruction(worker: Unit, building: Unit): boolean {
-    if (!this.units.includes(worker) || !this.units.includes(building)) return false
-    if (worker.isBuilding || !UNITS[worker.type]?.canGather) return false
-    if (!building.isBuilding || building.buildProgress >= 1 || building.hp <= 0) return false
-    if (worker.team !== building.team) return false
-
-    // Prevent stealing from a valid active builder (MovingToBuild or Building)
-    const existing = building.builder
-    if (existing && existing !== worker
-      && this.units.includes(existing)
-      && existing.hp > 0
-      && existing.buildTarget === building
-      && (existing.state === UnitState.MovingToBuild || existing.state === UnitState.Building)) {
-      return false
-    }
+    if (!canAssignBuilderToConstruction(worker, building, this.units)) return false
 
     building.builder = worker
-    dispatchGameCommand([worker], { type: 'build', target: building })
+    this.issueCommand([worker], { type: 'build', target: building })
     const hasPath = this.planPathToBuildingInteraction(worker, building)
     if (!hasPath) {
       worker.waypoints = []
@@ -2857,16 +3600,51 @@ export class Game {
 
   /** 更新模式提示文字 */
   private updateModeHint(text: string) {
-    this.elModeHint.textContent = text
-    this.elModeHint.style.display = text ? 'block' : 'none'
+    this.modeHintPresenter.clearState()
+    this.modeHintPresenter.show(text)
+  }
+
+  private playAudioCue(kind: AudioCueKind, label: string) {
+    this.audioCues.play(kind, label)
+    this._lastMilestoneStatusKey = ''
   }
 
   /** 编组召回轻量反馈（短暂闪烁编组号） */
   private groupHintTimer = 0
+  private commandHintTimer = 0
   private flashGroupHint(slot: number, count: number, summary: string) {
-    this.elModeHint.textContent = `编组 ${slot} — ${count} 个单位${summary ? ' (' + summary + ')' : ''}`
-    this.elModeHint.style.display = 'block'
+    this.modeHintPresenter.flashGroup(slot, count, summary)
     this.groupHintTimer = 1.2  // 秒
+  }
+
+  private flashCommandCardHint(text: string, state: 'ok' | 'blocked') {
+    this.modeHintPresenter.flashCommand(text, state)
+    this.commandHintTimer = state === 'blocked' ? 1.8 : 1.1
+  }
+
+  private triggerCommandCardHotkey(e: KeyboardEvent) {
+    if (e.ctrlKey || e.metaKey || e.altKey) return false
+    if (e.key.length !== 1) return false
+    if (!this.phase.isPlaying()) return false
+    if (this.hasModalInputMode()) return false
+    if (this.selectedUnits.length === 0) return false
+
+    const result = this.commandCardPresenter.triggerHotkey(e.key)
+    if (!result.handled) return false
+
+    e.preventDefault()
+    e.stopPropagation()
+
+    if (result.executed) {
+      this.flashCommandCardHint(`${result.hotkey.toUpperCase()} — ${result.label}`, 'ok')
+      this.playAudioCue('command', `命令卡 ${result.label}`)
+    } else {
+      const reason = result.disabledReason || '当前不可用'
+      this.flashCommandCardHint(`${result.hotkey.toUpperCase()} — ${result.label} 不可用：${reason}`, 'blocked')
+      this.playAudioCue('command', `命令卡不可用 ${result.label}`)
+    }
+
+    return true
   }
 
   /** 给一组单位设置 auto-aggro suppression 窗口（玩家手动撤退时使用） */
@@ -2885,7 +3663,52 @@ export class Game {
    * dispatcher without duplicating command field mutations in the browser.
    */
   issueCommand(units: Unit[], cmd: Parameters<typeof dispatchGameCommand>[1]) {
+    this.interruptChanneledCastsForOrder(units)
     dispatchGameCommand(units, cmd)
+  }
+
+  /** Runtime-test accessor for resource-loop pathing contracts. */
+  getBuildingApproachCandidates(target: Unit, extraRadius = 1) {
+    return getBuildingApproachCandidates(
+      target,
+      this.pathingGrid,
+      (tx, tz) => this.getWorldHeight(tx, tz),
+      extraRadius,
+    )
+  }
+
+  /** Runtime-test accessor for resource-loop pathing contracts. */
+  getTreeApproachCandidates(tree: TreeEntry, extraRadius = 1) {
+    return getTreeApproachCandidates(
+      tree,
+      this.pathingGrid,
+      (tx, tz) => this.getWorldHeight(tx, tz),
+      extraRadius,
+    )
+  }
+
+  /** Runtime-test accessor for gather interaction contracts. */
+  hasReachedGatherInteraction(unit: Unit) {
+    return hasUnitReachedGatherInteraction(unit)
+  }
+
+  /** Runtime-test accessor for resource-loop collision contracts. */
+  hasSuppressedUnitCollision(unit: Unit) {
+    return hasSuppressedResourceLoopCollision(unit)
+  }
+
+  /** Runtime-test accessor for tree interaction diagnostics. */
+  distanceToTreeFootprint(unit: Unit, tree: TreeEntry) {
+    return getDistanceToTreeFootprint(unit, tree)
+  }
+
+  private interruptChanneledCastsForOrder(units: readonly Unit[]) {
+    for (const u of units) {
+      if (u.type === 'archmage') {
+        this.interruptBlizzardChannel(u)
+        this.interruptMassTeleportPending(u)
+      }
+    }
   }
 
   /** 清除所有模式（ESC 统一出口） */
@@ -2900,7 +3723,385 @@ export class Game {
       this.rallyMode = false
       this.rallyBuilding = null
     }
+    this.clearHeroTargetModes()
     this.updateModeHint('')
+  }
+
+  private clearHeroTargetModes() {
+    this.weTargetMode = false
+    this.weTargetCaster = null
+    this.blizzardTargetMode = false
+    this.blizzardTargetCaster = null
+    this.massTeleportTargetMode = false
+    this.massTeleportTargetCaster = null
+    this.stormBoltTargetMode = false
+    this.stormBoltTargetCaster = null
+    this._lastCmdKey = ''
+  }
+
+  private clearHeroTargetMode(mode: HeroTargetModeKey) {
+    switch (mode) {
+      case 'waterElemental':
+        this.weTargetMode = false
+        this.weTargetCaster = null
+        break
+      case 'blizzard':
+        this.blizzardTargetMode = false
+        this.blizzardTargetCaster = null
+        break
+      case 'massTeleport':
+        this.massTeleportTargetMode = false
+        this.massTeleportTargetCaster = null
+        break
+      case 'stormBolt':
+        this.stormBoltTargetMode = false
+        this.stormBoltTargetCaster = null
+        break
+    }
+    this._lastCmdKey = ''
+  }
+
+  private enterHeroTargetMode(mode: HeroTargetModeKey, caster: Unit, hint: string) {
+    this.clearHeroTargetModes()
+    switch (mode) {
+      case 'waterElemental':
+        this.weTargetMode = true
+        this.weTargetCaster = caster
+        break
+      case 'blizzard':
+        this.blizzardTargetMode = true
+        this.blizzardTargetCaster = caster
+        break
+      case 'massTeleport':
+        this.massTeleportTargetMode = true
+        this.massTeleportTargetCaster = caster
+        break
+      case 'stormBolt':
+        this.stormBoltTargetMode = true
+        this.stormBoltTargetCaster = caster
+        break
+    }
+    this.updateModeHint(hint)
+    this._lastCmdKey = ''
+  }
+
+  private showHeroTargetInvalid(caster: Unit, message: string) {
+    this.setAbilityFeedback(caster, message, 2)
+    this.updateModeHint(`${message} — 重新选择，右键/Esc取消`)
+  }
+
+  private hasHeroTargetMode() {
+    return this.weTargetMode ||
+      this.blizzardTargetMode ||
+      this.massTeleportTargetMode ||
+      this.stormBoltTargetMode
+  }
+
+  private getActiveHeroTargetModeSnapshot(): ActiveHeroAbilityTargetMode | null {
+    if (this.weTargetMode && this.weTargetCaster) {
+      return {
+        mode: 'waterElemental',
+        abilityKey: 'water_elemental',
+        casterType: this.weTargetCaster.type,
+        targetKind: 'ground',
+        hint: '召唤水元素：选择未阻挡地面',
+      }
+    }
+    if (this.blizzardTargetMode && this.blizzardTargetCaster) {
+      return {
+        mode: 'blizzard',
+        abilityKey: 'blizzard',
+        casterType: this.blizzardTargetCaster.type,
+        targetKind: 'ground',
+        hint: '暴风雪：选择目标地面',
+      }
+    }
+    if (this.massTeleportTargetMode && this.massTeleportTargetCaster) {
+      return {
+        mode: 'massTeleport',
+        abilityKey: 'mass_teleport',
+        casterType: this.massTeleportTargetCaster.type,
+        targetKind: 'friendly-unit',
+        hint: '群体传送：选择友方单位或建筑',
+      }
+    }
+    if (this.stormBoltTargetMode && this.stormBoltTargetCaster) {
+      return {
+        mode: 'stormBolt',
+        abilityKey: 'storm_bolt',
+        casterType: this.stormBoltTargetCaster.type,
+        targetKind: 'enemy-unit',
+        hint: '风暴之锤：选择敌方非建筑单位',
+      }
+    }
+    return null
+  }
+
+  private getHeroTargetPointerGround(): { x: number; z: number } | null {
+    if (!this.hasHeroTargetMode()) return null
+    this.raycaster.setFromCamera(this.mouseNDC, this.camera)
+    const target = this.resolvePointerGroundPoint()
+    return target ? { x: target.x, z: target.z } : null
+  }
+
+  private getActiveHeroTargetEvaluation(): ActiveHeroAbilityTargetEvaluation | null {
+    const mode = this.getActiveHeroTargetModeSnapshot()
+    if (!mode) return null
+
+    this.raycaster.setFromCamera(this.mouseNDC, this.camera)
+    const ground = this.resolvePointerGroundPoint()
+    const hitUnit = this.resolvePointerAbilityTargetUnit(ground)
+
+    switch (mode.mode) {
+      case 'waterElemental':
+        return this.evaluateWaterElementalTarget(mode, this.weTargetCaster, ground)
+      case 'blizzard':
+        return this.evaluateBlizzardTarget(mode, this.blizzardTargetCaster, ground)
+      case 'massTeleport':
+        return this.evaluateMassTeleportTarget(mode, this.massTeleportTargetCaster, hitUnit, ground)
+      case 'stormBolt':
+        return this.evaluateStormBoltTarget(mode, this.stormBoltTargetCaster, hitUnit, ground)
+    }
+  }
+
+  private makeTargetEvaluation(input: {
+    mode: ActiveHeroAbilityTargetMode
+    legal: boolean
+    reason: string
+    status?: ActiveHeroAbilityTargetEvaluation['status']
+    targetLabel?: string
+    x?: number | null
+    z?: number | null
+  }): ActiveHeroAbilityTargetEvaluation {
+    return {
+      mode: input.mode.mode,
+      abilityKey: input.mode.abilityKey,
+      targetKind: input.mode.targetKind,
+      status: input.status ?? (input.legal ? 'valid' : 'invalid'),
+      legal: input.legal,
+      reason: input.reason,
+      targetLabel: input.targetLabel ?? '地面',
+      x: input.x ?? null,
+      z: input.z ?? null,
+    }
+  }
+
+  private getHeroAbilityLevelData(caster: Unit | null, abilityKey: string): HeroAbilityLevelDef | null {
+    if (!caster) return null
+    const learnedLevel = caster.abilityLevels?.[abilityKey] ?? 0
+    if (learnedLevel < 1) return null
+    const abilityDef = HERO_ABILITY_LEVELS[abilityKey]
+    if (!abilityDef) return null
+    return abilityDef.levels[Math.min(learnedLevel, abilityDef.maxLevel) - 1] ?? null
+  }
+
+  private targetLabel(unit: Unit | null) {
+    if (!unit) return '无目标'
+    return UNITS[unit.type]?.name ?? unit.type
+  }
+
+  private isCasterReadyForTargeting(caster: Unit | null, expectedType: string) {
+    if (!caster) return '没有施法者'
+    if (caster.type !== expectedType) return '施法者类型不匹配'
+    if (caster.isDead || caster.hp <= 0) return '施法者已死亡'
+    return ''
+  }
+
+  private evaluateWaterElementalTarget(
+    mode: ActiveHeroAbilityTargetMode,
+    caster: Unit | null,
+    ground: THREE.Vector3 | null,
+  ): ActiveHeroAbilityTargetEvaluation {
+    const casterBlock = this.isCasterReadyForTargeting(caster, 'archmage')
+    if (casterBlock) return this.makeTargetEvaluation({ mode, legal: false, reason: casterBlock, status: 'missing-target' })
+    const archmage = caster!
+    const learnedLevel = archmage.abilityLevels?.water_elemental ?? 0
+    const levelData = learnedLevel > 0
+      ? WATER_ELEMENTAL_SUMMON_LEVELS[Math.min(learnedLevel, WATER_ELEMENTAL_SUMMON_LEVELS.length) - 1]
+      : null
+    if (!levelData) return this.makeTargetEvaluation({ mode, legal: false, reason: '未学习水元素' })
+    if (this.gameTime < archmage.waterElementalCooldownUntil) return this.makeTargetEvaluation({ mode, legal: false, reason: '冷却中' })
+    if (archmage.mana < levelData.mana) return this.makeTargetEvaluation({ mode, legal: false, reason: '法力不足' })
+    if (!ground) return this.makeTargetEvaluation({ mode, legal: false, reason: '没有选中地面', status: 'missing-target' })
+    const distance = archmage.mesh.position.distanceTo(ground)
+    if (distance > WATER_ELEMENTAL_CAST_RANGE) {
+      return this.makeTargetEvaluation({ mode, legal: false, reason: '超出施法距离', x: ground.x, z: ground.z })
+    }
+    if (this.pathingGrid.isBlocked(Math.floor(ground.x), Math.floor(ground.z))) {
+      return this.makeTargetEvaluation({ mode, legal: false, reason: '目标地面被阻挡', x: ground.x, z: ground.z })
+    }
+    return this.makeTargetEvaluation({ mode, legal: true, reason: '可召唤', x: ground.x, z: ground.z })
+  }
+
+  private evaluateBlizzardTarget(
+    mode: ActiveHeroAbilityTargetMode,
+    caster: Unit | null,
+    ground: THREE.Vector3 | null,
+  ): ActiveHeroAbilityTargetEvaluation {
+    const casterBlock = this.isCasterReadyForTargeting(caster, 'archmage')
+    if (casterBlock) return this.makeTargetEvaluation({ mode, legal: false, reason: casterBlock, status: 'missing-target' })
+    const archmage = caster!
+    const levelData = this.getHeroAbilityLevelData(archmage, 'blizzard')
+    if (!levelData) return this.makeTargetEvaluation({ mode, legal: false, reason: '未学习暴风雪' })
+    if (this.blizzardChannel?.caster === archmage) return this.makeTargetEvaluation({ mode, legal: false, reason: '正在引导' })
+    if (this.gameTime < archmage.blizzardCooldownUntil) return this.makeTargetEvaluation({ mode, legal: false, reason: '冷却中' })
+    if (archmage.mana < levelData.mana) return this.makeTargetEvaluation({ mode, legal: false, reason: '法力不足' })
+    if (!ground) return this.makeTargetEvaluation({ mode, legal: false, reason: '没有选中地面', status: 'missing-target' })
+    const distance = archmage.mesh.position.distanceTo(ground)
+    if (distance > levelData.range) {
+      return this.makeTargetEvaluation({ mode, legal: false, reason: '超出施法距离', x: ground.x, z: ground.z })
+    }
+    return this.makeTargetEvaluation({ mode, legal: true, reason: '可施放', x: ground.x, z: ground.z })
+  }
+
+  private evaluateMassTeleportTarget(
+    mode: ActiveHeroAbilityTargetMode,
+    caster: Unit | null,
+    target: Unit | null,
+    ground: THREE.Vector3 | null,
+  ): ActiveHeroAbilityTargetEvaluation {
+    const casterBlock = this.isCasterReadyForTargeting(caster, 'archmage')
+    if (casterBlock) return this.makeTargetEvaluation({ mode, legal: false, reason: casterBlock, status: 'missing-target' })
+    const archmage = caster!
+    const levelData = this.getHeroAbilityLevelData(archmage, 'mass_teleport')
+    const fallbackPoint = ground ? { x: ground.x, z: ground.z } : {}
+    if (!levelData) return this.makeTargetEvaluation({ mode, legal: false, reason: '未学习群体传送', ...fallbackPoint })
+    if (this.massTeleportPending?.caster === archmage) return this.makeTargetEvaluation({ mode, legal: false, reason: '传送准备中', ...fallbackPoint })
+    if (this.gameTime < archmage.massTeleportCooldownUntil) return this.makeTargetEvaluation({ mode, legal: false, reason: '冷却中', ...fallbackPoint })
+    if (archmage.mana < levelData.mana) return this.makeTargetEvaluation({ mode, legal: false, reason: '法力不足', ...fallbackPoint })
+    if (!target) return this.makeTargetEvaluation({ mode, legal: false, reason: '需要友方单位或建筑', status: 'missing-target', ...fallbackPoint })
+    const targetPoint = { x: target.mesh.position.x, z: target.mesh.position.z }
+    if (target.isDead || target.hp <= 0) return this.makeTargetEvaluation({ mode, legal: false, reason: '目标已死亡', targetLabel: this.targetLabel(target), ...targetPoint })
+    if (target.team !== archmage.team) return this.makeTargetEvaluation({ mode, legal: false, reason: '必须选择友方目标', targetLabel: this.targetLabel(target), ...targetPoint })
+    return this.makeTargetEvaluation({ mode, legal: true, reason: '可传送', targetLabel: this.targetLabel(target), ...targetPoint })
+  }
+
+  private evaluateStormBoltTarget(
+    mode: ActiveHeroAbilityTargetMode,
+    caster: Unit | null,
+    target: Unit | null,
+    ground: THREE.Vector3 | null,
+  ): ActiveHeroAbilityTargetEvaluation {
+    const casterBlock = this.isCasterReadyForTargeting(caster, 'mountain_king')
+    if (casterBlock) return this.makeTargetEvaluation({ mode, legal: false, reason: casterBlock, status: 'missing-target' })
+    const mountainKing = caster!
+    const levelData = this.getHeroAbilityLevelData(mountainKing, 'storm_bolt')
+    const fallbackPoint = ground ? { x: ground.x, z: ground.z } : {}
+    if (!levelData) return this.makeTargetEvaluation({ mode, legal: false, reason: '未学习风暴之锤', ...fallbackPoint })
+    if (this.gameTime < mountainKing.stormBoltCooldownUntil) return this.makeTargetEvaluation({ mode, legal: false, reason: '冷却中', ...fallbackPoint })
+    if (mountainKing.mana < levelData.mana) return this.makeTargetEvaluation({ mode, legal: false, reason: '法力不足', ...fallbackPoint })
+    if (!target) return this.makeTargetEvaluation({ mode, legal: false, reason: '需要敌方非建筑单位', status: 'missing-target', ...fallbackPoint })
+    const targetPoint = { x: target.mesh.position.x, z: target.mesh.position.z }
+    if (target.isDead || target.hp <= 0) return this.makeTargetEvaluation({ mode, legal: false, reason: '目标已死亡', targetLabel: this.targetLabel(target), ...targetPoint })
+    if (target.team === mountainKing.team) return this.makeTargetEvaluation({ mode, legal: false, reason: '不能选择友方目标', targetLabel: this.targetLabel(target), ...targetPoint })
+    if (target.isBuilding) return this.makeTargetEvaluation({ mode, legal: false, reason: '不能选择建筑', targetLabel: this.targetLabel(target), ...targetPoint })
+    if (isSpellImmune(target, this.gameTime)) return this.makeTargetEvaluation({ mode, legal: false, reason: '目标魔法免疫', targetLabel: this.targetLabel(target), ...targetPoint })
+    if (mountainKing.mesh.position.distanceTo(target.mesh.position) > levelData.range) {
+      return this.makeTargetEvaluation({ mode, legal: false, reason: '超出施法距离', targetLabel: this.targetLabel(target), ...targetPoint })
+    }
+    return this.makeTargetEvaluation({ mode, legal: true, reason: '可命中', targetLabel: this.targetLabel(target), ...targetPoint })
+  }
+
+  private hasModalInputMode() {
+    return this.placement.mode ||
+      this.attackMoveMode ||
+      this.rallyMode ||
+      this.hasHeroTargetMode()
+  }
+
+  private setMouseNdcFromScreenPoint(x: number, y: number) {
+    const ndc = screenPointToNdc(x, y, window.innerWidth, window.innerHeight)
+    this.mouseNDC.set(ndc.x, ndc.y)
+  }
+
+  private setMouseNdcFromEvent(e: MouseEvent) {
+    this.setMouseNdcFromScreenPoint(e.clientX, e.clientY)
+  }
+
+  private cancelPrimaryInputMode(): boolean {
+    if (this.placement.mode) {
+      this.exitPlacementMode()
+      return true
+    }
+    if (this.attackMoveMode) {
+      this.attackMoveMode = false
+      this.updateModeHint('')
+      return true
+    }
+    if (this.rallyMode) {
+      this.rallyMode = false
+      this.rallyBuilding = null
+      this.updateModeHint('')
+      return true
+    }
+    if (this.hasHeroTargetMode()) {
+      this.clearHeroTargetModes()
+      this.updateModeHint('')
+      return true
+    }
+    return false
+  }
+
+  private consumePrimaryLeftClickMode(e: MouseEvent): boolean {
+    if (this.placement.mode) {
+      this.placeBuilding()
+      return true
+    }
+
+    if (this.attackMoveMode) {
+      this.setMouseNdcFromEvent(e)
+      this.handleAttackMoveClick()
+      this.attackMoveMode = false
+      this.updateModeHint('')
+      return true
+    }
+
+    if (this.rallyMode) {
+      this.setMouseNdcFromEvent(e)
+      this.handleRallyClick()
+      this.rallyMode = false
+      this.rallyBuilding = null
+      this.updateModeHint('')
+      return true
+    }
+
+    if (this.weTargetMode && this.weTargetCaster) {
+      this.setMouseNdcFromEvent(e)
+      if (this.handleWaterElementalTargetClick()) {
+        this.clearHeroTargetMode('waterElemental')
+        this.updateModeHint('')
+      }
+      return true
+    }
+
+    if (this.blizzardTargetMode && this.blizzardTargetCaster) {
+      this.setMouseNdcFromEvent(e)
+      if (this.handleBlizzardTargetClick()) {
+        this.clearHeroTargetMode('blizzard')
+        this.updateModeHint('')
+      }
+      return true
+    }
+
+    if (this.massTeleportTargetMode && this.massTeleportTargetCaster) {
+      this.setMouseNdcFromEvent(e)
+      if (this.handleMassTeleportTargetClick()) {
+        this.clearHeroTargetMode('massTeleport')
+        this.updateModeHint('')
+      }
+      return true
+    }
+
+    if (this.stormBoltTargetMode && this.stormBoltTargetCaster) {
+      this.setMouseNdcFromEvent(e)
+      if (this.handleStormBoltTargetClick()) {
+        this.clearHeroTargetMode('stormBolt')
+        this.updateModeHint('')
+      }
+      return true
+    }
+
+    return false
   }
 
   // ==================== 输入 ====================
@@ -2927,8 +4128,7 @@ export class Game {
     }
 
     canvas.addEventListener('mousemove', (e) => {
-      this.mouseNDC.x = (e.clientX / window.innerWidth) * 2 - 1
-      this.mouseNDC.y = -(e.clientY / window.innerHeight) * 2 + 1
+      this.setMouseNdcFromEvent(e)
       this.mouseScreen.set(e.clientX, e.clientY)
       this.updateTileInfo()
 
@@ -2940,32 +4140,7 @@ export class Game {
     canvas.addEventListener('mousedown', (e) => {
       if (e.button !== 0) return
 
-      // 建造模式：放置建筑
-      if (this.placement.mode) {
-        this.placeBuilding()
-        return
-      }
-
-      // 攻击移动模式：点击地面发出 attack-move
-      if (this.attackMoveMode) {
-        this.mouseNDC.x = (e.clientX / window.innerWidth) * 2 - 1
-        this.mouseNDC.y = -(e.clientY / window.innerHeight) * 2 + 1
-        this.handleAttackMoveClick()
-        this.attackMoveMode = false
-        this.updateModeHint('')
-        return
-      }
-
-      // 集结点模式：点击地面/金矿设 rally
-      if (this.rallyMode) {
-        this.mouseNDC.x = (e.clientX / window.innerWidth) * 2 - 1
-        this.mouseNDC.y = -(e.clientY / window.innerHeight) * 2 + 1
-        this.handleRallyClick()
-        this.rallyMode = false
-        this.rallyBuilding = null
-        this.updateModeHint('')
-        return
-      }
+      if (this.consumePrimaryLeftClickMode(e)) return
 
       this.isDragging = false
       this.dragStart.set(e.clientX, e.clientY)
@@ -2973,15 +4148,12 @@ export class Game {
 
     canvas.addEventListener('mouseup', (e) => {
       if (e.button !== 0) return
-      if (this.placement.mode) return
-      if (this.attackMoveMode) return
-      if (this.rallyMode) return
+      if (this.hasModalInputMode()) return
 
       if (this.isDragging) {
         this.finishBoxSelect(e.clientX, e.clientY, this.shiftHeld || e.shiftKey)
       } else {
-        this.mouseNDC.x = (e.clientX / window.innerWidth) * 2 - 1
-        this.mouseNDC.y = -(e.clientY / window.innerHeight) * 2 + 1
+        this.setMouseNdcFromEvent(e)
         this.handleClick()
       }
       this.isDragging = false
@@ -3000,31 +4172,11 @@ export class Game {
     canvas.addEventListener('contextmenu', (e) => {
       e.preventDefault()
 
-      // 右键取消建造模式
-      if (this.placement.mode) {
-        this.exitPlacementMode()
-        return
-      }
-
-      // 右键取消攻击移动模式
-      if (this.attackMoveMode) {
-        this.attackMoveMode = false
-        this.updateModeHint('')
-        return
-      }
-
-      // 右键取消集结点模式
-      if (this.rallyMode) {
-        this.rallyMode = false
-        this.rallyBuilding = null
-        this.updateModeHint('')
-        return
-      }
+      if (this.cancelPrimaryInputMode()) return
 
       if (this.selectedUnits.length === 0) return
 
-      this.mouseNDC.x = (e.clientX / window.innerWidth) * 2 - 1
-      this.mouseNDC.y = -(e.clientY / window.innerHeight) * 2 + 1
+      this.setMouseNdcFromEvent(e)
       this.handleRightClick()
     })
 
@@ -3040,7 +4192,7 @@ export class Game {
     window.addEventListener('keydown', (e) => {
       // Esc = 取消当前模式（最高优先级）
       if (e.key === 'Escape') {
-        if (this.placement.mode || this.attackMoveMode || this.rallyMode) {
+        if (this.hasModalInputMode()) {
           this.cancelAllModes()
           return
         }
@@ -3051,12 +4203,6 @@ export class Game {
         if (this.phase.isPlaying()) {
           this.pauseGame()
         }
-        return
-      }
-
-      // P = 截图（全局可用）
-      if (e.key.toLowerCase() === 'p') {
-        this.captureScreenshot()
         return
       }
 
@@ -3073,29 +4219,16 @@ export class Game {
       // 控制组：1..9 召回编组
       if (digit >= 1 && digit <= 9 && !e.ctrlKey && !e.altKey) {
         // 建造/攻击移动/集结模式时不响应数字键（避免误触）
-        if (this.placement.mode || this.attackMoveMode || this.rallyMode) return
+        if (this.hasModalInputMode()) return
 
         const recalled = this.controlGroups.recall(digit, this.units)
         if (recalled.length > 0) {
           // Shift 持有时追加到现有选择
           if (this.shiftHeld) {
-            for (const u of recalled) {
-              if (!this.selectionModel.contains(u)) {
-                this.selectionModel.add(u)
-                this.sel.createSelectionRing(u)
-              }
-            }
+            this.appendSelectionUnits(recalled)
           } else {
-            this.clearSelection()
-            this.sel.clearSelectionRings()
-            this.selectionModel.setSelection(recalled)
-            for (const u of recalled) {
-              this.sel.createSelectionRing(u)
-            }
+            this.replaceSelection(recalled)
           }
-          // 重置 HUD 缓存
-          this._lastCmdKey = ''
-          this._lastSelKey = ''
           // 轻量召回反馈：短暂显示编组信息
           const summary = this.controlGroups.getTypeSummary(digit)
           this.flashGroupHint(digit, recalled.length, summary)
@@ -3103,22 +4236,23 @@ export class Game {
         return
       }
 
+      if (this.triggerCommandCardHotkey(e)) return
+
+      // P = 截图；若当前命令卡有 P 热键，上面的命令卡路径优先。
+      if (e.key.toLowerCase() === 'p') {
+        this.captureScreenshot()
+        return
+      }
+
       // 建造/攻击移动/集结模式时不响应快捷键
-      if (this.placement.mode || this.attackMoveMode || this.rallyMode) return
+      if (this.hasModalInputMode()) return
       if (this.selectedUnits.length === 0) return
 
       // Tab = 子组切换
       if (e.key === 'Tab') {
         e.preventDefault()
         if (this.selectionModel.cycleSubgroup()) {
-          // 强制刷新命令卡和选择 HUD
-          this._lastCmdKey = ''
-          this._lastSelKey = ''
-          // 重建 selection rings 以匹配新的选择顺序
-          this.sel.clearSelectionRings()
-          for (const u of this.selectedUnits) {
-            this.sel.createSelectionRing(u)
-          }
+          this.refreshSelectionVisuals()
         }
         return
       }
@@ -3135,16 +4269,16 @@ export class Game {
         return
       }
 
-      const controllable = this.selectedUnits.filter((u) => u.team === 0 && !u.isBuilding)
+      const controllable = this.getSelectedControllableUnits()
       if (controllable.length === 0) return
 
       switch (e.key.toLowerCase()) {
         case 's':
-          dispatchGameCommand(controllable, { type: 'stop' })
+          this.issueCommand(controllable, { type: 'stop' })
           this.suppressAggroFor(controllable)
           break
         case 'h':
-          dispatchGameCommand(controllable, { type: 'holdPosition' })
+          this.issueCommand(controllable, { type: 'holdPosition' })
           break
         case 'a':
           this.enterAttackMoveMode()
@@ -3170,57 +4304,28 @@ export class Game {
   /** 为单个单位计算 A* 路径并设置 waypoints + moveTarget
    * @returns true = 有移动目标（路径或直线 fallback），false = 已在最佳可达位置 */
   private planPath(unit: Unit, target: THREE.Vector3): boolean {
-    if (unit.isBuilding) return false
-
-    const startTx = Math.floor(unit.mesh.position.x)
-    const startTz = Math.floor(unit.mesh.position.z)
-    const goalTx = Math.floor(target.x)
-    const goalTz = Math.floor(target.z)
-
-    const tilePath = findPath(startTx, startTz, goalTx, goalTz, this.pathingGrid)
-    const waypoints = pathToWorldWaypoints(tilePath, (wx, wz) => this.getWorldHeight(wx, wz))
-
-    if (waypoints === null) {
-      // 真正寻路失败 → 直线 fallback
-      unit.waypoints = []
-      unit.moveTarget = target.clone()
-      unit.moveTarget.y = this.getWorldHeight(target.x, target.z)
-      return true
-    } else if (waypoints.length > 0) {
-      // 有路径 → 跟随 waypoints
-      unit.waypoints = waypoints
-      unit.moveTarget = unit.waypoints.shift()!
-      return true
-    } else {
-      // 空路径 = 已在最佳可达位置（blocked target 旁），停止移动
-      unit.waypoints = []
-      unit.moveTarget = null
-      return false
-    }
-  }
-
-  private chooseBuildingApproachPoint(unit: Unit, target: Unit, reserved?: Set<string>): THREE.Vector3 {
-    const candidates = this.getBuildingApproachCandidates(target)
-    if (candidates.length === 0) return target.mesh.position.clone()
-
-    const scored = candidates
-      .map(point => {
-        const dx = unit.mesh.position.x - point.x
-        const dz = unit.mesh.position.z - point.z
-        const key = `${Math.floor(point.x)}:${Math.floor(point.z)}`
-        const reservedPenalty = reserved?.has(key) ? 1000 : 0
-        return { point, key, score: dx * dx + dz * dz + reservedPenalty }
-      })
-      .sort((a, b) => a.score - b.score)
-
-    const best = scored[0]
-    if (reserved) reserved.add(best.key)
-    return best.point.clone()
+    return planUnitPath(unit, target, this.pathingGrid, (wx, wz) => this.getWorldHeight(wx, wz))
   }
 
   /** 路径目标落在建筑外圈可站立点，避免单位挤向建筑占用格中心。 */
   private planPathToBuildingInteraction(unit: Unit, target: Unit, reserved?: Set<string>): boolean {
-    const approach = this.chooseBuildingApproachPoint(unit, target, reserved)
+    const candidates = getBuildingApproachCandidates(
+      target,
+      this.pathingGrid,
+      (tx, tz) => this.getWorldHeight(tx, tz),
+    )
+    const approach = chooseNearestApproachPoint(unit.mesh.position, candidates, target.mesh.position, reserved)
+    return this.planPath(unit, approach)
+  }
+
+  /** 路径目标落在树格外圈可站立点，避免农民对着树中心反复重寻路。 */
+  private planPathToTreeInteraction(unit: Unit, tree: TreeEntry, reserved?: Set<string>): boolean {
+    const candidates = getTreeApproachCandidates(
+      tree,
+      this.pathingGrid,
+      (tx, tz) => this.getWorldHeight(tx, tz),
+    )
+    const approach = chooseNearestApproachPoint(unit.mesh.position, candidates, tree.mesh.position, reserved)
     return this.planPath(unit, approach)
   }
 
@@ -3230,7 +4335,7 @@ export class Game {
         if (u.isBuilding) continue
         if (u.gatherType !== 'gold') continue
         if (u.resourceTarget?.type !== 'goldmine' || u.resourceTarget.mine !== target) continue
-        this.reserveGoldLoopSlot(u, target)
+        reserveGoldLoopSlot(u, target, this.units)
       }
     }
 
@@ -3240,38 +4345,22 @@ export class Game {
     }
   }
 
+  private planPathForUnitsToTreeInteraction(units: Unit[], tree: TreeEntry) {
+    const reserved = new Set<string>()
+    for (const u of units) {
+      if (!u.isBuilding) this.planPathToTreeInteraction(u, tree, reserved)
+    }
+  }
+
   /** 为一组单位批量计算路径（含编队偏移） */
   private planPathForUnits(units: Unit[], target: THREE.Vector3) {
-    if (units.length <= 1) {
-      for (const u of units) {
-        if (!u.isBuilding) this.planPath(u, target)
-      }
-      return
-    }
-
-    // Formation offsets: arrange units in a grid around the target
-    const cols = Math.ceil(Math.sqrt(units.length))
-    for (let i = 0; i < units.length; i++) {
-      const u = units[i]
-      if (u.isBuilding) continue
-
-      const row = Math.floor(i / cols)
-      const col = i % cols
-      const offsetX = (col - (cols - 1) / 2) * FORMATION_SPACING
-      const offsetZ = (row - (Math.ceil(units.length / cols) - 1) / 2) * FORMATION_SPACING
-
-      const offsetTarget = new THREE.Vector3(
-        target.x + offsetX,
-        target.y,
-        target.z + offsetZ,
-      )
-
-      // Validate offset target is not blocked; if it is, fall back to base target
-      if (this.isPositionBlocked(offsetTarget.x, offsetTarget.z)) {
-        this.planPath(u, target)
-      } else {
-        this.planPath(u, offsetTarget)
-      }
+    const targets = getFormationMoveTargets(
+      units,
+      target,
+      (wx, wz) => this.isPositionBlocked(wx, wz),
+    )
+    for (const move of targets) {
+      this.planPath(move.unit, move.target)
     }
   }
 
@@ -3282,6 +4371,35 @@ export class Game {
     return this.sel.resolveHitUnits(hits, this.units)
   }
 
+  private resolvePointerUnitHits(): Unit[] {
+    const unitMeshes = this.units.map((u) => u.mesh)
+    return this.resolveHitUnits(this.raycaster.intersectObjects(unitMeshes, true))
+  }
+
+  private resolvePointerGroundPoint(): THREE.Vector3 | null {
+    const hits = this.raycaster.intersectObject(this.terrain.groundPlane)
+    return hits.length > 0 ? hits[0].point : null
+  }
+
+  private resolvePointerAbilityTargetUnit(ground: THREE.Vector3 | null): Unit | null {
+    const direct = this.resolvePointerUnitHits()[0]
+    if (direct) return direct
+    if (!ground) return null
+
+    let best: { unit: Unit; distanceSq: number } | null = null
+    for (const unit of this.units) {
+      if (unit.isDead || unit.hp <= 0 || !unit.mesh?.position) continue
+      const dx = unit.mesh.position.x - ground.x
+      const dz = unit.mesh.position.z - ground.z
+      const distanceSq = dx * dx + dz * dz
+      const buildingSize = unit.isBuilding ? BUILDINGS[unit.type]?.size ?? 1 : 1
+      const radius = unit.isBuilding ? buildingSize * 0.65 + 0.35 : 0.95
+      if (distanceSq > radius * radius) continue
+      if (!best || distanceSq < best.distanceSq) best = { unit, distanceSq }
+    }
+    return best?.unit ?? null
+  }
+
   private resolveClickSelectionTarget(hitUnits: readonly Unit[]): Unit | undefined {
     return this.sel.resolveClickSelectionTarget(hitUnits)
   }
@@ -3290,26 +4408,20 @@ export class Game {
 
   private handleClick() {
     this.raycaster.setFromCamera(this.mouseNDC, this.camera)
-    const unitMeshes = this.units.map((u) => u.mesh)
-    const hits = this.raycaster.intersectObjects(unitMeshes, true)
+    const hitUnits = this.resolvePointerUnitHits()
 
-    if (hits.length > 0) {
-      const unit = this.resolveClickSelectionTarget(this.resolveHitUnits(hits))
+    if (hitUnits.length > 0) {
+      const unit = this.resolveClickSelectionTarget(hitUnits)
       if (unit) {
         // Shift+click: add/remove toggle
         if (this.shiftHeld) {
-          if (this.selectionModel.contains(unit)) {
-            // 移除：先记录 index 再从 model 移除
-            const idx = this.selectedUnits.indexOf(unit)
-            this.selectionModel.remove(unit)
+          const idx = this.selectedUnits.indexOf(unit)
+          const toggleResult = this.selectionModel.shiftToggle(unit, 0)
+          if (toggleResult === 'removed') {
             this.sel.removeSelectionRingAt(idx)
-          } else if (unit.team === 0) {
-            // 添加友方单位
-            this.selectionModel.add(unit)
+          } else if (toggleResult === 'added') {
             this.sel.createSelectionRing(unit)
           }
-          // 敌方单位：忽略
-          // 'rejected' = 敌方单位，忽略
           return
         }
 
@@ -3317,15 +4429,10 @@ export class Game {
         const now = performance.now()
         if (this.lastClickUnit === unit && now - this.lastClickTime < Game.DOUBLE_CLICK_MS) {
           // 双击：选中屏幕上所有同类友方单位
-          this.clearSelection()
-          this.sel.clearSelectionRings()
           this.selectionModel.setSelection([unit])
           // 尝试选中所有可见同类（保持 primary = 被点击的单位）
           this.selectionModel.selectSameType(this.units, 0, (u) => this.sel.isUnitOnScreen(u))
-          // 为所有选中的单位创建 selection rings
-          for (const u of this.selectedUnits) {
-            this.sel.createSelectionRing(u)
-          }
+          this.refreshSelectionVisuals(true)
           this.lastClickTime = 0
           this.lastClickUnit = null
           return
@@ -3334,171 +4441,194 @@ export class Game {
         // 普通单击：替换选择
         this.lastClickTime = now
         this.lastClickUnit = unit
-        this.clearSelection()
-        this.sel.clearSelectionRings()
-        this.selectUnit(unit)
+        this.replaceSelection([unit])
         return
       }
     }
     // 点击空白处：清除选择（Shift 不影响）
     this.clearSelection()
-    this.sel.clearSelectionRings()
   }
 
   // ==================== 右键命令 ====================
+
+  private getSelectedControllableUnits(): Unit[] {
+    return this.selectedUnits.filter((u) => u.team === 0 && !u.isBuilding)
+  }
 
   private handleRightClick() {
     this.raycaster.setFromCamera(this.mouseNDC, this.camera)
 
     // 先检测是否右键点击了单位/建筑
-    const unitMeshes = this.units.map((u) => u.mesh)
-    const unitHits = this.raycaster.intersectObjects(unitMeshes, true)
+    const unitHits = this.resolvePointerUnitHits()
 
     if (unitHits.length > 0) {
       // Resolve all hit units from the hit list. When workers crowd a goldmine
       // the first hit may be a worker, but the player intent is to gather.
       // Prefer goldmine or unfinished building over own units.
-      const hitUnits: Unit[] = []
-      const seen = new Set<Unit>()
-      for (const hit of unitHits) {
-        const u = this.sel.findUnitByObject(hit.object, this.units)
-        if (u && !seen.has(u)) { hitUnits.push(u); seen.add(u) }
-      }
-      const target =
-        hitUnits.find(u => u.type === 'goldmine') ??
-        hitUnits.find(u => u.team === 0 && u.isBuilding && u.buildProgress < 1) ??
-        hitUnits[0]
+      const target = selectRightClickUnitTarget(unitHits, 0)
 
       if (target) {
-        // 只有己方可控单位才能接受玩家命令
-        const controllable = this.selectedUnits.filter((u) => u.team === 0 && !u.isBuilding)
-
-        // 右键金矿 → 只派 worker 采金
-        if (target.type === 'goldmine') {
-          const workers = controllable.filter((u) => UNITS[u.type]?.canGather)
-          dispatchGameCommand(workers, { type: 'gather', resourceType: 'gold', target: target.mesh.position })
-          for (const u of workers) {
-            u.resourceTarget = { type: 'goldmine', mine: target }
-          }
-          this.planPathForUnitsToBuildingInteraction(workers, target)
-          // 非 worker 单位走到金矿旁（移动命令）
-          const nonWorkers = controllable.filter((u) => !UNITS[u.type]?.canGather)
-          if (nonWorkers.length > 0) {
-            dispatchGameCommand(nonWorkers, { type: 'move', target: target.mesh.position })
-            this.planPathForUnitsToBuildingInteraction(nonWorkers, target)
-            this.suppressAggroFor(nonWorkers)
-          }
-          this.feedback.showMoveIndicator(target.mesh.position.x, target.mesh.position.z)
-          return
-        }
-
-        // 右键敌方 → 攻击
-        if (target.team !== 0 && target.type !== 'goldmine') {
-          dispatchGameCommand(controllable, { type: 'attack', target })
-          this.planPathForUnits(controllable, target.mesh.position)
-          return
-        }
-
-        // 右键己方未完成建筑 → 农民续建
-        if (target.team === 0 && target.isBuilding && target.buildProgress < 1) {
-          const workers = controllable.filter((u) => UNITS[u.type]?.canGather)
-          let assigned = 0
-          for (const worker of workers) {
-            if (this.assignBuilderToConstruction(worker, target)) assigned++
-          }
-          if (assigned > 0) {
-            this.feedback.showMoveIndicator(target.mesh.position.x, target.mesh.position.z)
-            return
-          }
-        }
-
-        // 右键己方建筑 → 移动到建筑旁
-        dispatchGameCommand(controllable, { type: 'move', target: target.mesh.position })
-        this.planPathForUnitsToBuildingInteraction(controllable, target)
-        this.suppressAggroFor(controllable)
-        this.feedback.showMoveIndicator(target.mesh.position.x, target.mesh.position.z)
+        this.handleRightClickUnitTarget(target)
         return
       }
     }
 
     // 右键地面
-    const groundHits = this.raycaster.intersectObject(this.terrain.groundPlane)
-    if (groundHits.length === 0) return
+    const groundTarget = this.resolvePointerGroundPoint()
+    if (!groundTarget) return
+    this.handleRightClickGroundTarget(groundTarget)
+  }
 
-    const groundTarget = groundHits[0].point
-    const controllable = this.selectedUnits.filter((u) => u.team === 0 && !u.isBuilding)
+  private handleRightClickUnitTarget(target: Unit) {
+    const controllable = this.getSelectedControllableUnits()
+    this.interruptChanneledCastsForOrder(controllable)
+
+    const intent = getRightClickUnitIntent(target, 0)
+    switch (intent) {
+      case 'gatherGold': {
+        if (target.remainingGold <= 0) {
+          this.updateModeHint('金矿已采空')
+          this.feedback.showMoveIndicator(target.mesh.position.x, target.mesh.position.z)
+          return
+        }
+        const { gatherers, others } = splitGatherCapableUnits(controllable)
+        this.issueCommand(gatherers, { type: 'gather', resourceType: 'gold', target: target.mesh.position })
+        assignGoldGatherTarget(gatherers, target)
+        this.planPathForUnitsToBuildingInteraction(gatherers, target)
+        if (others.length > 0) {
+          this.issueCommand(others, { type: 'move', target: target.mesh.position })
+          this.planPathForUnitsToBuildingInteraction(others, target)
+          this.suppressAggroFor(others)
+        }
+        this.feedback.showMoveIndicator(target.mesh.position.x, target.mesh.position.z)
+        this.playAudioCue('command', '采集')
+        return
+      }
+
+      case 'attack':
+        this.issueCommand(controllable, { type: 'attack', target })
+        this.planPathForUnits(controllable, target.mesh.position)
+        this.playAudioCue('command', '攻击')
+        return
+
+      case 'resumeConstruction': {
+        const { gatherers } = splitGatherCapableUnits(controllable)
+        let assigned = 0
+        for (const worker of gatherers) {
+          if (this.assignBuilderToConstruction(worker, target)) assigned++
+        }
+        if (assigned > 0) {
+          this.feedback.showMoveIndicator(target.mesh.position.x, target.mesh.position.z)
+          this.playAudioCue('command', '续建')
+          return
+        }
+        break
+      }
+
+      case 'moveToUnit':
+        break
+    }
+
+    // 右键己方建筑/单位，或续建无人可分配 → 移动到目标旁
+    this.issueCommand(controllable, { type: 'move', target: target.mesh.position })
+    this.planPathForUnitsToBuildingInteraction(controllable, target)
+    this.suppressAggroFor(controllable)
+    this.feedback.showMoveIndicator(target.mesh.position.x, target.mesh.position.z)
+    this.playAudioCue('command', '移动')
+  }
+
+  private handleRightClickGroundTarget(groundTarget: THREE.Vector3) {
+    const controllable = this.getSelectedControllableUnits()
+    this.interruptChanneledCastsForOrder(controllable)
 
     // Shift + 右键地面 → 追加移动到队列（不覆盖当前移动，不触发采集）
     if (this.shiftHeld) {
       for (const u of controllable) {
-        u.moveQueue.push({ type: 'move', target: groundTarget.clone() })
-        // 如果单位当前空闲，立即启动第一段队列
-        if (u.state === UnitState.Idle && u.moveQueue.length > 0) {
-          const firstCmd = u.moveQueue.shift()!
-          this.executeQueuedCommand(u, firstCmd)
-        }
+        const firstCmd = enqueueQueuedCommand(u, { type: 'move', target: groundTarget.clone() })
+        if (firstCmd) this.executeQueuedCommand(u, firstCmd)
       }
       this.feedback.showQueuedMoveIndicator(groundTarget.x, groundTarget.z)
+      this.playAudioCue('command', '追加移动')
       return
     }
 
-    // 检查附近是否有树（伐木，通过 TreeManager 统一查询）
-    const nearestTree = this.treeManager.findNearest(groundTarget, 2)
+    const nearestTree = this.findNearestReachableTree(groundTarget, 2)
     if (nearestTree) {
-      const workers = controllable.filter((u) => UNITS[u.type]?.canGather)
-      dispatchGameCommand(workers, { type: 'gather', resourceType: 'lumber', target: nearestTree.mesh.position })
-      // 为每个 worker 设置明确的树目标
-      for (const u of workers) {
-        u.resourceTarget = { type: 'tree', entry: nearestTree }
-      }
-      this.planPathForUnits(workers, nearestTree.mesh.position)
-      // 非 worker 单位走到目标位置（移动命令）
-      const nonWorkers = controllable.filter((u) => !UNITS[u.type]?.canGather)
-      if (nonWorkers.length > 0) {
-        dispatchGameCommand(nonWorkers, { type: 'move', target: nearestTree.mesh.position })
-        this.planPathForUnits(nonWorkers, nearestTree.mesh.position)
-        this.suppressAggroFor(nonWorkers)
-      }
+      this.issueLumberRightClick(controllable, nearestTree)
     } else {
-      dispatchGameCommand(controllable, { type: 'move', target: groundTarget })
-      this.planPathForUnits(controllable, groundTarget)
-      this.suppressAggroFor(controllable)
+      this.issueGroundMoveRightClick(controllable, groundTarget)
     }
-
     this.feedback.showMoveIndicator(groundTarget.x, groundTarget.z)
+    this.playAudioCue('command', '移动')
+  }
+
+  private issueLumberRightClick(controllable: Unit[], nearestTree: TreeEntry) {
+    const { gatherers, others } = splitGatherCapableUnits(controllable)
+    this.issueCommand(gatherers, { type: 'gather', resourceType: 'lumber', target: nearestTree.mesh.position })
+    assignLumberGatherTarget(gatherers, nearestTree)
+    this.planPathForUnitsToTreeInteraction(gatherers, nearestTree)
+    if (others.length > 0) {
+      this.issueCommand(others, { type: 'move', target: nearestTree.mesh.position })
+      this.planPathForUnits(others, nearestTree.mesh.position)
+      this.suppressAggroFor(others)
+    }
+  }
+
+  private issueGroundMoveRightClick(controllable: Unit[], groundTarget: THREE.Vector3) {
+    this.issueCommand(controllable, { type: 'move', target: groundTarget })
+    this.planPathForUnits(controllable, groundTarget)
+    this.suppressAggroFor(controllable)
   }
 
   /** 攻击移动：左键点击地面 */
   private handleAttackMoveClick() {
     this.raycaster.setFromCamera(this.mouseNDC, this.camera)
-    const groundHits = this.raycaster.intersectObject(this.terrain.groundPlane)
-    if (groundHits.length === 0) return
-
-    const target = groundHits[0].point
-    const controllable = this.selectedUnits.filter((u) => u.team === 0 && !u.isBuilding)
+    const target = this.resolvePointerGroundPoint()
+    if (!target) return
+    const controllable = this.getSelectedControllableUnits()
+    this.interruptChanneledCastsForOrder(controllable)
 
     // Shift + attackMove → 追加到队列
     if (this.shiftHeld) {
       for (const u of controllable) {
-        u.moveQueue.push({ type: 'attackMove', target: target.clone() })
-        // 如果单位当前空闲，立即启动队列
-        if (u.state === UnitState.Idle && u.moveQueue.length > 0) {
-          const firstCmd = u.moveQueue.shift()!
-          this.executeQueuedCommand(u, firstCmd)
-        }
+        const firstCmd = enqueueQueuedCommand(u, { type: 'attackMove', target: target.clone() })
+        if (firstCmd) this.executeQueuedCommand(u, firstCmd)
       }
       this.feedback.showAttackMoveIndicator(target.x, target.z)
+      this.playAudioCue('command', '追加攻击移动')
       return
     }
 
-    dispatchGameCommand(controllable, { type: 'attackMove', target })
+    this.issueCommand(controllable, { type: 'attackMove', target })
     for (const u of controllable) {
       this.planAttackMovePath(u, target)
     }
     // 红色攻击移动指示器
     this.feedback.showAttackMoveIndicator(target.x, target.z)
+    this.playAudioCue('command', '攻击移动')
   }
 
+
+  /** Water Elemental ground-target mode: enter */
+  private enterWaterElementalTargetMode(caster: Unit) {
+    this.enterHeroTargetMode('waterElemental', caster, '召唤水元素 — 左键点击目标位置，右键/Esc取消')
+  }
+
+  /** Water Elemental ground-target mode: handle click */
+  private handleWaterElementalTargetClick() {
+    if (!this.weTargetCaster) return false
+    this.raycaster.setFromCamera(this.mouseNDC, this.camera)
+    const target = this.resolvePointerGroundPoint()
+    if (!target) {
+      this.showHeroTargetInvalid(this.weTargetCaster, '水元素：没有选中地面')
+      return false
+    }
+    const ok = this.castSummonWaterElemental(this.weTargetCaster, target.x, target.z)
+    if (!ok) {
+      this.showHeroTargetInvalid(this.weTargetCaster, '水元素：目标被阻挡、超出距离、法力不足或正在冷却')
+    }
+    return ok
+  }
 
   /** 集结点：左键点击地面/金矿 */
   private handleRallyClick() {
@@ -3507,25 +4637,22 @@ export class Game {
 
     // 先检查是否点击了单位/金矿
     this.raycaster.setFromCamera(this.mouseNDC, this.camera)
-    const unitMeshes = this.units.map((u) => u.mesh)
-    const unitHits = this.raycaster.intersectObjects(unitMeshes, true)
+    const unitHits = this.resolvePointerUnitHits()
 
     if (unitHits.length > 0) {
-      const hitObj = unitHits[0].object
-      const target = this.sel.findUnitByObject(hitObj, this.units)
+      const target = selectGoldmineTarget(unitHits)
       // 点击金矿 → 设为 goldmine rally
-      if (target && target.type === 'goldmine') {
-        dispatchGameCommand([], { type: 'setRally', building, target: target.mesh.position, rallyTarget: target })
+      if (target) {
+        this.issueCommand([], { type: 'setRally', building, target: target.mesh.position, rallyTarget: target })
         this.feedback.showMoveIndicator(target.mesh.position.x, target.mesh.position.z)
         return
       }
     }
 
     // 点击地面 → 设为普通位置 rally
-    const groundHits = this.raycaster.intersectObject(this.terrain.groundPlane)
-    if (groundHits.length === 0) return
-    const target = groundHits[0].point
-    dispatchGameCommand([], { type: 'setRally', building, target })
+    const target = this.resolvePointerGroundPoint()
+    if (!target) return
+    this.issueCommand([], { type: 'setRally', building, target })
     this.feedback.showMoveIndicator(target.x, target.z)
   }
 
@@ -3544,14 +4671,10 @@ export class Game {
 
   private finishBoxSelect(ex: number, ey: number, appendSelection?: boolean) {
     const shouldAppend = appendSelection ?? this.shiftHeld
-    const x1 = Math.min(this.dragStart.x, ex)
-    const y1 = Math.min(this.dragStart.y, ey)
-    const x2 = Math.max(this.dragStart.x, ex)
-    const y2 = Math.max(this.dragStart.y, ey)
+    const rect = normalizeScreenRect(this.dragStart.x, this.dragStart.y, ex, ey)
 
-    if ((x2 - x1) * (y2 - y1) < 25) {
-      this.mouseNDC.x = (ex / window.innerWidth) * 2 - 1
-      this.mouseNDC.y = -(ey / window.innerHeight) * 2 + 1
+    if (isTinySelectionRect(rect)) {
+      this.setMouseNdcFromScreenPoint(ex, ey)
       this.handleClick()
       return
     }
@@ -3559,20 +4682,20 @@ export class Game {
     // 如果没有 Shift，先清除现有选择
     if (!shouldAppend) {
       this.clearSelection()
-      this.sel.clearSelectionRings()
     }
 
-    const screenPos = new THREE.Vector3()
-    for (const unit of this.units) {
-      if (unit.team !== 0) continue
-      screenPos.copy(unit.mesh.position).project(this.camera)
-      const sx = (screenPos.x + 1) / 2 * window.innerWidth
-      const sy = (-screenPos.y + 1) / 2 * window.innerHeight
-      if (sx >= x1 && sx <= x2 && sy >= y1 && sy <= y2) {
-        // Shift+框选时避免重复添加
-        if (!shouldAppend || !this.selectionModel.contains(unit)) {
-          this.selectUnit(unit)
-        }
+    const boxUnits = getFriendlyUnitsInScreenRect(
+      this.units,
+      rect,
+      this.camera,
+      window.innerWidth,
+      window.innerHeight,
+      0,
+    )
+    for (const unit of boxUnits) {
+      // Shift+框选时避免重复添加
+      if (!shouldAppend || !this.selectionModel.contains(unit)) {
+        this.selectUnit(unit)
       }
     }
 
@@ -3584,15 +4707,45 @@ export class Game {
 
   // ==================== 选择管理 ====================
 
+  private markSelectionDirty() {
+    this._lastCmdKey = ''
+    this._lastSelKey = ''
+  }
+
+  private refreshSelectionVisuals(clearQueueIndicators = false) {
+    this.markSelectionDirty()
+    this.sel.clearSelectionRings()
+    for (const unit of this.selectedUnits) {
+      this.sel.createSelectionRing(unit)
+    }
+    if (clearQueueIndicators) this.feedback.clearQueueIndicators()
+  }
+
+  private replaceSelection(units: readonly Unit[]) {
+    this.selectionModel.setSelection([...units])
+    this.refreshSelectionVisuals(true)
+  }
+
+  private appendSelectionUnits(units: readonly Unit[]) {
+    let changed = false
+    for (const unit of units) {
+      if (this.selectionModel.contains(unit)) continue
+      this.selectionModel.add(unit)
+      this.sel.createSelectionRing(unit)
+      changed = true
+    }
+    if (changed) this.markSelectionDirty()
+  }
+
   private selectUnit(unit: Unit) {
     this.selectionModel.add(unit)
     this.sel.createSelectionRing(unit)
+    this.markSelectionDirty()
   }
 
   private clearSelection() {
     this.selectionModel.clear()
-    this._lastCmdKey = ''
-    this._lastSelKey = ''
+    this.markSelectionDirty()
     this.sel.clearSelectionRings()
     this.feedback.clearQueueIndicators()
   }
@@ -4176,24 +5329,7 @@ export class Game {
       this.spawnUnit('worker', 0, 10 + offset.x, 12 + offset.z)
     }
 
-    // 自动派玩家初始农民去采金（War3 开局惯例：农民自动进金矿）
-    const playerWorkers = this.units.filter(
-      (u) => u.team === 0 && u.type === 'worker' && u.hp > 0 && u.state === 0,
-    )
-    const playerMine = this.findNearestGoldmine(
-      this.units.find((u) => u.team === 0 && this.isMainHall(u.type) && u.hp > 0)!,
-    )
-    if (playerMine && playerWorkers.length > 0) {
-      dispatchGameCommand(playerWorkers, {
-        type: 'gather',
-        resourceType: 'gold',
-        target: playerMine.mesh.position.clone(),
-      })
-      for (const u of playerWorkers) {
-        u.resourceTarget = { type: 'goldmine', mine: playerMine }
-      }
-      this.planPathForUnitsToBuildingInteraction(playerWorkers, playerMine)
-    }
+    this.autoAssignOpeningGoldWorkers(0)
 
     // ===== AI 基地区（地图右上角，镜像布局）=====
     const far = 50
@@ -4204,9 +5340,41 @@ export class Game {
       this.spawnUnit('worker', 1, far + offset.x, far + offset.z)
     }
 
+    this.spawnNeutralCamps()
+
     // 初始镜头：聚焦玩家基地中心，让 TH + 金矿 + 农民一屏尽收
     this.cameraCtrl.distance = 26
     this.cameraCtrl.setTarget(14, 14)
+  }
+
+  private spawnNeutralCamps() {
+    const camps: readonly { x: number; z: number; units: readonly { type: string; dx: number; dz: number }[] }[] = [
+      {
+        x: 27,
+        z: 28,
+        units: [
+          { type: 'forest_troll', dx: -1, dz: 0 },
+          { type: 'forest_troll', dx: 1, dz: 0 },
+          { type: 'ogre_warrior', dx: 0, dz: 1 },
+        ],
+      },
+      {
+        x: 36,
+        z: 34,
+        units: [
+          { type: 'forest_troll', dx: -1, dz: 0 },
+          { type: 'ogre_warrior', dx: 1, dz: 0 },
+        ],
+      },
+    ]
+
+    for (const camp of camps) {
+      for (const entry of camp.units) {
+        const creep = this.spawnUnit(entry.type, 2, camp.x + entry.dx, camp.z + entry.dz)
+        creep.state = UnitState.HoldPosition
+        creep.aggroSuppressUntil = this.gameTime + 3
+      }
+    }
   }
 
   private spawnUnit(type: string, team: number, x: number, z: number): Unit {
@@ -4217,65 +5385,28 @@ export class Game {
     this.scene.add(mesh)
     this.outlineObjects.push(mesh)
 
-    const unit: Unit = {
-      mesh, type, team,
-      hp: def?.hp ?? 250, maxHp: def?.hp ?? 250,
-      speed: def?.speed ?? 3, moveTarget: null,
+    const unit = createRuntimeUnitState({
+      mesh,
+      type,
+      team,
+      hp: def?.hp ?? 250,
+      maxHp: def?.hp ?? 250,
+      speed: def?.speed ?? 3,
       isBuilding: false,
-      state: UnitState.Idle,
-      gatherType: null, carryAmount: 0, gatherTimer: 0,
-      resourceTarget: null,
-      goldLoopSlotMine: null,
-      goldStandMine: null,
-      attackTimer: 0, attackTarget: null,
       attackDamage: def?.attackDamage ?? 5,
       attackRange: def?.attackRange ?? MELEE_RANGE,
       attackCooldown: def?.attackCooldown ?? 1.5,
       armor: def?.armor ?? 0,
-      buildProgress: 1, builder: null, buildTarget: null,
-      trainingQueue: [],
-      reviveQueue: [],
-      researchQueue: [],
-      completedResearches: [],
+      buildProgress: 1,
       remainingGold: 0,
-      waypoints: [],
-      moveQueue: [],
-      attackMoveTarget: null,
-      rallyPoint: null,
-      rallyTarget: null,
-      previousState: null,
-      previousGatherType: null,
-      previousResourceTarget: null,
-      previousMoveTarget: null,
-      previousWaypoints: [],
-      previousMoveQueue: [],
-      previousAttackMoveTarget: null,
-      aggroSuppressUntil: 0,
-      rallyCallBoostUntil: 0,
-      rallyCallCooldownUntil: 0,
       mana: UNITS[type]?.maxMana ?? 0,
       maxMana: UNITS[type]?.maxMana ?? 0,
       manaRegen: UNITS[type]?.manaRegen ?? 0,
-      healCooldownUntil: 0,
-      upgradeQueue: null,
-      morphExpiresAt: 0,
-      morphOriginalType: null,
-      defendActive: false,
-      slowUntil: 0,
-      slowSpeedMultiplier: 1,
-      slowAutoCastEnabled: false,
-      slowAutoCastCooldownUntil: 0,
-      divineShieldUntil: 0,
-      divineShieldCooldownUntil: 0,
-      devotionAuraBonus: 0,
-      resurrectionCooldownUntil: 0,
-      resurrectionLastRevivedCount: 0,
-      resurrectionFeedbackUntil: 0,
-      heroLevel: UNITS[type]?.heroLevel,
+      heroLevel: UNITS[type]?.isHero ? (UNITS[type]?.heroLevel ?? 1) : undefined,
       heroXP: UNITS[type]?.isHero ? (UNITS[type]?.heroXP ?? 0) : undefined,
       heroSkillPoints: UNITS[type]?.isHero ? (UNITS[type]?.heroSkillPoints ?? HERO_XP_RULES.initialSkillPoints) : undefined,
       abilityLevels: UNITS[type]?.isHero ? {} : undefined,
-    }
+    })
     this.units.push(unit)
     this.createHealthBar(unit)
 
@@ -4293,58 +5424,24 @@ export class Game {
     this.scene.add(mesh)
     this.outlineObjects.push(mesh)
 
-    const unit: Unit = {
-      mesh, type, team,
-      hp: def?.hp ?? 500, maxHp: def?.hp ?? 500,
-      speed: 0, moveTarget: null,
+    const unit = createRuntimeUnitState({
+      mesh,
+      type,
+      team,
+      hp: def?.hp ?? 500,
+      maxHp: def?.hp ?? 500,
+      speed: 0,
       isBuilding: true,
-      state: UnitState.Idle,
-      gatherType: null, carryAmount: 0, gatherTimer: 0,
-      resourceTarget: null,
-      goldLoopSlotMine: null,
-      goldStandMine: null,
-      attackTimer: 0, attackTarget: null,
-      attackDamage: def?.attackDamage ?? 0, attackRange: def?.attackRange ?? 0, attackCooldown: def?.attackCooldown ?? 2, armor: def?.key === 'tower' ? 0 : 2,
-      buildProgress: 1, builder: null, buildTarget: null,
-      trainingQueue: [],
-      reviveQueue: [],
-      researchQueue: [],
-      completedResearches: [],
+      attackDamage: def?.attackDamage ?? 0,
+      attackRange: def?.attackRange ?? 0,
+      attackCooldown: def?.attackCooldown ?? 2,
+      armor: def?.key === 'tower' ? 0 : 2,
+      buildProgress: 1,
       remainingGold: type === 'goldmine' ? GOLDMINE_GOLD : 0,
-      waypoints: [],
-      moveQueue: [],
-      attackMoveTarget: null,
-      rallyPoint: null,
-      rallyTarget: null,
-      previousState: null,
-      previousGatherType: null,
-      previousResourceTarget: null,
-      previousMoveTarget: null,
-      previousWaypoints: [],
-      previousMoveQueue: [],
-      previousAttackMoveTarget: null,
-      aggroSuppressUntil: 0,
-      rallyCallBoostUntil: 0,
-      rallyCallCooldownUntil: 0,
       mana: 0,
       maxMana: 0,
       manaRegen: 0,
-      healCooldownUntil: 0,
-      upgradeQueue: null,
-      morphExpiresAt: 0,
-      morphOriginalType: null,
-      defendActive: false,
-      slowUntil: 0,
-      slowSpeedMultiplier: 1,
-      slowAutoCastEnabled: false,
-      slowAutoCastCooldownUntil: 0,
-      divineShieldUntil: 0,
-      divineShieldCooldownUntil: 0,
-      devotionAuraBonus: 0,
-      resurrectionCooldownUntil: 0,
-      resurrectionLastRevivedCount: 0,
-      resurrectionFeedbackUntil: 0,
-    }
+    })
     this.units.push(unit)
     if (type !== 'goldmine') this.createHealthBar(unit)
     // 登记建筑占用
@@ -4411,6 +5508,10 @@ export class Game {
 
   // ==================== Regression test hooks ====================
 
+  public __testTriggerAudioCue(kind: AudioCueKind, label: string) {
+    this.playAudioCue(kind, label)
+  }
+
   /**
    * Browser-side asset pipeline contracts for Playwright.
    *
@@ -4419,15 +5520,15 @@ export class Game {
    * factories that the runtime uses.
    */
   public __testRunAssetPipelineContracts() {
-    const source = this.createAssetPipelineFixture(2.5)
+    const source = createAssetPipelineFixture(2.5)
     const cloneA = __testDeepCloneWithMaterials(source)
     const cloneB = __testDeepCloneWithMaterials(source)
-    const sourceMesh = this.getFirstMesh(source)
-    const meshA = this.getFirstMesh(cloneA)
-    const meshB = this.getFirstMesh(cloneB)
-    const sourceMaterials = this.asMaterialArray(sourceMesh.material)
-    const materialsA = this.asMaterialArray(meshA.material)
-    const materialsB = this.asMaterialArray(meshB.material)
+    const sourceMesh = getFirstMesh(source)
+    const meshA = getFirstMesh(cloneA)
+    const meshB = getFirstMesh(cloneB)
+    const sourceMaterials = asMaterialArray(sourceMesh.material)
+    const materialsA = asMaterialArray(meshA.material)
+    const materialsB = asMaterialArray(meshB.material)
 
     const materialArrayIsolated =
       Array.isArray(meshA.material) &&
@@ -4438,7 +5539,7 @@ export class Game {
       mat !== sourceMaterials[idx] && mat !== materialsB[idx],
     )
 
-    const cleanupTeamAsset = __testInjectFakeAsset('footman', this.createAssetPipelineFixture(2.5), 2.5, 0, 'unit')
+    const cleanupTeamAsset = __testInjectFakeAsset('footman', createAssetPipelineFixture(2.5), 2.5, 0, 'unit')
     let teamBlue = 0
     let teamRed = 0
     let teamMaterialObjectsIsolated = false
@@ -4449,8 +5550,8 @@ export class Game {
       visualBlue = createUnitVisual('footman', 0)
       visualRed = createUnitVisual('footman', 1)
       factoryScale = visualBlue.scale.x
-      const blueTeamMat = this.findNamedMaterial(visualBlue, 'team_color')
-      const redTeamMat = this.findNamedMaterial(visualRed, 'team_color')
+      const blueTeamMat = findNamedMaterial(visualBlue, 'team_color')
+      const redTeamMat = findNamedMaterial(visualRed, 'team_color')
       teamBlue = blueTeamMat?.color.getHex() ?? 0
       teamRed = redTeamMat?.color.getHex() ?? 0
       teamMaterialObjectsIsolated = !!blueTeamMat && !!redTeamMat && blueTeamMat !== redTeamMat
@@ -4481,9 +5582,56 @@ export class Game {
 
   public __testCreateAssetVisualSummary(type: string, isBuilding: boolean, team = 0) {
     const visual = isBuilding ? createBuildingVisual(type, team) : createUnitVisual(type, team)
-    const summary = this.summarizeObject3D(visual)
+    const summary = summarizeObject3D(visual)
     disposeObject3DDeep(visual)
     return summary
+  }
+
+  public __testCreateItemVisualSummary(type: ItemKey) {
+    const visual = createItemVisual(type)
+    const summary = summarizeObject3D(visual)
+    disposeObject3DDeep(visual)
+    return summary
+  }
+
+  public __testGetAssetStatus(key: string) {
+    return getAssetStatus(key)
+  }
+
+  public __testGetAssetAnimationClipNames(key: string) {
+    return getAssetAnimationClipNames(key)
+  }
+
+  public __testRunAnimationClipPresentationContract() {
+    const clip = new THREE.AnimationClip('Walk', 0.6, [
+      new THREE.VectorKeyframeTrack(
+        'asset-pipeline-material-less-group.position',
+        [0, 0.3, 0.6],
+        [0, 0, 0, 0, 0.18, 0, 0, 0, 0],
+      ),
+    ])
+    const cleanupAsset = __testInjectFakeAsset('footman', createAssetPipelineFixture(1.5), 1.5, 0, 'unit', [clip])
+    try {
+      const unit = this.spawnUnit('footman', 0, 22, 22)
+      unit.state = UnitState.Moving
+      unit.moveTarget = new THREE.Vector3(23, unit.mesh.position.y, 22)
+      this.unitPresentation.update(this.units, 0.05, this.gameTime + 0.05)
+      const unitPresentation = this.getUnitPresentationSnapshot()
+      const identity = this.getVisualAudioIdentitySnapshot()
+      const entry = unitPresentation.entries.find(item => item.meshId === unit.mesh.id) ?? null
+      return {
+        injectedClipNames: unit.mesh.userData.assetAnimationClipNames ?? [],
+        entry,
+        unitPresentation,
+        identityPresentation: identity.presentation,
+      }
+    } finally {
+      cleanupAsset()
+    }
+  }
+
+  public __testRecordPlaytestError(message: string, source = 'runtime-test') {
+    this.recordPlaytestRuntimeError('test', message, source)
   }
 
   private __testRunRefreshScaleContract() {
@@ -4498,7 +5646,7 @@ export class Game {
     oldMesh.traverse(child => oldChildIds.add(child.id))
     oldMesh.scale.setScalar(0.2)
 
-    const cleanupAsset = __testInjectFakeAsset('footman', this.createAssetPipelineFixture(2.5), 2.5, 0, 'unit')
+    const cleanupAsset = __testInjectFakeAsset('footman', createAssetPipelineFixture(2.5), 2.5, 0, 'unit')
     let result: {
       ok: boolean
       oldScale: number
@@ -4537,7 +5685,7 @@ export class Game {
         oldRootStillInScene: !!this.scene.getObjectById(oldMeshId),
         sharedOldChildCount: newChildIds.filter(id => oldChildIds.has(id)).length,
         directChildCount: unit.mesh.children.length,
-        renderableMeshCount: this.countRenderableMeshes(unit.mesh),
+        renderableMeshCount: countRenderableMeshes(unit.mesh),
         flashHitError,
         dealDamageError,
       }
@@ -4548,77 +5696,6 @@ export class Game {
     return result
   }
 
-  private createAssetPipelineFixture(scale: number): THREE.Group {
-    const root = new THREE.Group()
-    root.name = 'asset-pipeline-fixture-root'
-    root.scale.setScalar(scale)
-
-    const materialLessGroup = new THREE.Group()
-    materialLessGroup.name = 'asset-pipeline-material-less-group'
-
-    const baseMat = new THREE.MeshStandardMaterial({ color: 0x334455 })
-    baseMat.name = 'base'
-    const teamMat = new THREE.MeshStandardMaterial({ color: 0x111111 })
-    teamMat.name = 'team_color'
-
-    const mesh = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), [baseMat, teamMat])
-    mesh.name = 'asset-pipeline-array-material-mesh'
-    materialLessGroup.add(mesh)
-    root.add(materialLessGroup)
-    return root
-  }
-
-  private summarizeObject3D(root: THREE.Object3D) {
-    root.updateWorldMatrix(true, true)
-    const box = new THREE.Box3().setFromObject(root)
-    const size = new THREE.Vector3()
-    box.getSize(size)
-    return {
-      visibleMeshCount: this.countRenderableMeshes(root),
-      bboxHeight: size.y,
-      bboxWidth: size.x,
-      bboxDepth: size.z,
-      directChildCount: root.children.length,
-      scale: { x: root.scale.x, y: root.scale.y, z: root.scale.z },
-    }
-  }
-
-  private countRenderableMeshes(root: THREE.Object3D): number {
-    let count = 0
-    root.traverse(child => {
-      if (child instanceof THREE.Mesh && child.visible !== false) count++
-    })
-    return count
-  }
-
-  private getFirstMesh(root: THREE.Object3D): THREE.Mesh {
-    let mesh: THREE.Mesh | null = null
-    root.traverse(child => {
-      if (!mesh && child instanceof THREE.Mesh) mesh = child
-    })
-    if (!mesh) throw new Error('asset pipeline fixture has no mesh')
-    return mesh
-  }
-
-  private asMaterialArray(material: THREE.Material | THREE.Material[]): THREE.Material[] {
-    return Array.isArray(material) ? material : [material]
-  }
-
-  private findNamedMaterial(root: THREE.Object3D, name: string): THREE.MeshStandardMaterial | null {
-    let found: THREE.MeshStandardMaterial | null = null
-    root.traverse(child => {
-      if (found || !(child instanceof THREE.Mesh) || !child.material) return
-      const materials = this.asMaterialArray(child.material)
-      for (const material of materials) {
-        if (material.name === name && 'color' in material) {
-          found = material as THREE.MeshStandardMaterial
-          return
-        }
-      }
-    })
-    return found
-  }
-
   private removeTestUnit(unit: Unit) {
     const idx = this.units.indexOf(unit)
     if (idx >= 0) this.units.splice(idx, 1)
@@ -4626,11 +5703,7 @@ export class Game {
     const oi = this.outlineObjects.indexOf(unit.mesh)
     if (oi >= 0) this.outlineObjects.splice(oi, 1)
 
-    const bars = this.healthBars.get(unit)
-    if (bars) {
-      disposeObject3DDeep(bars.bg.parent!)
-      this.healthBars.delete(unit)
-    }
+    this.healthBarRenderer.remove(unit)
 
     this.scene.remove(unit.mesh)
     disposeObject3DDeep(unit.mesh)
@@ -4645,55 +5718,26 @@ export class Game {
       resources: this.resources,
       placement: this.placementValidator,
       findNearestUnit: (unit, type, team) => this.findNearest(unit, type, team),
-      findNearestGoldmine: (unit) => this.findNearestGoldmine(unit),
-      findNearestTreeEntry: (pos, maxRange) => this.treeManager.findNearest(pos, maxRange ?? 30),
+      findNearestGoldmine: (unit) => findNearestGoldmine(unit.mesh.position, this.units),
+      findNearestTreeEntry: (pos, maxRange) => this.findNearestReachableTree(pos, maxRange ?? 30),
       spawnUnit: (type, team, x, z) => this.spawnUnit(type, team, x, z),
       spawnBuilding: (type, team, x, z) => this.spawnBuilding(type, team, x, z),
       getWorldHeight: (wx, wz) => this.getWorldHeight(wx, wz),
       planPath: (unit, target) => this.planPath(unit, target),
       planPathToBuildingInteraction: (unit, target) => this.planPathToBuildingInteraction(unit, target),
+      planPathToTreeInteraction: (unit, target) => this.planPathToTreeInteraction(unit, target),
       castHolyLight: (caster, target) => this.aiCastHolyLight(caster, target),
       castDivineShield: (caster) => this.aiCastDivineShield(caster),
       castResurrection: (caster) => this.aiCastResurrection(caster),
+      castSummonWaterElemental: (caster, tx, tz) => this.aiCastSummonWaterElemental(caster, tx, tz),
+      castBlizzard: (caster, tx, tz) => this.aiCastBlizzard(caster, tx, tz),
+      castStormBolt: (caster, target) => this.aiCastStormBolt(caster, target),
+      castThunderClap: (caster) => this.aiCastThunderClap(caster),
+      castAvatar: (caster) => this.aiCastAvatar(caster),
+      purchaseShopItem: (shop, itemKey) => this.purchaseShopItem(shop, itemKey),
     }
-    this.ai = new SimpleAI(ctx)
-  }
-
-  // ==================== 装饰物 ====================
-
-  // Fallback 树共享几何体（glTF 加载后不会被创建）
-  private static readonly TREE_CROWN1_GEO = new THREE.ConeGeometry(0.55, 1.1, 7)
-  private static readonly TREE_CROWN2_GEO = new THREE.ConeGeometry(0.38, 0.85, 7)
-  private static readonly TREE_CROWN3_GEO = new THREE.ConeGeometry(0.22, 0.65, 6)
-  private static readonly TREE_TRUNK_GEO = new THREE.CylinderGeometry(0.06, 0.1, 0.7, 5)
-  private static readonly TREE_CROWN1_MAT = new THREE.MeshLambertMaterial({ color: 0x1a3d10 })
-  private static readonly TREE_CROWN2_MAT = new THREE.MeshLambertMaterial({ color: 0x224d15 })
-  private static readonly TREE_CROWN3_MAT = new THREE.MeshLambertMaterial({ color: 0x1a3d10 })
-  private static readonly TREE_TRUNK_MAT = new THREE.MeshLambertMaterial({ color: 0x3d2210 })
-
-  /** 创建单棵树（glTF 优先，fallback 到程序几何体） */
-  private createSingleTree(): THREE.Group {
-    // 优先尝试 glTF
-    const gltf = getLoadedModel('pine_tree')
-    if (gltf) return gltf
-
-    // Fallback: 三层针叶树
-    const tree = new THREE.Group()
-    tree.userData.isTree = true
-    const c1 = new THREE.Mesh(Game.TREE_CROWN1_GEO, Game.TREE_CROWN1_MAT)
-    c1.position.y = 0.8
-    tree.add(c1)
-    const c2 = new THREE.Mesh(Game.TREE_CROWN2_GEO, Game.TREE_CROWN2_MAT)
-    c2.position.y = 1.5
-    tree.add(c2)
-    const c3 = new THREE.Mesh(Game.TREE_CROWN3_GEO, Game.TREE_CROWN3_MAT)
-    c3.position.y = 2.1
-    tree.add(c3)
-    const trunk = new THREE.Mesh(Game.TREE_TRUNK_GEO, Game.TREE_TRUNK_MAT)
-    trunk.position.y = 0.35
-    tree.add(trunk)
-    tree.traverse((c) => { if (c instanceof THREE.Mesh) c.castShadow = true })
-    return tree
+    const profileIndex = this.sessionPreferences.aiDifficulty === 'rush' ? 1 : 0
+    this.ai = new SimpleAI(ctx, profileIndex)
   }
 
   /**
@@ -4744,10 +5788,8 @@ export class Game {
     this.scene.add(unit.mesh)
     this.outlineObjects.push(unit.mesh)
 
-    const bars = this.healthBars.get(unit)
-    if (bars) {
-      disposeObject3DDeep(bars.bg.parent!)
-      this.healthBars.delete(unit)
+    if (this.healthBars.has(unit)) {
+      this.healthBarRenderer.remove(unit)
       this.createHealthBar(unit)
     }
   }
@@ -4762,7 +5804,7 @@ export class Game {
       const rot = oldMesh.rotation.clone()
       const scl = oldMesh.scale.clone()
 
-      const newTree = this.createSingleTree()
+      const newTree = createTreeVisual()
       newTree.position.copy(pos)
       newTree.rotation.copy(rot)
       newTree.scale.copy(scl)
@@ -4807,7 +5849,7 @@ export class Game {
         || tile === TileType.Stone || tile === TileType.DarkStone) continue
       const h = this.getWorldHeight(x, z)
       const scale = 0.6 + rng() * 0.5
-      const tree = this.createSingleTree()
+      const tree = createTreeVisual()
       tree.position.set(x + 0.5, h, z + 0.5)
       tree.scale.setScalar(scale)
       tree.rotation.y = rng() * Math.PI * 2
@@ -4835,7 +5877,7 @@ export class Game {
         || tile === TileType.Stone || tile === TileType.DarkStone) continue
       const h = this.getWorldHeight(x, z)
       const scale = 0.6 + rng() * 0.5
-      const tree = this.createSingleTree()
+      const tree = createTreeVisual()
       tree.position.set(x + 0.5, h, z + 0.5)
       tree.scale.setScalar(scale)
       tree.rotation.y = rng() * Math.PI * 2
@@ -4856,7 +5898,7 @@ export class Game {
 
       const h = this.getWorldHeight(x, z)
       const scale = 0.6 + rng() * 0.5
-      const tree = this.createSingleTree()
+      const tree = createTreeVisual()
       tree.position.set(x + 0.5, h, z + 0.5)
       tree.scale.setScalar(scale)
       tree.rotation.y = rng() * Math.PI * 2
@@ -4892,7 +5934,15 @@ export class Game {
     // 选中单位
     this.updateSelectionHUD()
     this.updateCommandCard()
+    this.updateHeroAbilityPreviews()
     this.updateTrainQueueUI()
+    this.renderObjectiveTracker()
+    this.renderPressureTracker()
+    this.renderMapObjectiveRadar()
+    this.renderWar3IdentityStatus()
+    this.renderHumanRoutePanel()
+    this.renderMilestoneStatusPanel()
+    this.renderPlaytestReadinessPanel()
 
     // 编组召回反馈倒计时
     if (this.groupHintTimer > 0) {
@@ -4901,1652 +5951,222 @@ export class Game {
         this.updateModeHint('')
       }
     }
-  }
-
-  // ===== Portrait 绘制 =====
-
-  /** 在 portrait canvas 上绘制单位类型图标 */
-  private drawPortrait(type: string, team: number) {
-    const canvas = this.elPortraitCanvas
-    const ctx = canvas.getContext('2d')!
-    const w = canvas.width
-    const h = canvas.height
-
-    // 背景
-    ctx.fillStyle = '#0c0a04'
-    ctx.fillRect(0, 0, w, h)
-
-    // 背景渐变氛围
-    const grad = ctx.createRadialGradient(w / 2, h / 2, 5, w / 2, h / 2, 38)
-    const teamColor = team === 0 ? '#2244aa' : '#aa2222'
-    grad.addColorStop(0, teamColor + '40')
-    grad.addColorStop(1, '#0c0a0400')
-    ctx.fillStyle = grad
-    ctx.fillRect(0, 0, w, h)
-
-    ctx.save()
-    ctx.translate(w / 2, h / 2)
-
-    switch (type) {
-      case 'worker': {
-        // 农民：半身头像 + 草帽 + 胡子 + 工具，选中面板里要比地图小人更有质感。
-        const teamCol = team === 0 ? '#4488ff' : '#ff4444'
-        const rimCol = team === 0 ? '#8ec0ff' : '#ff9a88'
-
-        const portraitGlow = ctx.createRadialGradient(0, -8, 8, 0, 2, 39)
-        portraitGlow.addColorStop(0, 'rgba(255,221,124,0.18)')
-        portraitGlow.addColorStop(0.55, 'rgba(42,86,122,0.16)')
-        portraitGlow.addColorStop(1, 'rgba(0,0,0,0)')
-        ctx.fillStyle = portraitGlow
-        ctx.fillRect(-38, -38, 76, 76)
-
-        // 背后的镐，先画让人物压在前面。
-        ctx.save()
-        ctx.rotate(-0.55)
-        ctx.strokeStyle = '#8b6914'
-        ctx.lineWidth = 4
-        ctx.lineCap = 'round'
-        ctx.beginPath()
-        ctx.moveTo(8, -28)
-        ctx.lineTo(8, 26)
-        ctx.stroke()
-        ctx.strokeStyle = '#c7c0aa'
-        ctx.lineWidth = 5
-        ctx.beginPath()
-        ctx.moveTo(-3, -29)
-        ctx.lineTo(23, -29)
-        ctx.stroke()
-        ctx.restore()
-
-        // 肩膀和皮革背带。
-        const bodyGrad = ctx.createLinearGradient(0, -2, 0, 28)
-        bodyGrad.addColorStop(0, '#c69248')
-        bodyGrad.addColorStop(1, '#6f451f')
-        ctx.fillStyle = bodyGrad
-        ctx.beginPath()
-        ctx.moveTo(-24, 28)
-        ctx.quadraticCurveTo(-20, 4, -10, 0)
-        ctx.lineTo(10, 0)
-        ctx.quadraticCurveTo(20, 4, 24, 28)
-        ctx.closePath()
-        ctx.fill()
-
-        ctx.fillStyle = teamCol
-        ctx.fillRect(-8, 7, 16, 19)
-        ctx.fillStyle = 'rgba(10,8,4,0.35)'
-        ctx.fillRect(-2, 7, 4, 19)
-        ctx.strokeStyle = '#4c2d15'
-        ctx.lineWidth = 3
-        ctx.beginPath()
-        ctx.moveTo(-15, 1)
-        ctx.lineTo(-3, 28)
-        ctx.moveTo(15, 1)
-        ctx.lineTo(3, 28)
-        ctx.stroke()
-
-        // 脖子和脸。
-        ctx.fillStyle = '#c99b6d'
-        ctx.fillRect(-6, -1, 12, 7)
-        const faceGrad = ctx.createLinearGradient(0, -27, 0, -4)
-        faceGrad.addColorStop(0, '#f0d3a2')
-        faceGrad.addColorStop(1, '#c9915f')
-        ctx.fillStyle = faceGrad
-        ctx.beginPath()
-        ctx.ellipse(0, -15, 12, 14, 0, 0, Math.PI * 2)
-        ctx.fill()
-
-        // 胡子、鼻子和脸部阴影。
-        ctx.fillStyle = '#5a3518'
-        ctx.beginPath()
-        ctx.moveTo(-10, -10)
-        ctx.quadraticCurveTo(0, 7, 10, -10)
-        ctx.quadraticCurveTo(5, 0, 0, 4)
-        ctx.quadraticCurveTo(-5, 0, -10, -10)
-        ctx.fill()
-        ctx.fillStyle = '#b77748'
-        ctx.beginPath()
-        ctx.moveTo(0, -18)
-        ctx.lineTo(4, -11)
-        ctx.lineTo(-2, -11)
-        ctx.closePath()
-        ctx.fill()
-        ctx.fillStyle = '#2b1d10'
-        ctx.fillRect(-6, -18, 3, 2)
-        ctx.fillRect(4, -18, 3, 2)
-
-        // 草帽：大帽檐是最像农民的部分，队伍色只做帽带。
-        const brimGrad = ctx.createLinearGradient(0, -34, 0, -18)
-        brimGrad.addColorStop(0, '#f0d58a')
-        brimGrad.addColorStop(1, '#b88c38')
-        ctx.fillStyle = brimGrad
-        ctx.beginPath()
-        ctx.ellipse(0, -25, 25, 8, 0, 0, Math.PI * 2)
-        ctx.fill()
-        ctx.strokeStyle = '#6b4e1f'
-        ctx.lineWidth = 1.5
-        ctx.stroke()
-
-        ctx.fillStyle = '#d7b85e'
-        ctx.beginPath()
-        ctx.moveTo(-13, -25)
-        ctx.quadraticCurveTo(0, -43, 13, -25)
-        ctx.closePath()
-        ctx.fill()
-        ctx.strokeStyle = '#806020'
-        ctx.stroke()
-
-        ctx.fillStyle = teamCol
-        ctx.fillRect(-13, -28, 26, 4)
-        ctx.fillStyle = rimCol
-        ctx.fillRect(-13, -28, 26, 1)
-
-        // 前景高光让头像别像平面色块。
-        ctx.strokeStyle = 'rgba(255,245,205,0.55)'
-        ctx.lineWidth = 1
-        ctx.beginPath()
-        ctx.moveTo(-20, -26)
-        ctx.quadraticCurveTo(0, -31, 20, -26)
-        ctx.stroke()
-        break
-      }
-      case 'footman': {
-        // 步兵：头盔 + 剑盾
-        // 身体（灰色铠甲）
-        ctx.fillStyle = '#787878'
-        ctx.fillRect(-8, -2, 16, 20)
-        // 肩甲
-        ctx.fillStyle = '#888'
-        ctx.fillRect(-14, -2, 7, 5)
-        ctx.fillRect(7, -2, 7, 5)
-        // 团队色战袍
-        ctx.fillStyle = team === 0 ? '#4488ff' : '#ff4444'
-        ctx.fillRect(-6, 2, 12, 10)
-        // 头盔
-        ctx.fillStyle = '#999'
-        ctx.beginPath()
-        ctx.arc(0, -10, 9, 0, Math.PI * 2)
-        ctx.fill()
-        // 鼻梁护
-        ctx.fillStyle = '#888'
-        ctx.fillRect(-1, -10, 2, 8)
-        // 剑
-        ctx.fillStyle = '#ccc'
-        ctx.fillRect(12, -14, 3, 24)
-        ctx.fillStyle = '#8b6914'
-        ctx.fillRect(11, 8, 5, 4)
-        // 盾
-        ctx.fillStyle = team === 0 ? '#4488ff' : '#ff4444'
-        ctx.fillRect(-18, 0, 5, 14)
-        ctx.strokeStyle = '#666'
-        ctx.lineWidth = 1
-        ctx.strokeRect(-18, 0, 5, 14)
-        break
-      }
-      case 'townhall': {
-        // 城镇大厅：正面建筑 + 旗帜
-        // 石基
-        ctx.fillStyle = '#808070'
-        ctx.fillRect(-20, 8, 40, 10)
-        // 主墙
-        ctx.fillStyle = '#a08050'
-        ctx.fillRect(-18, -8, 36, 18)
-        // 屋顶
-        ctx.fillStyle = '#8b4513'
-        ctx.beginPath()
-        ctx.moveTo(-22, -8)
-        ctx.lineTo(0, -24)
-        ctx.lineTo(22, -8)
-        ctx.closePath()
-        ctx.fill()
-        // 门
-        ctx.fillStyle = '#5c3a1e'
-        ctx.fillRect(-5, 2, 10, 14)
-        // 窗户
-        ctx.fillStyle = '#ddc880'
-        ctx.fillRect(-14, -4, 5, 5)
-        ctx.fillRect(9, -4, 5, 5)
-        // 旗帜（团队色）
-        ctx.fillStyle = team === 0 ? '#4488ff' : '#ff4444'
-        ctx.fillRect(14, -24, 10, 7)
-        ctx.strokeStyle = '#888'
-        ctx.lineWidth = 1
-        ctx.beginPath()
-        ctx.moveTo(14, -26)
-        ctx.lineTo(14, -14)
-        ctx.stroke()
-        break
-      }
-      case 'barracks': {
-        // 兵营：军事建筑 + 旗帜 + 剑
-        // 基座
-        ctx.fillStyle = '#707060'
-        ctx.fillRect(-16, 6, 32, 10)
-        // 主墙
-        ctx.fillStyle = '#604020'
-        ctx.fillRect(-14, -6, 28, 14)
-        // 屋顶
-        ctx.fillStyle = '#5c3a1e'
-        ctx.beginPath()
-        ctx.moveTo(-18, -6)
-        ctx.lineTo(0, -20)
-        ctx.lineTo(18, -6)
-        ctx.closePath()
-        ctx.fill()
-        // 门口
-        ctx.fillStyle = '#1a1208'
-        ctx.fillRect(-4, 0, 8, 10)
-        // 剑装饰
-        ctx.fillStyle = '#ccc'
-        ctx.fillRect(8, -12, 2, 16)
-        // 旗帜
-        ctx.fillStyle = team === 0 ? '#4488ff' : '#ff4444'
-        ctx.fillRect(-16, -22, 8, 5)
-        ctx.strokeStyle = '#888'
-        ctx.lineWidth = 1
-        ctx.beginPath()
-        ctx.moveTo(-16, -24)
-        ctx.lineTo(-16, -12)
-        ctx.stroke()
-        break
-      }
-      case 'farm': {
-        // 农场：简单小屋
-        ctx.fillStyle = '#907050'
-        ctx.fillRect(-12, 0, 24, 16)
-        ctx.fillStyle = '#8b6914'
-        ctx.beginPath()
-        ctx.moveTo(-16, 0)
-        ctx.lineTo(0, -14)
-        ctx.lineTo(16, 0)
-        ctx.closePath()
-        ctx.fill()
-        // 门
-        ctx.fillStyle = '#5c3a1e'
-        ctx.fillRect(-4, 6, 8, 10)
-        break
-      }
-      case 'tower': {
-        // 箭塔：高塔 + 城垛
-        ctx.fillStyle = '#808070'
-        ctx.fillRect(-8, -16, 16, 34)
-        // 城垛顶部
-        ctx.fillStyle = '#707060'
-        ctx.fillRect(-11, -20, 22, 6)
-        // 城垛齿
-        ctx.fillRect(-11, -24, 5, 4)
-        ctx.fillRect(-2, -24, 5, 4)
-        ctx.fillRect(7, -24, 5, 4)
-        // 尖顶
-        ctx.fillStyle = '#555'
-        ctx.beginPath()
-        ctx.moveTo(-8, -20)
-        ctx.lineTo(0, -30)
-        ctx.lineTo(8, -20)
-        ctx.closePath()
-        ctx.fill()
-        // 小旗
-        ctx.fillStyle = team === 0 ? '#4488ff' : '#ff4444'
-        ctx.fillRect(-1, -30, 8, 4)
-        break
-      }
-      case 'goldmine': {
-        // 金矿：岩壁 + 晶体
-        ctx.fillStyle = '#6a6050'
-        ctx.fillRect(-18, 2, 36, 16)
-        // 凸起
-        ctx.fillStyle = '#7a7060'
-        ctx.fillRect(-14, -4, 12, 8)
-        ctx.fillRect(6, -2, 10, 6)
-        // 主晶体（金色）
-        ctx.fillStyle = '#ffdd00'
-        ctx.beginPath()
-        ctx.moveTo(0, 2)
-        ctx.lineTo(6, -12)
-        ctx.lineTo(0, -20)
-        ctx.lineTo(-6, -12)
-        ctx.closePath()
-        ctx.fill()
-        // 小晶体
-        ctx.fillStyle = '#ffcc00'
-        ctx.beginPath()
-        ctx.moveTo(10, 4)
-        ctx.lineTo(14, -4)
-        ctx.lineTo(10, -8)
-        ctx.lineTo(6, -4)
-        ctx.closePath()
-        ctx.fill()
-        ctx.beginPath()
-        ctx.moveTo(-8, 6)
-        ctx.lineTo(-4, -2)
-        ctx.lineTo(-8, -6)
-        ctx.lineTo(-12, -2)
-        ctx.closePath()
-        ctx.fill()
-        // 金光晕
-        const glow = ctx.createRadialGradient(0, -6, 2, 0, -6, 14)
-        glow.addColorStop(0, 'rgba(255,200,0,0.3)')
-        glow.addColorStop(1, 'rgba(255,200,0,0)')
-        ctx.fillStyle = glow
-        ctx.fillRect(-18, -20, 36, 36)
-        break
-      }
-      case 'lumber_mill': {
-        // 伐木场：锯木台 + 木材堆 + 烟囱
-        ctx.fillStyle = '#604020'
-        ctx.fillRect(-16, 2, 32, 14)
-        // 锯台
-        ctx.fillStyle = '#888'
-        ctx.fillRect(-8, -6, 16, 10)
-        // 锯轮
-        ctx.fillStyle = '#aaa'
-        ctx.beginPath()
-        ctx.arc(6, -2, 5, 0, Math.PI * 2)
-        ctx.fill()
-        // 木材堆
-        ctx.fillStyle = '#8b6914'
-        ctx.fillRect(-14, -10, 8, 10)
-        ctx.fillRect(-8, -14, 6, 14)
-        // 烟囱
-        ctx.fillStyle = '#706050'
-        ctx.fillRect(10, -18, 6, 22)
-        // 旗帜（团队色）
-        ctx.fillStyle = team === 0 ? '#4488ff' : '#ff4444'
-        ctx.fillRect(10, -22, 8, 4)
-        break
-      }
-      case 'priest': {
-        // 牧师：长袍 + 兜帽 + 法杖 + 光球
-        ctx.fillStyle = '#f0e8d0'
-        ctx.fillRect(-6, -2, 12, 20)
-        // 团队色肩带
-        ctx.fillStyle = team === 0 ? '#4488ff' : '#ff4444'
-        ctx.fillRect(-5, 4, 10, 4)
-        // 兜帽
-        ctx.fillStyle = team === 0 ? '#4488ff' : '#ff4444'
-        ctx.beginPath()
-        ctx.arc(0, -10, 8, 0, Math.PI * 2)
-        ctx.fill()
-        // 法杖
-        ctx.fillStyle = '#8b6914'
-        ctx.fillRect(8, -14, 2, 28)
-        // 光球
-        ctx.fillStyle = '#ccf'
-        ctx.beginPath()
-        ctx.arc(9, -16, 4, 0, Math.PI * 2)
-        ctx.fill()
-        break
-      }
-      case 'sorceress': {
-        // 女巫：蓝白长袍 + 法杖 + 冰蓝法球
-        ctx.fillStyle = '#dcecff'
-        ctx.fillRect(-6, -2, 12, 20)
-        ctx.fillStyle = team === 0 ? '#4488ff' : '#ff4444'
-        ctx.fillRect(-6, 3, 12, 5)
-        ctx.fillStyle = '#cfd7ff'
-        ctx.beginPath()
-        ctx.arc(0, -10, 8, 0, Math.PI * 2)
-        ctx.fill()
-        ctx.fillStyle = '#8b6914'
-        ctx.fillRect(9, -14, 2, 28)
-        ctx.fillStyle = '#88ddff'
-        ctx.beginPath()
-        ctx.arc(10, -17, 4, 0, Math.PI * 2)
-        ctx.fill()
-        break
-      }
-      case 'arcane_sanctum': {
-        // 奥秘圣殿：石塔 + 紫色光球
-        ctx.fillStyle = '#606070'
-        ctx.fillRect(-16, 2, 32, 14)
-        // 主墙
-        ctx.fillStyle = '#7070a0'
-        ctx.fillRect(-14, -10, 28, 14)
-        // 拱门
-        ctx.fillStyle = '#1a1208'
-        ctx.fillRect(-4, -2, 8, 14)
-        // 尖塔
-        ctx.fillStyle = '#5555aa'
-        ctx.beginPath()
-        ctx.moveTo(-10, -10)
-        ctx.lineTo(0, -24)
-        ctx.lineTo(10, -10)
-        ctx.closePath()
-        ctx.fill()
-        // 光球
-        ctx.fillStyle = '#ccf'
-        ctx.beginPath()
-        ctx.arc(0, -28, 5, 0, Math.PI * 2)
-        ctx.fill()
-        // 团队色旗
-        ctx.fillStyle = team === 0 ? '#4488ff' : '#ff4444'
-        ctx.fillRect(8, -24, 7, 4)
-        break
-      }
-      default: {
-        // 通用问号
-        ctx.fillStyle = '#5a4e22'
-        ctx.font = 'bold 32px Georgia'
-        ctx.textAlign = 'center'
-        ctx.textBaseline = 'middle'
-        ctx.fillText('?', 0, 0)
-        break
+    if (this.commandHintTimer > 0) {
+      this.commandHintTimer -= dt
+      if (this.commandHintTimer <= 0 && this.groupHintTimer <= 0) {
+        this.updateModeHint('')
       }
     }
-
-    ctx.restore()
-
-    // 外框内描边
-    ctx.strokeStyle = '#6a5e2a'
-    ctx.lineWidth = 1
-    ctx.strokeRect(0.5, 0.5, w - 1, h - 1)
-  }
-
-  // ===== 多选摘要绘制 =====
-
-  /** 在多选 breakdown 中绘制小型类型图标 */
-  private drawMiniPortrait(canvas: HTMLCanvasElement, type: string, team: number) {
-    const ctx = canvas.getContext('2d')!
-    const w = canvas.width
-    const h = canvas.height
-    ctx.clearRect(0, 0, w, h)
-
-    ctx.fillStyle = '#0c0a04'
-    ctx.fillRect(0, 0, w, h)
-
-    ctx.save()
-    ctx.translate(w / 2, h / 2)
-
-    const teamCol = team === 0 ? '#4488ff' : '#ff4444'
-
-    switch (type) {
-      case 'worker': {
-        ctx.fillStyle = '#b88a48'
-        ctx.beginPath()
-        ctx.roundRect(-5, -1, 10, 10, 2)
-        ctx.fill()
-        ctx.fillStyle = teamCol
-        ctx.fillRect(-3, 3, 6, 5)
-        ctx.fillStyle = '#ddc8a0'
-        ctx.beginPath()
-        ctx.arc(0, -6, 4.5, 0, Math.PI * 2)
-        ctx.fill()
-        ctx.fillStyle = '#5a3518'
-        ctx.beginPath()
-        ctx.moveTo(-3.5, -4)
-        ctx.quadraticCurveTo(0, 1, 3.5, -4)
-        ctx.lineTo(0, 1.5)
-        ctx.closePath()
-        ctx.fill()
-        ctx.fillStyle = '#d1b765'
-        ctx.beginPath()
-        ctx.ellipse(0, -10, 8, 2.8, 0, 0, Math.PI * 2)
-        ctx.fill()
-        ctx.fillStyle = teamCol
-        ctx.fillRect(-5, -11, 10, 1.5)
-        ctx.strokeStyle = '#9d9d92'
-        ctx.lineWidth = 1.5
-        ctx.beginPath()
-        ctx.moveTo(5, -7)
-        ctx.lineTo(9, 6)
-        ctx.stroke()
-        break
-      }
-      case 'footman': {
-        ctx.fillStyle = '#787878'
-        ctx.fillRect(-4, -1, 8, 10)
-        ctx.fillStyle = '#999'
-        ctx.beginPath()
-        ctx.arc(0, -5, 5, 0, Math.PI * 2)
-        ctx.fill()
-        ctx.fillStyle = teamCol
-        ctx.fillRect(-3, 1, 6, 5)
-        ctx.fillStyle = '#ccc'
-        ctx.fillRect(6, -7, 2, 12)
-        break
-      }
-      case 'priest': {
-        ctx.fillStyle = '#f0e8d0'
-        ctx.fillRect(-3, 0, 6, 8)
-        ctx.fillStyle = teamCol
-        ctx.fillRect(-3, 2, 6, 3)
-        ctx.beginPath()
-        ctx.arc(0, -3, 3, 0, Math.PI * 2)
-        ctx.fill()
-        ctx.fillStyle = '#ccf'
-        ctx.beginPath()
-        ctx.arc(4, -5, 2, 0, Math.PI * 2)
-        ctx.fill()
-        break
-      }
-      case 'sorceress': {
-        ctx.fillStyle = '#dcecff'
-        ctx.fillRect(-3, 0, 6, 8)
-        ctx.fillStyle = teamCol
-        ctx.fillRect(-3, 2, 6, 3)
-        ctx.fillStyle = '#cfd7ff'
-        ctx.beginPath()
-        ctx.arc(0, -3, 3, 0, Math.PI * 2)
-        ctx.fill()
-        ctx.fillStyle = '#88ddff'
-        ctx.beginPath()
-        ctx.arc(4, -5, 2, 0, Math.PI * 2)
-        ctx.fill()
-        break
-      }
-      default: {
-        ctx.fillStyle = '#5a4e22'
-        ctx.font = 'bold 12px Georgia'
-        ctx.textAlign = 'center'
-        ctx.textBaseline = 'middle'
-        ctx.fillText('?', 0, 0)
-        break
+    if (this.objectiveHintTimer > 0) {
+      this.objectiveHintTimer -= dt
+      if (this.objectiveHintTimer <= 0 && this.groupHintTimer <= 0 && this.commandHintTimer <= 0) {
+        this.updateModeHint('')
       }
     }
+  }
 
-    ctx.restore()
+  private updateHeroAbilityPreviews() {
+    const hero = this.getHeroMilestoneSnapshot()
+    this.feedback.updateAbilityPreviews(hero.abilityPresentation.previewRings)
+    this.feedback.updateResurrectionReadability({
+      corpseMarkers: hero.resurrectionReadability.corpseMarkers,
+      radiusRings: hero.resurrectionReadability.radiusRings,
+    })
   }
 
   private updateSelectionHUD() {
     const primaryType = this.selectionModel.primaryType
-    const selKey = this.selectedUnits.length > 0
-      ? `${this.selectedUnits.length}:${primaryType}:${this.selectedUnits.map(u => u.type).sort().join(',')}`
-      : ''
+    const selectedUnits = this.selectedUnits
 
-    if (this.selectedUnits.length === 0) {
-      // 无选择 → 隐藏所有，清空
+    if (selectedUnits.length === 0) {
       if (this._lastSelKey !== '') {
-        this.elSingleSelect.style.display = ''
-        this.elMultiSelect.style.display = 'none'
-        this.elUnitName.textContent = '未选择单位'
-        this.elUnitHpFill.style.width = '0%'
-        this.elUnitHpText.textContent = ''
-        this.elUnitState.textContent = ''
-        this.elUnitStats.innerHTML = ''
-        this.elTypeBadge.style.display = 'none'
-        // 清空 portrait
-        const ctx = this.elPortraitCanvas.getContext('2d')!
-        ctx.fillStyle = '#0c0a04'
-        ctx.fillRect(0, 0, 76, 76)
+        this.selectionHudPresenter.renderNoSelection()
         this._lastSelKey = ''
       }
       return
     }
 
-    // 多选 vs 单选
-    if (this.selectedUnits.length > 1) {
-      // 多选面板
-      this.elSingleSelect.style.display = 'none'
-      this.elMultiSelect.style.display = 'flex'
-
-      // 数量
-      this.elMultiCount.textContent = `${this.selectedUnits.length} 个单位`
-
-      // 类型分组
-      const typeCounts: Record<string, number> = {}
-      for (const u of this.selectedUnits) {
-        typeCounts[u.type] = (typeCounts[u.type] ?? 0) + 1
-      }
-
-      // HP 汇总
-      let totalHp = 0
-      let totalMaxHp = 0
-      for (const u of this.selectedUnits) {
-        totalHp += u.hp
-        totalMaxHp += u.maxHp
-      }
-
-      // 只有类型变化时才重建 breakdown（防抖）
-      const primaryType = this.selectionModel.primaryType
-      if (selKey !== this._lastSelKey) {
-        this.elMultiBreakdown.innerHTML = ''
-        for (const [type, count] of Object.entries(typeCounts).sort()) {
-          const row = document.createElement('div')
-          row.className = type === primaryType ? 'breakdown-row breakdown-primary' : 'breakdown-row'
-          const miniCanvas = document.createElement('canvas')
-          miniCanvas.className = 'breakdown-icon'
-          miniCanvas.width = 18
-          miniCanvas.height = 18
-          this.drawMiniPortrait(miniCanvas, type, 0)
-          row.appendChild(miniCanvas)
-          const label = document.createElement('span')
-          label.textContent = `${UNITS[type]?.name ?? BUILDINGS[type]?.name ?? type} x${count}`
-          row.appendChild(label)
-          this.elMultiBreakdown.appendChild(row)
-        }
-      }
-
-      // HP 条（每帧更新）
-      const hpPct = totalMaxHp > 0 ? (totalHp / totalMaxHp) * 100 : 0
-      this.elMultiHpFill.style.width = `${hpPct}%`
-      this.elMultiHpFill.style.background = hpPct > 50 ? '#0c0' : hpPct > 25 ? '#cc0' : '#c00'
-      this.elMultiHpText.textContent = `${totalHp} / ${totalMaxHp}`
-
+    if (selectedUnits.length > 1) {
+      const selKey = buildMultiSelectionHudKey(selectedUnits, primaryType)
+      const rebuildBreakdown = selKey !== this._lastSelKey
+      this.selectionHudPresenter.renderMultiSelection(selectedUnits, primaryType, rebuildBreakdown)
       this._lastSelKey = selKey
       return
     }
 
-    // === 单选 ===
-    const u = this.selectionModel.primary!
-    // 构建缓存键：量化所有可能变化的值，防止无意义 churn
-    const bpKey = u.buildProgress < 1 ? Math.floor(u.buildProgress * 100) : 100
-    const goldKey = u.type === 'goldmine' ? Math.floor(u.remainingGold / 10) : 0
-    const queueLen = u.trainingQueue.length
-    const reviveQueueLen = u.reviveQueue.length
-    // 训练进度量化到 1%（每秒约 1 次更新，不是每帧）
-    const trainProgressKey = queueLen > 0 ? Math.floor(u.trainingQueue[0].remaining * 10) : 0
-    const reviveProgressKey = reviveQueueLen > 0 ? Math.floor(u.reviveQueue[0].remaining * 10) : 0
-    const rallyKey = u.rallyPoint ? 'r' : 'n'
-    const hpKey = `${u.hp}:${u.maxHp}`
-    const moveQueueKey = u.moveQueue.length
-    const rallyCallKey = u.rallyCallBoostUntil > this.gameTime ? Math.floor(u.rallyCallBoostUntil) : 0
-    const manaKey = u.maxMana > 0 ? Math.floor(u.mana) : -1
-    const healCooldownKey = u.healCooldownUntil > this.gameTime ? Math.ceil(u.healCooldownUntil * 10) : 0
-    const heroLevelKey = UNITS[u.type]?.isHero ? (u.heroLevel ?? 1) : -1
-    const heroXpKey = UNITS[u.type]?.isHero ? (u.heroXP ?? 0) : -1
-    const heroSpKey = UNITS[u.type]?.isHero ? (u.heroSkillPoints ?? 0) : -1
-    const abilityKey = UNITS[u.type]?.isHero ? JSON.stringify(u.abilityLevels ?? {}) : ''
-    const dsActiveKey = u.divineShieldUntil > this.gameTime ? Math.ceil(u.divineShieldUntil - this.gameTime) : 0
-    const selKeyFull = `${u.type}:${u.team}:${bpKey}:${goldKey}:${queueLen}:${trainProgressKey}:${reviveQueueLen}:${reviveProgressKey}:${rallyKey}:${hpKey}:${u.state}:${moveQueueKey}:${rallyCallKey}:${manaKey}:${healCooldownKey}:${heroLevelKey}:${heroXpKey}:${heroSpKey}:${abilityKey}:${dsActiveKey}`
-
-    if (selKeyFull === this._lastSelKey) return
-    this._lastSelKey = selKeyFull
-
-    this.elSingleSelect.style.display = ''
-    this.elMultiSelect.style.display = 'none'
-
-    const stateNames = ['空闲', '移动', '前往采集', '采集中', '运送资源', '前往建造', '建造中', '攻击中', '攻击移动', '驻守']
-
-    // Portrait
-    this.drawPortrait(u.type, u.team)
-
-    // 名称
-    this.elUnitName.textContent = UNITS[u.type]?.name ?? BUILDINGS[u.type]?.name ?? u.type
-
-    // HP 条 + 数值
-    const pct = u.maxHp > 0 ? (u.hp / u.maxHp) * 100 : 0
-    this.elUnitHpFill.style.width = `${pct}%`
-    this.elUnitHpFill.style.background = pct > 50 ? '#0c0' : pct > 25 ? '#cc0' : '#c00'
-    this.elUnitHpText.textContent = `${Math.max(0, u.hp)} / ${u.maxHp}`
-
-    // 状态
-    const stateText = u.isBuilding
-      ? (u.buildProgress < 1 ? `建造中 ${Math.floor(u.buildProgress * 100)}%` : '就绪')
-      : (stateNames[u.state] ?? '')
-    const queueText = !u.isBuilding && u.moveQueue.length > 0
-      ? ` (队列: ${u.moveQueue.length})`
-      : ''
-    const rallyText = (!u.isBuilding && u.rallyCallBoostUntil > this.gameTime)
-      ? ` [集结号令 +${ABILITIES.rally_call.effectValue}伤害]`
-      : ''
-    this.elUnitState.textContent = stateText + queueText + rallyText
-
-    // 类型标签
-    const badges: Record<string, string> = {
-      worker: '采集', footman: '近战', rifleman: '远程', mortar_team: '攻城', priest: '治疗', sorceress: '法师',
-      townhall: '主基地',
-      barracks: '军事', farm: '人口', tower: '防御', goldmine: '资源', blacksmith: '科技',
-      lumber_mill: '木材', workshop: '攻城', arcane_sanctum: '法师',
+    const primary = this.selectionModel.primary!
+    const runtimeState = {
+      gameTime: this.gameTime,
+      blizzardChannel: this.blizzardChannel,
+      massTeleportPending: this.massTeleportPending,
     }
-    this.elTypeBadge.textContent = badges[u.type] ?? ''
-    this.elTypeBadge.style.display = 'block'
+    const selKey = buildSingleSelectionHudKey(primary, runtimeState)
+    if (selKey === this._lastSelKey) return
 
-    // 属性行统一从 GameData 读取，避免按单位类型写死数值。
-    const def = UNITS[u.type]
-    const bDef = BUILDINGS[u.type]
-    if (!u.isBuilding && def) {
-      let statsHtml = `<span class="stat">⚔ ${def.attackDamage}</span>`
-      statsHtml += `<span class="stat">🛡 ${def.armor}</span>`
-      statsHtml += `<span class="stat">💨 ${def.speed.toFixed(1)}</span>`
-      // 远程单位显示射程（近战不显示，因为都是 MELEE_RANGE）
-      if (def.attackRange > MELEE_RANGE) {
-        statsHtml += `<span class="stat">🎯 ${def.attackRange}</span>`
-      }
-      // 法师单位显示 mana
-      if (u.maxMana > 0) {
-        statsHtml += `<span class="stat">💧 ${Math.floor(u.mana)}/${u.maxMana}</span>`
-      }
-      // 攻击/护甲类型来自 GameData。
-      if (def.attackType !== undefined) {
-        statsHtml += `<span class="stat">${ATTACK_TYPE_NAMES[def.attackType]}</span>`
-      }
-      if (def.armorType !== undefined) {
-        statsHtml += `<span class="stat">${ARMOR_TYPE_NAMES[def.armorType]}</span>`
-      }
-      if (def.isHero) {
-        const level = u.heroLevel ?? 1
-        const xp = u.heroXP ?? 0
-        const sp = u.heroSkillPoints ?? 0
-        statsHtml += `<span class="stat">等级 ${level}</span>`
-        if (level >= HERO_XP_RULES.maxHeroLevel) {
-          statsHtml += `<span class="stat">XP 最高等级</span>`
-        } else {
-          const nextThreshold = HERO_XP_RULES.xpThresholdsByLevel[level + 1] ?? 0
-          statsHtml += `<span class="stat">XP ${xp}/${nextThreshold}</span>`
-        }
-        statsHtml += `<span class="stat">技能点 ${sp}</span>`
-        if (u.abilityLevels) {
-          const hlLv = u.abilityLevels.holy_light ?? 0
-          if (hlLv > 0) {
-            statsHtml += `<span class="stat">圣光术 Lv${hlLv}</span>`
-          }
-          const dsLv = u.abilityLevels.divine_shield ?? 0
-          if (dsLv > 0) {
-            statsHtml += `<span class="stat">神圣护盾 Lv${dsLv}</span>`
-          }
-          const daLv = u.abilityLevels.devotion_aura ?? 0
-          if (daLv > 0) {
-            statsHtml += `<span class="stat">虔诚光环 Lv${daLv}</span>`
-          }
-          const resLv = u.abilityLevels.resurrection ?? 0
-          if (resLv > 0) {
-            statsHtml += `<span class="stat">复活术 Lv${resLv}</span>`
-          }
-        }
-      }
-      if (u.divineShieldUntil > this.gameTime) {
-        const remaining = Math.ceil(u.divineShieldUntil - this.gameTime)
-        statsHtml += `<span class="stat">神圣护盾生效 ${remaining}s</span>`
-      }
-      if (u.devotionAuraBonus > 0) {
-        statsHtml += `<span class="stat">虔诚光环 +${u.devotionAuraBonus} 护甲</span>`
-      }
-      if (u.resurrectionCooldownUntil > this.gameTime) {
-        const remaining = Math.ceil(u.resurrectionCooldownUntil - this.gameTime)
-        statsHtml += `<span class="stat">复活冷却 ${remaining}s</span>`
-      }
-      if (u.resurrectionLastRevivedCount > 0 && u.resurrectionFeedbackUntil > this.gameTime) {
-        statsHtml += `<span class="stat">刚复活 ${u.resurrectionLastRevivedCount} 个单位</span>`
-      }
-      this.elUnitStats.innerHTML = statsHtml
-    } else if (u.isBuilding && u.type !== 'goldmine') {
-      let statsHtml = ''
-      const supplyVal = bDef?.supply ?? 0
-      if (supplyVal > 0) statsHtml += `<span class="stat">人口 +${supplyVal}</span>`
-      if (bDef?.trains) statsHtml += `<span class="stat">可训练</span>`
-      if (u.rallyPoint) {
-        const rt = u.rallyTarget
-        if (rt && rt.type === 'goldmine') {
-          statsHtml += `<span class="stat">集结 → 金矿</span>`
-        } else {
-          statsHtml += `<span class="stat">集结 ✓</span>`
-        }
-      }
-      // 训练队列信息
-      if (u.trainingQueue.length > 0) {
-        const first = u.trainingQueue[0]
-        const tDef = UNITS[first.type]
-        if (tDef) {
-          const progress = Math.floor(((tDef.trainTime - first.remaining) / tDef.trainTime) * 100)
-          statsHtml += `<span class="stat">训练 ${tDef.name} ${progress}%</span>`
-        }
-        if (u.trainingQueue.length > 1) {
-          statsHtml += `<span class="stat">队列 ${u.trainingQueue.length}</span>`
-        }
-      }
-      if (u.reviveQueue.length > 0) {
-        const first = u.reviveQueue[0]
-        const heroDef = UNITS[first.heroType]
-        if (heroDef) {
-          const progress = Math.floor(((first.totalDuration - first.remaining) / first.totalDuration) * 100)
-          statsHtml += `<span class="stat">复活 ${heroDef.name} ${progress}%</span>`
-        }
-      }
-      // Weapon stats for combat buildings (e.g., tower)
-      if (bDef?.attackDamage) {
-        statsHtml += `<span class="stat">⚔ ${bDef.attackDamage}</span>`
-        if (bDef.attackRange) statsHtml += `<span class="stat">射程 ${bDef.attackRange}</span>`
-        if (bDef.attackCooldown) statsHtml += `<span class="stat">冷却 ${bDef.attackCooldown}s</span>`
-      }
-      // 攻击/护甲类型来自 GameData。
-      if (bDef?.attackType !== undefined) {
-        statsHtml += `<span class="stat">${ATTACK_TYPE_NAMES[bDef.attackType]}</span>`
-      }
-      if (bDef?.armorType !== undefined) {
-        statsHtml += `<span class="stat">${ARMOR_TYPE_NAMES[bDef.armorType]}</span>`
-      }
-      this.elUnitStats.innerHTML = statsHtml
-    } else if (u.type === 'goldmine') {
-      this.elUnitStats.innerHTML = `<span class="stat">黄金 ${u.remainingGold}</span>`
-    } else {
-      this.elUnitStats.innerHTML = ''
-    }
+    this._lastSelKey = selKey
+    this.selectionHudPresenter.renderSingleSelection(primary, runtimeState)
   }
 
   // ==================== 命令卡 ====================
 
   private updateCommandCard() {
     // 关键：只在选择变化时重建，否则按钮每帧被销毁导致无法点击
-    // 量化 buildProgress 到 1% 避免 float 抖动
     const primary = this.selectionModel.primary
-    const bpKey = primary && primary.buildProgress < 1
-      ? Math.floor(primary.buildProgress * 100)
-      : (primary ? 100 : -1)
-    const res = this.resources.get(0)
-    const supply = this.resources.computeSupply(0, this.units)
-    const queuedSupply = this.getQueuedSupply(0)
-    const primaryQueueKey = primary ? primary.trainingQueue.map(item => `${item.type}:${Math.ceil(item.remaining * 10)}`).join('|') : ''
-    const primaryReviveKey = primary ? primary.reviveQueue.map(item => `${item.heroType}:${Math.ceil(item.remaining * 10)}`).join('|') : ''
-    // Include completed prerequisite building count so tech-gated buttons refresh
-    const prereqKey = this.units
-      .filter(u => u.team === 0 && u.isBuilding && u.buildProgress >= 1 && u.hp > 0)
-      .map(u => u.type).sort().join(',')
-    // Include research state so research buttons refresh on completion
-    const researchKey = this.units
-      .filter(u => u.team === 0 && u.isBuilding)
-      .flatMap(u => [...u.completedResearches, ...u.researchQueue.map(r => `${r.key}:${Math.ceil(r.remaining * 10)}`)])
-      .sort().join(',')
-    const rallyCooldownKey = primary && !primary.isBuilding && primary.team === 0
-      ? Math.ceil(primary.rallyCallCooldownUntil * 10)
-      : 0
-    const cmdManaKey = primary && primary.maxMana > 0
-      ? Math.floor(primary.mana)
-      : -1
-    const cmdHealCdKey = primary && primary.healCooldownUntil > this.gameTime
-      ? Math.ceil(primary.healCooldownUntil * 10)
-      : 0
-    const upgradeKey = primary?.upgradeQueue
-      ? `upg:${primary.upgradeQueue.targetType}:${Math.ceil(primary.upgradeQueue.remaining * 10)}`
-      : ''
-    const heroReviveStateKey = primary && BUILDINGS[primary.type]?.trains
-      ? BUILDINGS[primary.type]!.trains!
-        .filter(heroKey => UNITS[heroKey]?.isHero)
-        .map(heroKey => {
-          const hero = this.units.find(u => u.team === primary.team && u.type === heroKey && !u.isBuilding)
-          return `${heroKey}:${hero ? (hero.isDead ? 'dead' : 'live') : 'none'}:${hero?.hp ?? 0}:${hero?.mana ?? 0}:${hero?.heroLevel ?? 1}`
-        })
-        .join('|')
-      : ''
-    const morphKey = primary?.morphExpiresAt
-      ? `morph:${Math.ceil(primary.morphExpiresAt * 10)}`
-      : ''
-    const defendKey = primary?.defendActive ? 'defend:1' : 'defend:0'
-    const heroCommandKey = primary && UNITS[primary.type]?.isHero
-      ? `hero:${primary.heroLevel ?? 1}:${primary.heroSkillPoints ?? 0}:${JSON.stringify(primary.abilityLevels ?? {})}:${primary.isDead ? 'dead' : 'live'}`
-      : ''
-    const divineShieldKey = primary?.type === 'paladin'
-      ? `ds:${Math.ceil(Math.max(0, primary.divineShieldUntil - this.gameTime) * 10)}:${Math.ceil(Math.max(0, primary.divineShieldCooldownUntil - this.gameTime) * 10)}`
-      : ''
-    const resurrectionKey = primary?.type === 'paladin'
-      ? `res:${Math.ceil(Math.max(0, primary.resurrectionCooldownUntil - this.gameTime) * 10)}:${primary.resurrectionLastRevivedCount}:${Math.ceil(Math.max(0, primary.resurrectionFeedbackUntil - this.gameTime) * 10)}`
-      : ''
-    const selKey = primary
-      ? `${primary.type}:${primary.team}:${bpKey}:${res.gold}:${res.lumber}:${supply.used}:${supply.total}:${queuedSupply}:${primaryQueueKey}:${primaryReviveKey}:${heroReviveStateKey}:${prereqKey}:${researchKey}:${rallyCooldownKey}:${cmdManaKey}:${cmdHealCdKey}:${upgradeKey}:${morphKey}:${defendKey}:${heroCommandKey}:${divineShieldKey}:${resurrectionKey}`
-      : ''
+    if (primary !== this._lastCommandCardPrimary) {
+      this.commandCardPresenter.resetPage()
+      this._lastCommandCardPrimary = primary
+    }
+    const selKey = buildCommandCardStateKey({
+      primary,
+      units: this.units,
+      playerTeam: 0,
+      gameTime: this.gameTime,
+      resources: this.resources.get(0),
+      supply: this.resources.computeSupply(0, this.units),
+      queuedSupply: computeQueuedSupply(this.units, 0),
+      blizzardChannel: this.blizzardChannel,
+      massTeleportPending: this.massTeleportPending,
+    })
     if (selKey === this._lastCmdKey) return
     this._lastCmdKey = selKey
 
-    this.elCommandCard.innerHTML = ''
+    this.commandCardPresenter.clear()
 
     if (this.selectedUnits.length === 0 || !primary || primary.team !== 0) {
       // 显示固定命令卡空槽，保持 HUD 布局稳定。
-      for (let i = 0; i < COMMAND_CARD_SLOT_COUNT; i++) {
-        const slot = document.createElement('div')
-        slot.className = 'cmd-slot'
-        this.elCommandCard.appendChild(slot)
-      }
+      this.commandCardPresenter.renderEmptySlots()
       return
     }
 
     // 收集要显示的按钮
-    const buttons: { label: string; cost: string; onClick: () => void; hotkey?: string; enabled?: boolean; disabledReason?: string }[] = []
+    const buttons: CommandCardButtonSpec[] = []
+    const markCommandCardDirty = () => { this._lastCmdKey = '' }
+    const activeHeroTarget = this.getActiveHeroTargetModeSnapshot()
+    const activeAbilityKey = activeHeroTarget?.casterType === primary.type
+      ? activeHeroTarget.abilityKey
+      : undefined
 
-    // 农民：显示可建造的建筑
-    if (primary.type === 'worker') {
-      for (const bKey of PEASANT_BUILD_MENU) {
-        const def = BUILDINGS[bKey]
-        if (!def) continue
-        const capturedKey = bKey
-        const availability = this.getBuildAvailability(capturedKey, 0)
-        buttons.push({
-          label: def.name,
-          cost: `${def.cost.gold}g ${def.cost.lumber}w · ${def.buildTime}s`,
-          enabled: availability.ok,
-          disabledReason: availability.reason,
-          onClick: () => {
-            if (this.getBuildAvailability(capturedKey, 0).ok) {
-              this.enterPlacementMode(capturedKey)
-            }
-          },
-        })
-      }
-      // Call to Arms — Militia morph (HN4-IMPL2)
-      const cta = ABILITIES.call_to_arms
-      const nearHall = this.units.some(u =>
-        this.isMainHall(u.type) &&
-        u.team === 0 &&
-        u.buildProgress >= 1 &&
-        u.hp > 0 &&
-        u.mesh.position.distanceTo(primary.mesh.position) <= cta.range
-      )
-      buttons.push({
-        label: cta.name,
-        cost: `${cta.duration}s`,
-        enabled: nearHall,
-        disabledReason: nearHall ? '' : '需要靠近城镇大厅',
-        onClick: () => {
-          const sel = this.selectedUnits.filter((u) => u.type === 'worker' && u.team === 0 && !u.isBuilding)
-          for (const u of sel) {
-            this.morphToMilitia(u)
-          }
-          this._lastCmdKey = ''
-        },
-        hotkey: 'T',
-      })
-    }
+    buttons.push(...buildWorkerCommandButtons({
+      primary,
+      selectedUnits: this.selectedUnits,
+      units: this.units,
+      playerTeam: 0,
+      markDirty: markCommandCardDirty,
+      getBuildAvailability: (buildingType, team) =>
+        checkBuildAvailability(this.units, this.resources, buildingType, team),
+      enterPlacementMode: (buildingType) => this.enterPlacementMode(buildingType),
+      isMainHall: isMainHallType,
+      morphToMilitia: (unit) => this.morphToMilitia(unit),
+    }))
 
-    // 未完成建筑：显示取消建造
-    if (primary.isBuilding && primary.buildProgress < 1) {
-      const def = BUILDINGS[primary.type]
-      const refundGold = Math.floor((def?.cost.gold ?? 0) * CONSTRUCTION_CANCEL_REFUND_RATE)
-      const refundLumber = Math.floor((def?.cost.lumber ?? 0) * CONSTRUCTION_CANCEL_REFUND_RATE)
-      buttons.push({
-        label: '取消',
-        cost: `返还 ${refundGold}g ${refundLumber}w`,
-        onClick: () => { this.cancelConstruction(primary) },
-        hotkey: 'C',
-      })
-    }
+    buttons.push(...buildConstructionCommandButtons({
+      primary,
+      cancelRefundRate: CONSTRUCTION_CANCEL_REFUND_RATE,
+      cancelConstruction: (building) => this.cancelConstruction(building),
+    }))
 
     // 可移动军事单位：显示 停止 / 驻守 / 攻击移动
     if (!primary.isBuilding && primary.type !== 'worker') {
-      buttons.push({
-        label: '停止', cost: '—',
-        onClick: () => {
-          const sel = this.selectedUnits.filter((u) => u.team === 0 && !u.isBuilding)
-          dispatchGameCommand(sel, { type: 'stop' })
-          this.suppressAggroFor(sel)
-        },
-        hotkey: 'S',
-      })
-      buttons.push({
-        label: '驻守', cost: '—',
-        onClick: () => {
-          dispatchGameCommand(this.selectedUnits.filter((u) => u.team === 0 && !u.isBuilding), { type: 'holdPosition' })
-        },
-        hotkey: 'H',
-      })
-      buttons.push({
-        label: '攻击移动', cost: '—',
-        onClick: () => { this.enterAttackMoveMode() },
-        hotkey: 'A',
-      })
-      // Rally Call — Human identity ability
-      const rallyOnCooldown = primary.rallyCallCooldownUntil > this.gameTime
-      const rallyReason = rallyOnCooldown
-        ? `冷却中 ${(primary.rallyCallCooldownUntil - this.gameTime).toFixed(0)}s`
-        : ''
-      buttons.push({
-        label: '集结号令',
-        cost: `伤害+${ABILITIES.rally_call.effectValue} ${ABILITIES.rally_call.duration}s`,
-        enabled: !rallyOnCooldown,
-        disabledReason: rallyReason,
-        onClick: () => {
-          const sel = this.selectedUnits.filter((u) => u.team === 0 && !u.isBuilding)
-          for (const u of sel) {
-            this.triggerRallyCall(u)
-          }
-          this._lastCmdKey = '' // force refresh
-        },
-        hotkey: 'R',
-      })
-      const defend = ABILITIES.defend
-      const isDefendOwner = (unit: Unit) => Array.isArray(defend.ownerType)
-        ? defend.ownerType.includes(unit.type)
-        : unit.type === defend.ownerType
-      if (isDefendOwner(primary)) {
-        const nextActive = !primary.defendActive
-        buttons.push({
-          label: primary.defendActive ? `${defend.name} ✓` : defend.name,
-          cost: `穿刺伤害×${defend.damageReduction ?? 1} 移速×${defend.speedMultiplier ?? 1}`,
-          onClick: () => {
-            const sel = this.selectedUnits.filter((u) => isDefendOwner(u))
-            for (const u of sel) {
-              this.setDefend(u, nextActive)
-            }
-            this._lastCmdKey = ''
-          },
-          hotkey: 'D',
-        })
-      }
-      // Heal — Priest ability
-      if (primary.type === 'priest') {
-        const healOnCooldown = primary.healCooldownUntil > this.gameTime
-        const noMana = primary.mana < (ABILITIES.priest_heal.cost.mana ?? 0)
-        const healReason = healOnCooldown
-          ? `治疗冷却中 ${(primary.healCooldownUntil - this.gameTime).toFixed(1)}s`
-          : noMana
-            ? '魔力不足'
-            : ''
-        buttons.push({
-          label: '治疗',
-          cost: `💧${ABILITIES.priest_heal.cost.mana ?? 0} 回复${ABILITIES.priest_heal.effectValue}HP`,
-          enabled: !healOnCooldown && !noMana,
-          disabledReason: healReason,
-          onClick: () => {
-            // Manual heal: find lowest-HP injured friendly in range
-            const injuredFriendlies = this.units
-              .filter(u => u.team === 0 && u.hp > 0 && !u.isBuilding && u.hp < u.maxHp
-                && u.mesh.position.distanceTo(primary.mesh.position) <= ABILITIES.priest_heal.range)
-              .sort((a, b) => (a.hp / a.maxHp) - (b.hp / b.maxHp))
-            if (injuredFriendlies.length > 0) {
-              this.castHeal(primary, injuredFriendlies[0])
-            }
-            this._lastCmdKey = '' // force refresh
-          },
-          hotkey: 'E',
-        })
-      }
-      const btw = ABILITIES.back_to_work
-      const isBackToWorkOwner = (unit: Unit) => Array.isArray(btw.ownerType)
-        ? btw.ownerType.includes(unit.type)
-        : unit.type === btw.ownerType
-      if (isBackToWorkOwner(primary) && primary.morphExpiresAt > 0) {
-        buttons.push({
-          label: btw.name,
-          cost: '',
-          onClick: () => {
-            const sel = this.selectedUnits.filter((u) => isBackToWorkOwner(u) && u.morphExpiresAt > 0)
-            for (const u of sel) {
-              this.backToWork(u)
-            }
-            this._lastCmdKey = '' // force refresh
-          },
-          hotkey: 'B',
-        })
-      }
-      // Slow — Sorceress ability
-      if (primary.type === 'sorceress') {
-        const slow = ABILITIES.slow
-        const noMana = primary.mana < (slow.cost.mana ?? 0)
-        buttons.push({
-          label: slow.name,
-          cost: `💧${slow.cost.mana ?? 0} 移速×${slow.speedMultiplier ?? 1} ${slow.duration}s`,
-          enabled: !noMana,
-          disabledReason: noMana ? '魔力不足' : '',
-          onClick: () => {
-            const enemies = this.units
-              .filter(u => u.team !== primary.team && u.hp > 0 && !u.isBuilding
-                && u.mesh.position.distanceTo(primary.mesh.position) <= slow.range)
-              .sort((a, b) =>
-                a.mesh.position.distanceTo(primary.mesh.position)
-                - b.mesh.position.distanceTo(primary.mesh.position))
-            if (enemies.length > 0) {
-              this.castSlow(primary, enemies[0])
-            }
-            this._lastCmdKey = ''
-          },
-          hotkey: 'W',
-        })
-        // Auto-cast Slow toggle
-        const nextAutoCast = !primary.slowAutoCastEnabled
-        buttons.push({
-          label: primary.slowAutoCastEnabled ? `${slow.name} (自动) ✓` : `${slow.name} (自动)`,
-          cost: nextAutoCast ? '开启自动施法' : '关闭自动施法',
-          enabled: true,
-          onClick: () => {
-            const sel = this.selectedUnits.filter((u) => u.type === 'sorceress')
-            for (const u of sel) {
-              u.slowAutoCastEnabled = nextAutoCast
-            }
-            this._lastCmdKey = ''
-          },
-          hotkey: 'Q',
-        })
-      }
-      // Holy Light — Paladin hero ability (requires learned level)
+      buttons.push(...buildBasicUnitCommandButtons({
+        primary,
+        selectedUnits: this.selectedUnits,
+        units: this.units,
+        playerTeam: 0,
+        markDirty: markCommandCardDirty,
+        gameTime: this.gameTime,
+        issueCommand: (units, command) => this.issueCommand(units, command),
+        suppressAggroFor: (units) => this.suppressAggroFor(units),
+        enterAttackMoveMode: () => this.enterAttackMoveMode(),
+        triggerRallyCall: (source) => this.triggerRallyCall(source),
+        setDefend: (unit, active) => this.setDefend(unit, active),
+        castHeal: (caster, target) => this.castHeal(caster, target),
+        backToWork: (unit) => this.backToWork(unit),
+        castSlow: (caster, target) => this.castSlow(caster, target),
+      }))
       if (primary.type === 'paladin') {
-        const hl = ABILITIES.holy_light
-        const learnedLevel = primary.abilityLevels?.holy_light ?? 0
-        const hlDef = HERO_ABILITY_LEVELS.holy_light
+        buttons.push(...buildPaladinCommandButtons({
+          primary,
+          gameTime: this.gameTime,
+          activeAbilityKey,
+          units: this.units,
+          markDirty: markCommandCardDirty,
+          castHolyLight: (caster, target) => this.castHolyLight(caster, target),
+          castDivineShield: (caster) => this.castDivineShield(caster),
+          castResurrection: (caster) => this.castResurrection(caster),
+          hasResurrectionTargets: (caster, levelData) =>
+            this.getResurrectionEligibleRecordIndices(caster, levelData).length > 0,
+        }))
+      }
 
-        // Learn button: visible when skill points available and next level exists
-        if (learnedLevel < hlDef.maxLevel) {
-          const sp = primary.heroSkillPoints ?? 0
-          const nextLevel = learnedLevel + 1
-          const nextData = hlDef.levels[nextLevel - 1]
-          const heroLvl = primary.heroLevel ?? 1
-          const meetsHeroLvl = heroLvl >= nextData.requiredHeroLevel
-          const isDead = !!primary.isDead
-          const canLearn = sp > 0 && meetsHeroLvl && !isDead
-          let learnReason = ''
-          if (isDead) learnReason = '已死亡'
-          else if (sp <= 0) learnReason = '无技能点'
-          else if (!meetsHeroLvl) learnReason = `需要英雄等级 ${nextData.requiredHeroLevel}`
-          buttons.push({
-            label: `学习圣光术 (Lv${nextLevel})`,
-            cost: `治疗${nextData.effectValue} 亡灵${nextData.undeadDamage}`,
-            enabled: canLearn,
-            disabledReason: learnReason,
-            onClick: () => {
-              const currentLevel = primary.abilityLevels?.holy_light ?? 0
-              const currentNextLevel = currentLevel + 1
-              const currentNextData = hlDef.levels[currentNextLevel - 1]
-              if (!currentNextData || currentLevel >= hlDef.maxLevel) return
-              if ((primary.heroSkillPoints ?? 0) <= 0) return
-              if (primary.isDead) return
-              if ((primary.heroLevel ?? 1) < currentNextData.requiredHeroLevel) return
-              if (!primary.abilityLevels) primary.abilityLevels = {}
-              primary.abilityLevels.holy_light = currentNextLevel
-              primary.heroSkillPoints = (primary.heroSkillPoints ?? 1) - 1
-              this._lastCmdKey = ''
-            },
-            hotkey: 'L',
-          })
-        }
+      if (primary.type === 'archmage') {
+        buttons.push(...buildArchmageCommandButtons({
+          primary,
+          gameTime: this.gameTime,
+          activeAbilityKey,
+          markDirty: markCommandCardDirty,
+          enterWaterElementalTargetMode: (caster) => this.enterWaterElementalTargetMode(caster),
+          enterBlizzardTargetMode: (caster) => this.enterBlizzardTargetMode(caster),
+          enterMassTeleportTargetMode: (caster) => this.enterMassTeleportTargetMode(caster),
+          isBlizzardChanneling: (caster) => this.blizzardChannel?.caster === caster,
+          isMassTeleportPending: (caster) => this.massTeleportPending?.caster === caster,
+          getBlizzardChannelRemaining: (caster) => this.blizzardChannel?.caster === caster
+            ? Math.max(0, this.blizzardChannel.nextWaveTime + Math.max(0, this.blizzardChannel.wavesRemaining - 1) * this.blizzardChannel.waveInterval - this.gameTime)
+            : 0,
+          getMassTeleportPendingRemaining: (caster) => this.massTeleportPending?.caster === caster
+            ? Math.max(0, this.massTeleportPending.completeTime - this.gameTime)
+            : 0,
+        }))
+      }
 
-        // Cast button: only when at least level 1 learned
-        if (learnedLevel >= 1) {
-          const displayLevel = Math.min(learnedLevel, hlDef.maxLevel)
-          const levelData = hlDef.levels[displayLevel - 1]
-          if (levelData) {
-            const hlOnCooldown = primary.healCooldownUntil > this.gameTime
-            const noMana = primary.mana < levelData.mana
-            let hlReason = ''
-            if (hlOnCooldown) hlReason = `冷却中 ${(primary.healCooldownUntil - this.gameTime).toFixed(1)}s`
-            else if (noMana) hlReason = '魔力不足'
-            buttons.push({
-              label: `${hl.name} (Lv${displayLevel})`,
-              cost: `💧${levelData.mana} 回复${levelData.effectValue}HP`,
-              enabled: !hlOnCooldown && !noMana,
-              disabledReason: hlReason,
-              onClick: () => {
-                const injuredFriendlies = this.units
-                  .filter(u => u.team === 0 && u.hp > 0 && !u.isBuilding && u.hp < u.maxHp
-                    && u !== primary
-                    && u.mesh.position.distanceTo(primary.mesh.position) <= levelData.range)
-                  .sort((a, b) => (a.hp / a.maxHp) - (b.hp / b.maxHp))
-                if (injuredFriendlies.length > 0) {
-                  this.castHolyLight(primary, injuredFriendlies[0])
-                }
-                this._lastCmdKey = ''
-              },
-              hotkey: 'E',
-            })
-          }
-        }
+      if (primary.type === 'mountain_king') {
+        buttons.push(...buildMountainKingCommandButtons({
+          primary,
+          gameTime: this.gameTime,
+          activeAbilityKey,
+          markDirty: markCommandCardDirty,
+          enterStormBoltTargetMode: (caster) => this.enterStormBoltTargetMode(caster),
+          castThunderClap: (caster) => this.castThunderClap(caster),
+          castAvatar: (caster) => this.castAvatar(caster),
+        }))
+      }
 
-        // Divine Shield — learn button only (no cast in IMPL1A)
-        const dsDef = HERO_ABILITY_LEVELS.divine_shield
-        if (dsDef) {
-          const dsLearned = primary.abilityLevels?.divine_shield ?? 0
-          if (dsLearned < dsDef.maxLevel) {
-            const sp = primary.heroSkillPoints ?? 0
-            const nextLevel = dsLearned + 1
-            const nextData = dsDef.levels[nextLevel - 1]
-            const heroLvl = primary.heroLevel ?? 1
-            const meetsHeroLvl = heroLvl >= nextData.requiredHeroLevel
-            const isDead = !!primary.isDead
-            const canLearn = sp > 0 && meetsHeroLvl && !isDead
-            let learnReason = ''
-            if (isDead) learnReason = '已死亡'
-            else if (sp <= 0) learnReason = '无技能点'
-            else if (!meetsHeroLvl) learnReason = `需要英雄等级 ${nextData.requiredHeroLevel}`
-            buttons.push({
-              label: `学习神圣护盾 (Lv${nextLevel})`,
-              cost: `无敌${nextData.duration}s 冷却${nextData.cooldown}s`,
-              enabled: canLearn,
-              disabledReason: learnReason,
-              onClick: () => {
-                const currentLevel = primary.abilityLevels?.divine_shield ?? 0
-                const currentNextLevel = currentLevel + 1
-                const currentNextData = dsDef.levels[currentNextLevel - 1]
-                if (!currentNextData || currentLevel >= dsDef.maxLevel) return
-                if ((primary.heroSkillPoints ?? 0) <= 0) return
-                if (primary.isDead) return
-                if ((primary.heroLevel ?? 1) < currentNextData.requiredHeroLevel) return
-                if (!primary.abilityLevels) primary.abilityLevels = {}
-                primary.abilityLevels.divine_shield = currentNextLevel
-                primary.heroSkillPoints = (primary.heroSkillPoints ?? 1) - 1
-                this._lastCmdKey = ''
-              },
-              hotkey: 'D',
-            })
-          }
-          // Divine Shield — cast button (self-cast invulnerability)
-          if (dsLearned >= 1) {
-            const displayLevel = Math.min(dsLearned, dsDef.maxLevel)
-            const levelData = dsDef.levels[displayLevel - 1]
-            if (levelData) {
-              const dsActive = primary.divineShieldUntil > this.gameTime
-              const dsOnCooldown = primary.divineShieldCooldownUntil > this.gameTime
-              const noMana = primary.mana < levelData.mana
-              let dsReason = ''
-              if (dsActive) dsReason = `生效中 ${(primary.divineShieldUntil - this.gameTime).toFixed(1)}s`
-              else if (dsOnCooldown) dsReason = `冷却中 ${(primary.divineShieldCooldownUntil - this.gameTime).toFixed(1)}s`
-              else if (noMana) dsReason = '魔力不足'
-              buttons.push({
-                label: `神圣护盾 (Lv${displayLevel})`,
-                cost: `💧${levelData.mana} 无敌${levelData.duration ?? 0}s`,
-                enabled: !dsActive && !dsOnCooldown && !noMana,
-                disabledReason: dsReason,
-                onClick: () => {
-                  this.castDivineShield(primary)
-                  this._lastCmdKey = ''
-                },
-                hotkey: 'D',
-              })
-            }
-          }
-        }
-        // Devotion Aura — learn button only (passive, no cast button)
-        const daDef = HERO_ABILITY_LEVELS.devotion_aura
-        if (daDef) {
-          const daLearned = primary.abilityLevels?.devotion_aura ?? 0
-          if (daLearned < daDef.maxLevel) {
-            const sp = primary.heroSkillPoints ?? 0
-            const nextLevel = daLearned + 1
-            const nextData = daDef.levels[nextLevel - 1]
-            const heroLvl = primary.heroLevel ?? 1
-            const meetsHeroLvl = heroLvl >= nextData.requiredHeroLevel
-            const isDead = !!primary.isDead
-            const canLearn = sp > 0 && meetsHeroLvl && !isDead
-            let learnReason = ''
-            if (isDead) learnReason = '已死亡'
-            else if (sp <= 0) learnReason = '无技能点'
-            else if (!meetsHeroLvl) learnReason = `需要英雄等级 ${nextData.requiredHeroLevel}`
-            buttons.push({
-              label: `学习虔诚光环 (Lv${nextLevel})`,
-              cost: `护甲+${nextData.armorBonus ?? 0} 半径${nextData.auraRadius ?? 0}`,
-              enabled: canLearn,
-              disabledReason: learnReason,
-              onClick: () => {
-                const currentLevel = primary.abilityLevels?.devotion_aura ?? 0
-                const currentNextLevel = currentLevel + 1
-                const currentNextData = daDef.levels[currentNextLevel - 1]
-                if (!currentNextData || currentLevel >= daDef.maxLevel) return
-                if ((primary.heroSkillPoints ?? 0) <= 0) return
-                if (primary.isDead) return
-                if ((primary.heroLevel ?? 1) < currentNextData.requiredHeroLevel) return
-                if (!primary.abilityLevels) primary.abilityLevels = {}
-                primary.abilityLevels.devotion_aura = currentNextLevel
-                primary.heroSkillPoints = (primary.heroSkillPoints ?? 1) - 1
-                this._lastCmdKey = ''
-              },
-              hotkey: 'V',
-            })
-          }
-        }
-        // Resurrection — learn button + cast button
-        const resDef = HERO_ABILITY_LEVELS.resurrection
-        if (resDef) {
-          const resLearned = primary.abilityLevels?.resurrection ?? 0
-          if (resLearned < resDef.maxLevel) {
-            const sp = primary.heroSkillPoints ?? 0
-            const nextLevel = resLearned + 1
-            const nextData = resDef.levels[nextLevel - 1]
-            const heroLvl = primary.heroLevel ?? 1
-            const meetsHeroLvl = heroLvl >= nextData.requiredHeroLevel
-            const isDead = !!primary.isDead
-            const canLearn = sp > 0 && meetsHeroLvl && !isDead
-            let learnReason = ''
-            if (isDead) learnReason = '已死亡'
-            else if (sp <= 0) learnReason = '无技能点'
-            else if (!meetsHeroLvl) learnReason = `需要英雄等级 ${nextData.requiredHeroLevel}`
-            buttons.push({
-              label: `学习复活 (Lv${nextLevel})`,
-              cost: `复活最多${nextData.maxTargets ?? 0}个友方单位`,
-              enabled: canLearn,
-              disabledReason: learnReason,
-              onClick: () => {
-                const currentLevel = primary.abilityLevels?.resurrection ?? 0
-                const currentNextLevel = currentLevel + 1
-                const currentNextData = resDef.levels[currentNextLevel - 1]
-                if (!currentNextData || currentLevel >= resDef.maxLevel) return
-                if ((primary.heroSkillPoints ?? 0) <= 0) return
-                if (primary.isDead) return
-                if ((primary.heroLevel ?? 1) < currentNextData.requiredHeroLevel) return
-                if (!primary.abilityLevels) primary.abilityLevels = {}
-                primary.abilityLevels.resurrection = currentNextLevel
-                primary.heroSkillPoints = (primary.heroSkillPoints ?? 1) - 1
-                this._lastCmdKey = ''
-              },
-              hotkey: 'R',
-            })
-          }
-          // Cast button — shown when Resurrection is learned
-          if (resLearned >= 1) {
-            const levelData = resDef.levels[0]
-            const isDead = !!primary.isDead
-            const notEnoughMana = primary.mana < levelData.mana
-            const onCooldown = this.gameTime < primary.resurrectionCooldownUntil
-            const hasTargets = this.getResurrectionEligibleRecordIndices(primary, levelData).length > 0
-            const canCast = !isDead && !notEnoughMana && !onCooldown && hasTargets
-            let castReason = ''
-            if (isDead) castReason = '已死亡'
-            else if (notEnoughMana) castReason = '法力不足'
-            else if (onCooldown) castReason = `冷却中 ${(primary.resurrectionCooldownUntil - this.gameTime).toFixed(1)}s`
-            else if (!hasTargets) castReason = '无可复活单位'
-            buttons.push({
-              label: '复活',
-              cost: `法力${levelData.mana} 复活≤${levelData.maxTargets ?? 6}单位`,
-              enabled: canCast,
-              disabledReason: castReason,
-              onClick: () => {
-                this.castResurrection(primary)
-                this._lastCmdKey = ''
-              },
-              hotkey: 'R',
-            })
-          }
-        }
+      if (UNITS[primary.type]?.isHero) {
+        buttons.push(...buildHeroInventoryCommandButtons({
+          primary,
+          useInventoryItem: (hero, index) => this.useInventoryItem(hero, index),
+          markDirty: markCommandCardDirty,
+        }))
       }
     }
-    // 城镇大厅/兵营：显示可训练的单位（支持多建筑选择 alpha）
-    const buildingDef = BUILDINGS[primary.type]
-    if (buildingDef?.trains && primary.buildProgress >= 1) {
-      // 收集所有同类型可训练建筑
-      const sameTypeBuildings = this.selectedUnits.filter(
-        u => u.team === 0 && u.isBuilding && u.type === primary.type && u.buildProgress >= 1,
-      )
-      for (const uKey of buildingDef.trains) {
-        const uDef = UNITS[uKey]
-        if (!uDef) continue
-        if (uDef.isHero) continue // hero units use a dedicated summon path, not generic trains
-        const capturedUKey = uKey
-        const availability = this.getTrainAvailability(capturedUKey, 0)
-        buttons.push({
-          label: uDef.name,
-          cost: `${uDef.cost.gold}g${uDef.cost.lumber > 0 ? ` ${uDef.cost.lumber}w` : ''} (${uDef.supply}口) · ${uDef.trainTime}s`,
-          enabled: availability.ok,
-          disabledReason: availability.reason,
-          onClick: () => {
-            // 多建筑训练：依次为每个建筑排队（直到资源不足）
-            for (const b of sameTypeBuildings) {
-              this.trainUnit(b, capturedUKey)
-            }
-          },
-        })
-      }
-      // 集结点按钮（应用到所有同类建筑）
-      buttons.push({
-        label: '集结点', cost: '—',
-        onClick: () => { this.enterRallyMode(primary) },
-        hotkey: 'Y',
-      })
-    }
+    buttons.push(...buildBuildingCommandButtons({
+      primary,
+      selectedUnits: this.selectedUnits,
+      units: this.units,
+      playerTeam: 0,
+      getTrainAvailability: (unitType, team) =>
+        checkTrainAvailability(this.units, this.resources, unitType, team),
+      getCostBlockReason: (team, cost) => checkCostBlockReason(this.resources, team, cost),
+      getQueuedSupply: (team) => computeQueuedSupply(this.units, team),
+      getSupply: (team) => this.resources.computeSupply(team, this.units),
+      hasCompletedResearch: (researchKey, team) => checkCompletedResearch(this.units, researchKey, team),
+      getResearchAvailability: (researchKey, team) =>
+        checkResearchAvailability(this.units, this.resources, researchKey, team),
+      getHeroReviveQuote: calculateHeroReviveQuote,
+      trainUnit: (building, unitType) => this.trainUnit(building, unitType),
+      enterRallyMode: (building) => this.enterRallyMode(building),
+      startReviveHero: (altar, heroKey) => this.startReviveHero(altar, heroKey),
+      startBuildingUpgrade: (building, targetKey) => this.startBuildingUpgrade(building, targetKey),
+      startResearch: (building, researchKey) => this.startResearch(building, researchKey),
+      getShopItemAvailability: (shop, itemKey) => this.getShopItemAvailability(shop, itemKey),
+      purchaseShopItem: (shop, itemKey) => {
+        if (this.purchaseShopItem(shop, itemKey)) markCommandCardDirty()
+      },
+    }))
 
-    // 英雄祭坛：英雄专用召唤路径（非通用 trains 循环）
-    if (buildingDef?.trains && primary.buildProgress >= 1) {
-      for (const heroKey of buildingDef.trains) {
-        const heroDef = UNITS[heroKey]
-        if (!heroDef || !heroDef.isHero) continue
-        const hasExistingHero = this.units.some(
-          u => u.team === 0 && u.type === heroKey && !u.isBuilding,
-        )
-        const hasQueuedHero = this.units.some(
-          u => u.team === 0 && u.isBuilding && u.trainingQueue.some((item: any) => item.type === heroKey),
-        )
-        const resourceReason = this.getCostBlockReason(0, heroDef.cost)
-        const supply = this.resources.computeSupply(0, this.units)
-        const queuedSupply = this.getQueuedSupply(0)
-        const supplyBlocked = supply.used + queuedSupply + heroDef.supply > supply.total
-        let disabledReason = ''
-        if (hasExistingHero) {
-          const isDeadHero = this.units.find(
-            u => u.team === 0 && u.type === heroKey && !u.isBuilding,
-          )?.isDead
-          disabledReason = isDeadHero ? `${heroDef.name}已阵亡（需复活）` : `${heroDef.name}已存活`
-        }
-        else if (hasQueuedHero) disabledReason = '正在召唤'
-        else if (resourceReason) disabledReason = resourceReason
-        else if (supplyBlocked) disabledReason = '人口不足'
-        const capturedHeroKey = heroKey
-        buttons.push({
-          label: heroDef.name,
-          cost: `${heroDef.cost.gold}g${heroDef.cost.lumber > 0 ? ` ${heroDef.cost.lumber}w` : ''} · ${heroDef.trainTime}s`,
-          enabled: !disabledReason,
-          disabledReason,
-          onClick: () => {
-            this.trainUnit(primary, capturedHeroKey)
-          },
-        })
-      }
-    }
-
-    // 英雄祭坛：复活按钮（死亡英雄存在时显示）
-    if (buildingDef?.trains && primary.buildProgress >= 1) {
-      for (const heroKey of buildingDef.trains) {
-        const heroDef = UNITS[heroKey]
-        if (!heroDef || !heroDef.isHero) continue
-        const deadHero = this.units.find(
-          u => u.team === 0 && u.type === heroKey && !u.isBuilding && u.isDead,
-        )
-        if (!deadHero) continue
-
-        const reviveQuote = this.getHeroReviveQuote(deadHero)
-        if (!reviveQuote) continue
-
-        // Check if already queued for revive on any altar
-        const isAlreadyQueued = this.units.some(
-          u => u.team === primary.team && u.isBuilding && u.reviveQueue.some((rv: any) => rv.heroType === heroKey),
-        )
-
-        let reviveDisabledReason = ''
-        if (isAlreadyQueued) reviveDisabledReason = '正在复活'
-        else {
-          reviveDisabledReason = this.getCostBlockReason(0, { gold: reviveQuote.gold, lumber: reviveQuote.lumber })
-        }
-
-        const capturedHeroKey = heroKey
-        buttons.push({
-          label: `复活${heroDef.name}`,
-          cost: `${reviveQuote.gold}g · ${reviveQuote.totalDuration}s`,
-          enabled: !reviveDisabledReason,
-          disabledReason: reviveDisabledReason,
-          onClick: () => {
-            this.startReviveHero(primary, capturedHeroKey)
-          },
-        })
-      }
-    }
-
-    // 建筑：显示升级按钮（如 Town Hall -> Keep）
-    if (buildingDef?.upgradeTo && primary.isBuilding && primary.buildProgress >= 1 && !primary.upgradeQueue) {
-      const upgradeDef = BUILDINGS[buildingDef.upgradeTo]
-      if (upgradeDef) {
-        const upgradeCost = upgradeDef.cost
-        const costReason = this.getCostBlockReason(0, upgradeCost)
-        buttons.push({
-          label: '升级主城',
-          cost: `${upgradeCost.gold}g ${upgradeCost.lumber}w · ${upgradeDef.buildTime}s`,
-          enabled: !costReason,
-          disabledReason: costReason,
-          onClick: () => {
-            this.startBuildingUpgrade(primary, buildingDef.upgradeTo!)
-          },
-        })
-      }
-    }
-
-    // 建筑：显示升级进度（如 Town Hall 正在升级为主城）
-    if (primary.isBuilding && primary.buildProgress >= 1 && primary.upgradeQueue) {
-      const targetDef = BUILDINGS[primary.upgradeQueue.targetType]
-      const remaining = Math.ceil(primary.upgradeQueue.remaining)
-      buttons.push({
-        label: `升级${targetDef?.name ?? '中'}…`,
-        cost: `${remaining}秒`,
-        enabled: false,
-        disabledReason: `正在升级${targetDef?.name ?? ''}`,
-        onClick: () => {},
-      })
-    }
-
-    // 建筑：显示可用研究（如铁匠铺的 Long Rifles）
-    if (buildingDef?.researches && primary.buildProgress >= 1) {
-      for (const rKey of buildingDef.researches) {
-        const rDef = RESEARCHES[rKey]
-        if (!rDef) continue
-        const capturedRKey = rKey
-        const avail = this.getResearchAvailability(capturedRKey, 0)
-        // If already completed, show completed state
-        if (this.hasCompletedResearch(capturedRKey, 0)) {
-          // 完成态仍展示研究效果，避免只显示“已完成”。
-          const effectDesc = rDef.effects?.map(e => `${e.stat === 'attackRange' ? '射程' : e.stat} +${e.value}`).join(', ') ?? ''
-          buttons.push({
-            label: `${rDef.name} ✓`,
-            cost: effectDesc || '已完成',
-            enabled: false,
-            disabledReason: '已研究',
-            onClick: () => {},
-          })
-        } else {
-          // 研究按钮展示费用和数据化效果。
-          const effectDesc = rDef.effects?.map(e => {
-            const unitName = UNITS[e.targetUnitType]?.name ?? e.targetUnitType
-            const statName = e.stat === 'attackRange' ? '射程' : e.stat
-            return `${unitName} ${statName}+${e.value}`
-          }).join(', ') ?? rDef.description
-          buttons.push({
-            label: rDef.name,
-            cost: `${rDef.cost.gold}g ${rDef.cost.lumber}w · ${effectDesc}`,
-            enabled: avail.ok,
-            disabledReason: avail.reason,
-            onClick: () => {
-              this.startResearch(primary, capturedRKey)
-            },
-          })
-        }
-      }
-    }
-
-    const renderedButtons = Math.min(buttons.length, COMMAND_CARD_SLOT_COUNT)
-
-    // 先渲染已填充的按钮。
-    for (let i = 0; i < renderedButtons; i++) {
-      const b = buttons[i]
-      this.addCommandButton(b.label, b.cost, b.onClick, b.hotkey, b.enabled ?? true, b.disabledReason ?? '')
-    }
-    // 剩余位置用空插槽补齐
-    for (let i = renderedButtons; i < COMMAND_CARD_SLOT_COUNT; i++) {
-      const slot = document.createElement('div')
-      slot.className = 'cmd-slot'
-      this.elCommandCard.appendChild(slot)
-    }
-  }
-
-  private addCommandButton(label: string, cost: string, onClick: () => void, hotkey?: string, enabled = true, disabledReason = '') {
-    const btn = document.createElement('button')
-    if (!enabled) {
-      btn.disabled = true
-      btn.dataset.disabledReason = disabledReason
-      btn.title = disabledReason
-      btn.classList.add('cmd-disabled')
-    }
-    btn.innerHTML =
-      (hotkey ? `<span class="btn-hotkey">${hotkey}</span>` : '') +
-      `<span class="btn-label">${label}</span>` +
-      `<span class="btn-cost">${cost}</span>` +
-      (disabledReason ? `<span class="btn-reason">${disabledReason}</span>` : '')
-    btn.addEventListener('click', onClick)
-    this.elCommandCard.appendChild(btn)
+    this.commandCardPresenter.renderButtons(buttons)
   }
 
   // ==================== 训练 ====================
-
-  private getQueuedSupply(team: number): number {
-    let queuedSupply = 0
-    for (const u of this.units) {
-      if (u.team !== team || !u.isBuilding) continue
-      for (const item of u.trainingQueue) {
-        queuedSupply += UNITS[item.type]?.supply ?? 0
-      }
-    }
-    return queuedSupply
-  }
-
-  private getCostBlockReason(team: number, cost: { gold: number; lumber: number }): string {
-    const res = this.resources.get(team)
-    const reasons: string[] = []
-    if (res.gold < cost.gold) reasons.push('黄金不足')
-    if (res.lumber < cost.lumber) reasons.push('木材不足')
-    return reasons.join(' / ')
-  }
-
-  private getHeroReviveQuote(deadHero: Unit): { gold: number; lumber: number; totalDuration: number } | null {
-    const heroDef = UNITS[deadHero.type]
-    if (!heroDef?.isHero) return null
-
-    const level = deadHero.heroLevel ?? heroDef.heroLevel ?? 1
-    const goldFactor = Math.min(
-      HERO_REVIVE_RULES.goldBaseFactor + HERO_REVIVE_RULES.goldLevelFactor * (level - 1),
-      HERO_REVIVE_RULES.goldMaxFactor,
-    )
-    const gold = Math.min(
-      Math.floor(heroDef.cost.gold * goldFactor),
-      HERO_REVIVE_RULES.goldHardCap,
-    )
-    const lumberFactor = HERO_REVIVE_RULES.lumberBaseFactor + HERO_REVIVE_RULES.lumberLevelFactor * (level - 1)
-    const lumber = Math.floor(heroDef.cost.lumber * lumberFactor)
-    const rawTime = heroDef.trainTime * level * HERO_REVIVE_RULES.timeFactor
-    const cappedTime = Math.min(
-      rawTime,
-      heroDef.trainTime * HERO_REVIVE_RULES.timeMaxFactor,
-      HERO_REVIVE_RULES.timeHardCap,
-    )
-
-    return { gold, lumber, totalDuration: Math.round(cappedTime) }
-  }
-
-  private getBuildAvailability(buildingType: string, team: number): { ok: boolean; reason: string } {
-    const def = BUILDINGS[buildingType]
-    if (!def) return { ok: false, reason: '不可用' }
-
-    // Tech prerequisite: require a completed building of the specified type
-    if (def.techPrereq) {
-      const hasPrereq = this.units.some(
-        u => u.team === team && u.type === def.techPrereq && u.isBuilding
-          && u.buildProgress >= 1 && u.hp > 0,
-      )
-      if (!hasPrereq) {
-        const prereqDef = BUILDINGS[def.techPrereq]
-        return { ok: false, reason: `需要${prereqDef?.name ?? def.techPrereq}` }
-      }
-    }
-
-    const reason = this.getCostBlockReason(team, def.cost)
-    return reason ? { ok: false, reason } : { ok: true, reason: '' }
-  }
-
-  private getTrainAvailability(unitType: string, team: number): { ok: boolean; reason: string } {
-    const def = UNITS[unitType]
-    if (!def) return { ok: false, reason: '不可用' }
-
-    // Tech prerequisite: require a completed building of the specified type
-    if (def.techPrereq) {
-      const hasPrereq = this.units.some(
-        u => u.team === team && u.type === def.techPrereq && u.isBuilding
-          && u.buildProgress >= 1 && u.hp > 0,
-      )
-      if (!hasPrereq) {
-        const prereqDef = BUILDINGS[def.techPrereq]
-        return { ok: false, reason: `需要${prereqDef?.name ?? def.techPrereq}` }
-      }
-    }
-
-    // Multi-building prerequisite: all buildings in techPrereqs must be completed
-    if (def.techPrereqs && def.techPrereqs.length > 0) {
-      for (const prereqKey of def.techPrereqs) {
-        const hasPrereq = this.units.some(
-          u => u.team === team && u.type === prereqKey && u.isBuilding
-            && u.buildProgress >= 1 && u.hp > 0,
-        )
-        if (!hasPrereq) {
-          const prereqDef = BUILDINGS[prereqKey]
-          return { ok: false, reason: `需要${prereqDef?.name ?? prereqKey}` }
-        }
-      }
-    }
-
-    const resourceReason = this.getCostBlockReason(team, def.cost)
-    if (resourceReason) return { ok: false, reason: resourceReason }
-
-    const supply = this.resources.computeSupply(team, this.units)
-    const queuedSupply = this.getQueuedSupply(team)
-    if (supply.used + queuedSupply + def.supply > supply.total) {
-      return { ok: false, reason: '人口不足' }
-    }
-    return { ok: true, reason: '' }
-  }
 
   /** Start hero revive on an Altar */
   private startReviveHero(altar: Unit, heroKey: string) {
@@ -6567,7 +6187,7 @@ export class Game {
     )
     if (alreadyQueued) return
 
-    const quote = this.getHeroReviveQuote(deadHero)
+    const quote = calculateHeroReviveQuote(deadHero)
     if (!quote) return
 
     // Check and spend resources
@@ -6575,19 +6195,6 @@ export class Game {
     this.resources.spend(altar.team, { gold: quote.gold, lumber: quote.lumber })
 
     altar.reviveQueue.push({ heroType: heroKey, remaining: quote.totalDuration, totalDuration: quote.totalDuration })
-  }
-
-  private checkHeroLevelUp(hero: Unit) {
-    const currentLevel = hero.heroLevel ?? 1
-    if (currentLevel >= HERO_XP_RULES.maxHeroLevel) return
-    const nextLevel = currentLevel + 1
-    const threshold = HERO_XP_RULES.xpThresholdsByLevel[nextLevel]
-    if (threshold === undefined) return
-    if ((hero.heroXP ?? 0) < threshold) return
-    hero.heroLevel = nextLevel
-    hero.heroSkillPoints = (hero.heroSkillPoints ?? 0) + HERO_XP_RULES.skillPointsPerLevel
-    // Recurse for multi-level jumps
-    this.checkHeroLevelUp(hero)
   }
 
   private trainUnit(building: Unit, unitType: string) {
@@ -6620,11 +6227,11 @@ export class Game {
 
     // 检查人口上限（含训练队列中的单位，防止超额训练）
     const supply = this.resources.computeSupply(0, this.units)
-    const queuedSupply = this.getQueuedSupply(0)
+    const queuedSupply = computeQueuedSupply(this.units, 0)
     if (supply.used + queuedSupply + def.supply > supply.total) return
 
     this.resources.spend(0, def.cost)
-    dispatchGameCommand([], { type: 'train', building, unitType, trainTime: def.trainTime })
+    this.issueCommand([], { type: 'train', building, unitType, trainTime: def.trainTime })
   }
 
   // ==================== 建筑升级（数据驱动主基地升级）====================
@@ -6643,109 +6250,638 @@ export class Game {
     if (!this.resources.canAfford(team, targetDef.cost)) return
 
     this.resources.spend(team, targetDef.cost)
-    dispatchGameCommand([], { type: 'upgradeBuilding', building, targetKey, upgradeTime: targetDef.buildTime })
+    this.issueCommand([], { type: 'upgradeBuilding', building, targetKey, upgradeTime: targetDef.buildTime })
   }
 
   // ==================== 研究 ====================
-
-  private getResearchAvailability(researchKey: string, team: number): { ok: boolean; reason: string } {
-    const def = RESEARCHES[researchKey]
-    if (!def) return { ok: false, reason: '不可用' }
-
-    // Already completed
-    if (this.hasCompletedResearch(researchKey, team)) {
-      return { ok: false, reason: '已研究' }
-    }
-
-    // Already in a research queue somewhere on this team
-    const inProgress = this.units.some(
-      u => u.team === team && u.isBuilding && u.researchQueue.some(r => r.key === researchKey),
-    )
-    if (inProgress) {
-      return { ok: false, reason: '正在研究中' }
-    }
-
-    // Required building
-    if (def.requiresBuilding) {
-      const hasBuilding = this.units.some(
-        u => u.team === team && u.type === def.requiresBuilding && u.isBuilding
-          && u.buildProgress >= 1 && u.hp > 0,
-      )
-      if (!hasBuilding) {
-        const bDef = BUILDINGS[def.requiresBuilding]
-        return { ok: false, reason: `需要${bDef?.name ?? def.requiresBuilding}` }
-      }
-    }
-
-    // Additional required buildings (multi-building prerequisites)
-    if (def.requiresBuildings?.length) {
-      const missing: string[] = []
-      for (const bType of def.requiresBuildings) {
-        const hasIt = this.units.some(
-          u => u.team === team && u.type === bType && u.isBuilding
-            && u.buildProgress >= 1 && u.hp > 0,
-        )
-        if (!hasIt) {
-          const bDef = BUILDINGS[bType]
-          missing.push(bDef?.name ?? bType)
-        }
-      }
-      if (missing.length > 0) {
-        return { ok: false, reason: `需要${missing.join('、')}` }
-      }
-    }
-
-    // Prerequisite research (ordered tier chain)
-    if (def.prerequisiteResearch) {
-      if (!this.hasCompletedResearch(def.prerequisiteResearch, team)) {
-        const preDef = RESEARCHES[def.prerequisiteResearch]
-        return { ok: false, reason: `需要先研究${preDef?.name ?? def.prerequisiteResearch}` }
-      }
-    }
-
-    // Resources
-    const reason = this.getCostBlockReason(team, def.cost)
-    if (reason) return { ok: false, reason }
-
-    return { ok: true, reason: '' }
-  }
 
   private startResearch(building: Unit, researchKey: string) {
     const def = RESEARCHES[researchKey]
     if (!def) return
     const team = building.team
-    if (!this.getResearchAvailability(researchKey, team).ok) return
+    if (!checkResearchAvailability(this.units, this.resources, researchKey, team).ok) return
 
     this.resources.spend(team, def.cost)
     building.researchQueue.push({ key: researchKey, remaining: def.researchTime })
   }
 
   private updateTrainQueueUI() {
-    this.elTrainQueue.innerHTML = ''
-    // 显示所有有训练/研究队列的玩家建筑
-    for (const unit of this.units) {
-      if (unit.team !== 0 || !unit.isBuilding) continue
-      for (const item of unit.trainingQueue) {
-        const def = UNITS[item.type]
-        if (!def) continue
-        const total = def.trainTime
-        const pct = ((total - item.remaining) / total) * 100
-        const div = document.createElement('div')
-        div.className = 'train-item'
-        div.innerHTML = `${def.name} <div class="train-bar"><div class="train-fill" style="width:${pct}%"></div></div>`
-        this.elTrainQueue.appendChild(div)
-      }
-      for (const item of unit.researchQueue) {
-        const def = RESEARCHES[item.key]
-        if (!def) continue
-        const total = def.researchTime
-        const pct = ((total - item.remaining) / total) * 100
-        const div = document.createElement('div')
-        div.className = 'train-item'
-        div.innerHTML = `R: ${def.name} <div class="train-bar"><div class="train-fill" style="width:${pct}%"></div></div>`
-        this.elTrainQueue.appendChild(div)
-      }
+    this.trainingQueuePresenter.render(buildTrainingQueueItems(this.units))
+  }
+
+  private renderObjectiveTracker(force = false) {
+    if (!this.elObjectiveList) return
+    const objectives = this.buildCurrentSkirmishObjectives()
+    const key = buildObjectiveStateKey(objectives)
+    if (!force && key === this._lastObjectiveKey) return
+    this._lastObjectiveKey = key
+
+    const newlyCompleted = objectives.filter(objective =>
+      objective.completed && !this.completedObjectiveKeys.has(objective.key),
+    )
+    const shouldFlashCompletions = this.objectiveTrackerPrimed && newlyCompleted.length > 0
+
+    this.elObjectiveList.replaceChildren(...objectives.map((objective) => {
+      const item = document.createElement('li')
+      const justCompleted = shouldFlashCompletions && newlyCompleted.some(done => done.key === objective.key)
+      item.className = `objective-item${justCompleted ? ' objective-item--new' : ''}`
+      item.dataset.key = objective.key
+      item.dataset.complete = objective.completed ? 'true' : 'false'
+      item.dataset.tone = objective.tone
+      item.title = objective.detail
+      item.setAttribute('aria-label', `${objective.label}: ${objective.progressText}`)
+
+      const icon = document.createElement('span')
+      icon.className = 'objective-icon'
+      icon.textContent = objective.icon
+
+      const state = document.createElement('span')
+      state.className = 'objective-state'
+      state.textContent = objective.completed ? '✓' : '•'
+
+      const body = document.createElement('span')
+      body.className = 'objective-body'
+
+      const name = document.createElement('span')
+      name.className = 'objective-name'
+      name.textContent = objective.label
+
+      const progress = document.createElement('span')
+      progress.className = 'objective-progress'
+      progress.textContent = objective.progressText
+
+      const rail = document.createElement('span')
+      rail.className = 'objective-rail'
+
+      const railFill = document.createElement('span')
+      railFill.className = 'objective-rail-fill'
+      railFill.style.width = `${Math.round(Math.max(0, Math.min(1, objective.progressValue)) * 100)}%`
+      rail.append(railFill)
+
+      body.append(name, progress, rail)
+      item.append(icon, body, state)
+      return item
+    }))
+
+    for (const objective of objectives) {
+      if (objective.completed) this.completedObjectiveKeys.add(objective.key)
     }
+    if (shouldFlashCompletions) {
+      this.objectiveHintTimer = 2.2
+      this.updateModeHint(`目标完成：${newlyCompleted.map(objective => objective.label).join('、')}`)
+      this.playAudioCue('objective', `目标完成：${newlyCompleted[0]?.label ?? '短局目标'}`)
+    }
+    this.objectiveTrackerPrimed = true
+  }
+
+  private renderPressureTracker(force = false) {
+    if (!this.elPressureStage || !this.elPressureWave || !this.elPressureNext || !this.elPressureMeterFill) return
+    const pressure = this.getAIPressureSnapshot()
+    if (!pressure) return
+
+    const key = [
+      pressure.stage,
+      pressure.pressure,
+      pressure.waveCount,
+      Math.ceil(pressure.nextWaveIn),
+      pressure.armyCount,
+      pressure.creepCampAttempts,
+      pressure.shopPurchases,
+      pressure.counterAttackCount,
+      pressure.defenseResponses,
+      pressure.regroupCount,
+      pressure.directorPhase,
+      pressure.playerBaseThreatLevel,
+    ].join(':')
+    if (!force && key === this._lastPressureKey) return
+    this._lastPressureKey = key
+
+    this.elPressureStage.textContent = `AI ${pressure.difficultyLabel} · ${pressure.stageLabel}`
+    this.elPressureWave.textContent = `波次 ${pressure.waveCount}`
+    const nextLabel = pressure.waveCount === 0 ? '首波' : '下波'
+    this.elPressureNext.textContent = pressure.nextWaveIn > 0
+      ? `${pressure.directorPhaseLabel} · ${nextLabel} ${Math.ceil(pressure.nextWaveIn)}s`
+      : `${pressure.directorPhaseLabel} · ${nextLabel} 就绪`
+    this.elPressureMeterFill.style.width = `${Math.max(0, Math.min(100, pressure.pressure))}%`
+    if (this.elPressureAlert) {
+      const hpSuffix = pressure.playerBaseHpPct !== null && pressure.playerBaseThreatLevel === 'siege'
+        ? ` · 基地 ${pressure.playerBaseHpPct}%`
+        : ''
+      this.elPressureAlert.textContent = `${pressure.playerBaseThreatLabel}${hpSuffix}`
+      this.elPressureAlert.dataset.alert = pressure.playerBaseThreatLevel
+    }
+    const pressureCueKey = `${pressure.stage}:${pressure.playerBaseThreatLevel}:${pressure.waveCount}`
+    if (pressureCueKey !== this._lastPressureCueKey &&
+      (pressure.stage === 'attacking' ||
+        pressure.stage === 'counterattacking' ||
+        pressure.playerBaseThreatLevel === 'attack' ||
+        pressure.playerBaseThreatLevel === 'siege')) {
+      this._lastPressureCueKey = pressureCueKey
+      this.playAudioCue('pressure', `AI ${pressure.stageLabel}`)
+    } else if (pressureCueKey !== this._lastPressureCueKey) {
+      this._lastPressureCueKey = pressureCueKey
+    }
+  }
+
+  private renderMapObjectiveRadar(force = false) {
+    if (!this.elMapObjectiveList) return
+    const objectives = this.buildCurrentMapObjectives()
+    if (this.sessionPreferences.objectiveBeacons) {
+      this.mapObjectiveBeacons.render(objectives)
+    } else {
+      this.mapObjectiveBeacons.render([])
+    }
+    const key = buildMapObjectiveStateKey(objectives)
+    if (!force && key === this._lastMapObjectiveKey) return
+    this._lastMapObjectiveKey = key
+
+    this.elMapObjectiveList.replaceChildren(...objectives.map((objective) => {
+      const item = document.createElement('div')
+      item.className = 'map-objective-item'
+      item.dataset.key = objective.key
+      item.dataset.tone = objective.tone
+      item.title = objective.detail
+      item.setAttribute('aria-label', `${objective.label}: ${objective.status}, ${objective.distanceText}`)
+
+      const icon = document.createElement('span')
+      icon.className = 'map-objective-icon'
+      icon.textContent = objective.icon
+
+      const body = document.createElement('span')
+      body.className = 'map-objective-body'
+
+      const main = document.createElement('span')
+      main.className = 'map-objective-main'
+
+      const label = document.createElement('span')
+      label.className = 'map-objective-label'
+      label.textContent = objective.label
+
+      const status = document.createElement('span')
+      status.className = 'map-objective-status'
+      status.textContent = objective.status
+
+      const rail = document.createElement('span')
+      rail.className = 'map-objective-rail'
+
+      const railFill = document.createElement('span')
+      railFill.className = 'map-objective-rail-fill'
+      railFill.style.width = `${Math.round(Math.max(0, Math.min(1, objective.progressValue)) * 100)}%`
+      rail.append(railFill)
+
+      const distance = document.createElement('span')
+      distance.className = 'map-objective-distance'
+      distance.textContent = objective.distanceText
+
+      main.append(label, status)
+      body.append(main, rail)
+      item.append(icon, body, distance)
+      return item
+    }))
+  }
+
+  private renderWar3IdentityStatus(force = false) {
+    if (!this.elWar3IdentityStatus) return
+    const snapshot = this.getWar3IdentitySnapshot()
+    const key = [
+      snapshot.completedCount,
+      snapshot.totalCount,
+      Math.round(snapshot.visibility.visiblePct * 100),
+      Math.round(snapshot.visibility.exploredPct * 100),
+      snapshot.scoutedObjectiveCount,
+      snapshot.visibleNeutralCount,
+      snapshot.worldItems.length,
+    ].join(':')
+    if (!force && key === this._lastWar3IdentityKey) return
+    this._lastWar3IdentityKey = key
+
+    this.elWar3IdentityStatus.dataset.complete = snapshot.completed ? 'true' : 'false'
+    this.elWar3IdentityStatus.textContent =
+      `侦察 ${Math.round(snapshot.visibility.exploredPct * 100)}% · ` +
+      `可见 ${Math.round(snapshot.visibility.visiblePct * 100)}% · ` +
+      `目标 ${snapshot.scoutedObjectiveCount}/6 · ` +
+      `野怪 ${snapshot.visibleNeutralCount} · ` +
+      `物品 ${snapshot.worldItems.length} · ` +
+      snapshot.verdict
+  }
+
+  private updateHumanRouteCompletionFeedback(snapshot: HumanRouteSnapshot) {
+    const completedKeys = [
+      ...snapshot.steps
+        .filter(step => step.completed)
+        .map(step => `step:${step.key}`),
+      ...snapshot.unlocks
+        .filter(unlock => unlock.available && unlock.dataReady)
+        .map(unlock => `unlock:${unlock.key}`),
+    ]
+    const nextCompleted = new Set(completedKeys)
+    const newlyCompleted = completedKeys.filter(key => !this.completedHumanRouteKeys.has(key))
+
+    this.completedHumanRouteKeys = nextCompleted
+    if (!this.humanRouteFeedbackPrimed) {
+      this.humanRouteFeedbackPrimed = true
+      this.lastHumanRouteCompletionKeys = []
+      return []
+    }
+
+    this.lastHumanRouteCompletionKeys = newlyCompleted
+    if (newlyCompleted.length > 0) {
+      this.humanRouteCompletionCueCount += newlyCompleted.length
+      this.audioCues.play('objective', `Human route ${newlyCompleted.length} complete`)
+    }
+    return newlyCompleted
+  }
+
+  private renderHumanRoutePanel(force = false) {
+    if (!this.elHumanRoutePanel || !this.elHumanRouteList) return
+    this.elHumanRoutePanel.hidden = !this.sessionPreferences.humanRoutePanel
+    this.elHumanRoutePanel.setAttribute('aria-hidden', this.sessionPreferences.humanRoutePanel ? 'false' : 'true')
+    if (!this.sessionPreferences.humanRoutePanel) return
+
+    const snapshot = this.getHumanRouteSnapshot()
+    const key = [
+      snapshot.tier.currentTierLabel,
+      snapshot.tier.availableUnlockCount,
+      snapshot.tier.nextActions.join('/'),
+      snapshot.rhythm.phaseLabel,
+      snapshot.rhythm.roleCoverageCount,
+      snapshot.rhythm.completeRoleCount,
+      snapshot.rhythm.recommendedFocus,
+      snapshot.combat.compositionCoverageCount,
+      snapshot.combat.counterAdvantageCount,
+      snapshot.combat.recommendedMix,
+      snapshot.upgradeImpact.completedResearchCount,
+      snapshot.upgradeImpact.battleReason,
+      snapshot.steps
+        .map(step => `${step.key}:${Math.round(step.liveProgress * 100)}:${step.status}:${step.completed ? 1 : 0}`)
+        .join('|'),
+      snapshot.unlocks
+        .map(unlock => `${unlock.key}:${unlock.state}:${Math.round(unlock.progress * 100)}:${unlock.status}:${unlock.nextAction}`)
+        .join('|'),
+    ].join('::')
+    const newlyCompletedKeys = new Set(this.updateHumanRouteCompletionFeedback(snapshot))
+    if (!force && key === this._lastHumanRouteKey && newlyCompletedKeys.size === 0) return
+    this._lastHumanRouteKey = key
+
+    this.elHumanRoutePanel.dataset.complete = snapshot.completed ? 'true' : 'false'
+    if (this.elHumanRouteTechSummary) {
+      const next = snapshot.tier.nextActions.length > 0
+        ? `下一步 ${snapshot.tier.nextActions.join('；')}`
+        : `路线已闭环；${snapshot.rhythm.recommendedFocus}`
+      this.elHumanRouteTechSummary.textContent =
+        `${snapshot.tier.currentTierLabel} · ${snapshot.rhythm.phaseLabel} · 角色 ${snapshot.rhythm.roleCoverageCount}/${snapshot.rhythm.totalRoleCount} · 混编 ${snapshot.combat.compositionCoverageCount}/${snapshot.combat.totalCompositionRoleCount} · 克制 ${snapshot.combat.counterAdvantageCount}/${snapshot.combat.counterRuleCount} · 科技 ${snapshot.upgradeImpact.completedResearchCount}/${snapshot.upgradeImpact.totalTrackedResearchCount} · 解锁 ${snapshot.tier.availableUnlockCount}/${snapshot.tier.totalUnlockCount} · ${next}`
+      this.elHumanRouteTechSummary.dataset.complete = snapshot.completed ? 'true' : 'false'
+      this.elHumanRouteTechSummary.title = `${snapshot.rhythm.nextPowerSpike}；${snapshot.combat.recommendedMix}；${snapshot.upgradeImpact.battleReason}`
+    }
+    this.elHumanRouteList.replaceChildren(...snapshot.steps.map((step) => {
+      const item = document.createElement('div')
+      item.className = 'human-route-item'
+      item.dataset.key = step.key
+      item.dataset.tone = step.tone
+      item.dataset.complete = step.completed ? 'true' : 'false'
+      item.dataset.new = newlyCompletedKeys.has(`step:${step.key}`) ? 'true' : 'false'
+      item.title = step.detail
+
+      const icon = document.createElement('span')
+      icon.className = 'human-route-icon'
+      icon.textContent = step.icon
+      icon.setAttribute('aria-hidden', 'true')
+
+      const label = document.createElement('span')
+      label.className = 'human-route-label'
+      label.textContent = step.label
+
+      const status = document.createElement('span')
+      status.className = 'human-route-status'
+      status.textContent = step.status
+
+      const rail = document.createElement('span')
+      rail.className = 'human-route-rail'
+      const fill = document.createElement('span')
+      fill.className = 'human-route-rail-fill'
+      fill.style.width = `${Math.round(step.liveProgress * 100)}%`
+      rail.append(fill)
+
+      item.append(icon, label, status, rail)
+      return item
+    }))
+    if (this.elHumanRouteUnlockList) {
+      this.elHumanRouteUnlockList.replaceChildren(...snapshot.unlocks.map((unlock) => {
+        const item = document.createElement('div')
+        item.className = 'human-route-unlock-item'
+        item.dataset.key = unlock.key
+        item.dataset.tier = unlock.tier
+        item.dataset.tone = unlock.tone
+        item.dataset.state = unlock.state
+        item.dataset.role = unlock.role
+        item.dataset.action = unlock.nextAction
+        item.dataset.progress = String(Math.round(unlock.progress * 100))
+        item.dataset.counter = getHumanUnlockCounterText(unlock.key, snapshot)
+        item.dataset.complete = unlock.available && unlock.dataReady ? 'true' : 'false'
+        item.dataset.new = newlyCompletedKeys.has(`unlock:${unlock.key}`) ? 'true' : 'false'
+        item.title = `${unlock.detail}；${unlock.impact}；${getHumanUnlockCounterText(unlock.key, snapshot)}；下一步：${unlock.nextAction}`
+
+        const icon = document.createElement('span')
+        icon.className = 'human-route-unlock-icon'
+        icon.textContent = unlock.icon
+        icon.setAttribute('aria-hidden', 'true')
+
+        const label = document.createElement('span')
+        label.className = 'human-route-unlock-label'
+        label.textContent = unlock.label
+
+        const status = document.createElement('span')
+        status.className = 'human-route-unlock-status'
+        status.textContent = unlock.status
+
+        const role = document.createElement('span')
+        role.className = 'human-route-unlock-role'
+        role.textContent = `${unlock.role} · ${unlock.nextAction}`
+
+        const counter = document.createElement('span')
+        counter.className = 'human-route-unlock-counter'
+        counter.textContent = getHumanUnlockCounterText(unlock.key, snapshot)
+
+        item.append(icon, label, status, role, counter)
+        return item
+      }))
+    }
+  }
+
+  private renderMilestoneStatusPanel(force = false) {
+    if (!this.elFoundationStatus || !this.elHeroTacticsStatus || !this.elAiOpponentStatus || !this.elVisualAudioStatus) return
+    const foundation = this.getFoundationMilestoneSnapshot()
+    const hero = this.getHeroMilestoneSnapshot()
+    const ai = this.getAIOpponentSnapshot()
+    const identity = this.getVisualAudioIdentitySnapshot()
+    const key = [
+      foundation.completedCount,
+      foundation.stages.map(stage => `${stage.key}:${stage.completed ? 1 : 0}`).join('|'),
+      hero.completedCount,
+      hero.maxHeroLevel,
+      hero.learnedAbilityCount,
+      hero.activeFeedbackCount,
+      hero.tacticalAbilityCount,
+      hero.tacticalReadyCount,
+      hero.tacticalBlockedCount,
+      hero.tacticalTargetHintCount,
+      hero.abilityPresentation.completedCount,
+      hero.abilityPresentation.rangePreviewCount,
+      hero.abilityPresentation.areaPreviewCount,
+      hero.abilityPresentation.cursorHintCount,
+      hero.abilityPresentation.visiblePreviewRingCount,
+      hero.abilityPresentation.activeTargetLegalCount,
+      hero.abilityPresentation.activeTargetInvalidCount,
+      hero.abilityPresentation.activeTargetMarkerCount,
+      hero.abilityPresentation.activeTargetEvaluation?.reason ?? '',
+      hero.resurrectionReadability.completedCount,
+      hero.resurrectionReadability.visibleCorpseMarkerCount,
+      hero.resurrectionReadability.visibleEligibleCorpseMarkerCount,
+      hero.resurrectionReadability.resurrectionRadiusCount,
+      ai.completedCount,
+      ai.directorPhase,
+      ai.armyCount,
+      ai.heroCount,
+      identity.completedCount,
+      identity.feedbackCueCount,
+      identity.loadedAssetCount,
+      identity.presentationCheckCount,
+      identity.presentation.abilityPreviewRingCount,
+      identity.presentation.abilityEffectBurstCount,
+      identity.presentation.abilityTargetMarkerCount,
+      identity.resultPresentation.completedCount,
+      identity.resultPresentation.cardCount,
+      identity.resultPresentation.objectiveChipCount,
+      identity.resultPresentation.flowStepCount,
+      identity.perceptionCheckCount,
+      identity.assetReadinessCheckCount,
+      identity.combatFeedbackCount,
+      identity.perception.audioKindCount,
+      identity.perception.deathSignalCount,
+      identity.perception.constructionSignalCount,
+      identity.assetReadiness.realClipStateCount,
+      identity.assetReadiness.requiredClipStateCount,
+      identity.assetReadiness.audioAssetCueKindCount,
+      identity.assetReadiness.audioCueContractCount,
+      identity.unitPresentation.clipBackedUnitCount,
+      identity.unitPresentation.proceduralFallbackUnitCount,
+      identity.unitPresentation.availableClipUnitCount,
+    ].join(':')
+    if (!force && key === this._lastMilestoneStatusKey) return
+    this._lastMilestoneStatusKey = key
+
+    this.elFoundationStatus.dataset.complete = foundation.completed ? 'true' : 'false'
+    this.elFoundationStatus.textContent =
+      `R1-R6 基础 ${foundation.completedCount}/${foundation.totalCount} · ${foundation.verdict}`
+
+    this.elHeroTacticsStatus.dataset.complete = hero.completed ? 'true' : 'false'
+    this.elHeroTacticsStatus.textContent =
+      `R8 英雄 ${hero.completedCount}/${hero.totalCount} · Lv${hero.maxHeroLevel} · 技能 ${hero.learnedAbilityCount} · ${hero.verdict}`
+
+    if (this.elHeroTacticsReadiness) {
+      const readinessComplete = hero.tacticalAbilityCount > 0 &&
+        hero.tacticalTargetHintCount >= 6 &&
+        hero.tacticalAbilityCount === hero.abilityReadiness.length &&
+        hero.abilityPresentation.completed
+      this.elHeroTacticsReadiness.dataset.complete = readinessComplete ? 'true' : 'false'
+      const activeTarget = hero.abilityPresentation.activeTargetEvaluation
+      const activeTargetText = activeTarget
+        ? ` · 当前目标 ${activeTarget.legal ? '合法' : '非法'}:${activeTarget.reason}`
+        : ''
+      const resurrectionText = hero.resurrectionReadability.visibleCorpseMarkerCount > 0 ||
+        hero.resurrectionReadability.resurrectionRadiusCount > 0
+        ? ` · 复活 尸体${hero.resurrectionReadability.visibleCorpseMarkerCount}/可复活${hero.resurrectionReadability.visibleEligibleCorpseMarkerCount}/范围${hero.resurrectionReadability.resurrectionRadiusCount}`
+        : ''
+      this.elHeroTacticsReadiness.textContent =
+        `技能判断 可用 ${hero.tacticalReadyCount}/${hero.tacticalAbilityCount} · 阻断 ${hero.tacticalBlockedCount} · ` +
+        `目标提示 ${hero.tacticalTargetHintCount} · 预览 距离${hero.abilityPresentation.rangePreviewCount}/范围${hero.abilityPresentation.areaPreviewCount}/光标${hero.abilityPresentation.cursorHintCount}${activeTargetText}${resurrectionText}`
+    }
+
+    this.elAiOpponentStatus.dataset.complete = ai.completed ? 'true' : 'false'
+    this.elAiOpponentStatus.textContent =
+      `R9 AI ${ai.completedCount}/${ai.totalCount} · ${ai.difficultyLabel} · ${ai.directorPhase} · 军队 ${ai.armyCount} · ${ai.verdict}`
+
+    this.elVisualAudioStatus.dataset.complete = identity.completed ? 'true' : 'false'
+    this.elVisualAudioStatus.textContent =
+      `R14 反馈 ${identity.completedCount}/${identity.totalCount} · ` +
+      `资产 ${identity.loadedAssetCount}/${identity.assetCount} · ` +
+      `表现 ${identity.presentationCheckCount}/${identity.presentation.totalCount} · ` +
+      `感知 ${identity.perceptionCheckCount}/${identity.perception.totalCount} · ` +
+      `门禁 ${identity.assetReadiness.realClipStateCount}/${identity.assetReadiness.requiredClipStateCount}clip ${identity.assetReadiness.audioAssetCueKindCount}/${identity.assetReadiness.audioCueContractCount}音频 · ` +
+      `动作 clip ${identity.unitPresentation.clipBackedUnitCount}/fallback ${identity.unitPresentation.proceduralFallbackUnitCount} · ` +
+      `技能环 ${identity.presentation.abilityPreviewRingCount}/特效${identity.presentation.abilityEffectBurstCount}/标记${identity.presentation.abilityTargetMarkerCount}/尸体${identity.presentation.corpseMarkerCount} · ` +
+      `结果卡 ${identity.resultPresentation.cardCount}/${identity.resultPresentation.objectiveChipCount}/${identity.resultPresentation.flowStepCount} · ` +
+      `cue ${identity.feedbackCueCount} · ${identity.verdict}`
+  }
+
+  private getCurrentMapSourceLabel() {
+    if (!this.currentMapSource) return '未加载'
+    if (this.currentMapSource.kind === 'procedural') return '程序化短局地图'
+    const terrain = this.currentMapSource.mapData.terrain
+    return `W3X ${terrain.width}x${terrain.height} · tileset ${terrain.tileset}`
+  }
+
+  private getPlaytestRuntimeInfo(): PlaytestRuntimeInfo {
+    const rendererSize = new THREE.Vector2()
+    this.renderer.getSize(rendererSize)
+    const fps = document.getElementById('fps')?.textContent?.trim() ?? ''
+    const result = this.gameOverResult
+    const assetEntries = getAllAssetEntries()
+    const assetLoadedCount = assetEntries.filter(entry => getAssetStatus(entry.key) === 'loaded').length
+    const buildingCount = this.units.filter(unit => unit.isBuilding && unit.hp > 0).length
+    const unitCount = this.units.filter(unit => !unit.isBuilding && unit.hp > 0 && !unit.isDead).length
+    return {
+      buildLabel: PLAYTEST_BUILD_LABEL,
+      browser: navigator.userAgent,
+      viewport: `${window.innerWidth}x${window.innerHeight}`,
+      url: window.location.href,
+      mapSource: this.getCurrentMapSourceLabel(),
+      modeLabel: this.currentMapSource?.kind === 'parsed' ? 'W3X 地图遭遇战' : '短局遭遇战',
+      resultLabel: result ?? (this.phase.isGameOver() ? 'ended' : 'in-progress'),
+      gameTimeLabel: this.elTime.textContent?.trim() || '00:00',
+      fpsText: fps,
+      rendererReady: rendererSize.x > 0 && rendererSize.y > 0,
+      devicePixelRatio: Number(window.devicePixelRatio.toFixed(2)),
+      hardwareConcurrency: typeof navigator.hardwareConcurrency === 'number' ? navigator.hardwareConcurrency : null,
+      webglVersion: this.renderer.capabilities.isWebGL2 ? 'WebGL2' : 'WebGL1',
+      unitCount,
+      buildingCount,
+      treeCount: this.treeManager.entries.length,
+      worldItemCount: this.worldItems.length,
+      assetLoadedCount,
+      assetTotalCount: assetEntries.length,
+    }
+  }
+
+  private getPlaytestFeedbackInput(): PlaytestFeedbackInput {
+    return {
+      category: this.elPlaytestFeedbackCategory?.value || 'startup',
+      severity: this.elPlaytestFeedbackSeverity?.value || 'blocker',
+      notes: this.elPlaytestUserNotes?.value.trim().slice(0, 800) || '',
+    }
+  }
+
+  private canUseLocalStorage() {
+    try {
+      const key = '__war3_re_playtest_probe__'
+      localStorage.setItem(key, '1')
+      localStorage.removeItem(key)
+      return true
+    } catch {
+      return false
+    }
+  }
+
+  private getPlaytestCompatibilitySignals(): PlaytestCompatibilitySignal[] {
+    const clipboardAvailable = !!navigator.clipboard && typeof navigator.clipboard.writeText === 'function'
+    return [
+      {
+        key: 'webgl',
+        label: 'WebGL',
+        ok: this.renderer.domElement.width > 0 && this.renderer.domElement.height > 0,
+        detail: `${this.renderer.capabilities.isWebGL2 ? 'WebGL2' : 'WebGL1'} renderer active`,
+      },
+      {
+        key: 'local-storage',
+        label: 'LocalStorage',
+        ok: this.canUseLocalStorage(),
+        detail: this.canUseLocalStorage() ? 'preferences can persist' : 'preferences cannot persist',
+      },
+      {
+        key: 'pointer',
+        label: 'Pointer/Mouse',
+        ok: typeof window.PointerEvent !== 'undefined' || typeof window.MouseEvent !== 'undefined',
+        detail: typeof window.PointerEvent !== 'undefined' ? 'PointerEvent available' : 'MouseEvent fallback available',
+      },
+      {
+        key: 'audio',
+        label: 'AudioContext',
+        ok: typeof AudioContext !== 'undefined' || typeof (window as any).webkitAudioContext !== 'undefined',
+        detail: typeof AudioContext !== 'undefined' || typeof (window as any).webkitAudioContext !== 'undefined'
+          ? 'audio cue runtime can initialize'
+          : 'audio cue runtime may be unavailable',
+      },
+      {
+        key: 'clipboard',
+        label: 'Clipboard',
+        ok: clipboardAvailable,
+        detail: clipboardAvailable ? 'copy feedback supported' : 'copy may require manual select',
+      },
+    ]
+  }
+
+  private getPlaytestRecentErrors(): PlaytestErrorSignal[] {
+    return [...this.playtestRuntimeErrors]
+  }
+
+  private getRuntimeMilestoneSnapshots(): RuntimeMilestoneSnapshots {
+    return {
+      foundation: this.getFoundationMilestoneSnapshot(),
+      r7: this.getHumanRouteSnapshot(),
+      r8: this.getHeroMilestoneSnapshot(),
+      r9: this.getAIOpponentSnapshot(),
+      r10: this.getSkirmishCompletionSnapshot(),
+      r11: this.getBattlefieldReadabilitySnapshot(),
+      r12: this.getWar3IdentitySnapshot(),
+      r13: this.getSessionShellSnapshot(),
+      r14: this.getVisualAudioIdentitySnapshot(),
+    }
+  }
+
+  private getPlaytestMilestoneSignals(): PlaytestMilestoneSignal[] {
+    return buildPlaytestMilestoneSignals(this.getRuntimeMilestoneSnapshots())
+  }
+
+  renderPlaytestReadinessPanel(force = false) {
+    if (!this.elPlaytestReadinessStatus || !this.elPlaytestReadinessList || !this.elPlaytestFeedbackPacket) return
+    const snapshot = this.getPlaytestReadinessSnapshot()
+    const key = [
+      snapshot.completedCount,
+      snapshot.totalCount,
+      snapshot.feedbackPacket.length,
+      snapshot.feedback.category,
+      snapshot.feedback.severity,
+      snapshot.feedback.notes.length,
+      snapshot.recentErrors.length,
+      snapshot.compatibility.map(item => `${item.key}:${item.ok ? 1 : 0}`).join('|'),
+      snapshot.checks.map(check => `${check.key}:${check.completed ? 1 : 0}`).join('|'),
+    ].join(':')
+    if (!force && key === this._lastPlaytestReadinessKey) return
+    this._lastPlaytestReadinessKey = key
+
+    this.elPlaytestReadinessStatus.dataset.complete = snapshot.completed ? 'true' : 'false'
+    this.elPlaytestReadinessStatus.textContent =
+      `R15 ${snapshot.completedCount}/${snapshot.totalCount} · ${snapshot.buildLabel} · ${snapshot.verdict}`
+    this.elPlaytestFeedbackPacket.value = snapshot.feedbackPacket
+    if (this.elPlaytestOperationalSummary) {
+      const runtime = this.getPlaytestRuntimeInfo()
+      this.elPlaytestOperationalSummary.textContent =
+        `性能 ${runtime.fpsText || 'not sampled'} · WebGL ${runtime.webglVersion} · 对象 U${runtime.unitCount}/B${runtime.buildingCount}/T${runtime.treeCount}/I${runtime.worldItemCount} · 资产 ${runtime.assetLoadedCount}/${runtime.assetTotalCount}`
+    }
+    if (this.elPlaytestErrorList) {
+      this.elPlaytestErrorList.textContent = snapshot.recentErrors.length > 0
+        ? `运行时异常：${snapshot.recentErrors.map(item => `${item.timeLabel} ${item.kind} ${item.message}`).join(' | ')}`
+        : '运行时异常：未捕获'
+    }
+
+    this.elPlaytestReadinessList.replaceChildren(...snapshot.checks.map((check) => {
+      const item = document.createElement('div')
+      item.className = 'playtest-readiness-item'
+      item.dataset.key = check.key
+      item.dataset.complete = check.completed ? 'true' : 'false'
+      item.title = check.detail
+
+      const label = document.createElement('span')
+      label.className = 'playtest-readiness-label'
+      label.textContent = check.label
+
+      const detail = document.createElement('span')
+      detail.className = 'playtest-readiness-detail'
+      detail.textContent = check.detail
+
+      item.append(label, detail)
+      return item
+    }))
   }
 
   // ==================== 地块信息 ====================
@@ -6753,9 +6889,8 @@ export class Game {
   private updateTileInfo() {
     if (this.placement.mode) return
     this.raycaster.setFromCamera(this.mouseNDC, this.camera)
-    const hits = this.raycaster.intersectObject(this.terrain.groundPlane)
-    if (hits.length > 0) {
-      const p = hits[0].point
+    const p = this.resolvePointerGroundPoint()
+    if (p) {
       const info = this.mapRuntime.getTileInfo(p.x, p.z)
       this.elTileInfo.textContent = `地块 (${info.tx}, ${info.tz}) ${info.name}`
     }
@@ -6764,48 +6899,23 @@ export class Game {
   // ==================== 小地图 ====================
 
   updateMinimap() {
-    const canvas = document.getElementById('minimap-canvas') as HTMLCanvasElement
-    if (!canvas) return
-    const ctx = canvas.getContext('2d')!
-    const w = canvas.width
-    const h = canvas.height
-    const sx = w / this.mapRuntime.width
-    const sz = h / this.mapRuntime.height
-
-    ctx.fillStyle = '#111'
-    ctx.fillRect(0, 0, w, h)
-
-    // 使用 MapRuntime 统一渲染小地图底图
-    const imageData = ctx.createImageData(w, h)
-    this.mapRuntime.renderMinimap(imageData.data, w, h)
-    ctx.putImageData(imageData, 0, 0)
-
-    // 单位标记
-    for (const unit of this.units) {
-      ctx.fillStyle = unit.team === 0 ? '#4488ff' : unit.team === 1 ? '#ff4444' : '#ffd700'
-      const px = unit.mesh.position.x * sx
-      const pz = unit.mesh.position.z * sz
-      const size = unit.isBuilding ? 3 : 2
-      ctx.fillRect(px - size / 2, pz - size / 2, size, size)
-    }
     const target = this.cameraCtrl.getTarget()
-    const vs = this.cameraCtrl.getZoom()
-    ctx.strokeStyle = '#fff'
-    ctx.lineWidth = 1
-    ctx.strokeRect((target.x - vs) * sx, (target.z - vs) * sz, vs * 2 * sx, vs * 2 * sz)
+    this.minimapPresenter.render({
+      mapRuntime: this.mapRuntime,
+      units: this.units,
+      cameraTarget: target,
+      cameraZoom: this.cameraCtrl.getZoom(),
+      objectives: this.buildCurrentMapObjectives(),
+      visibility: this.visibility,
+      showFog: this.sessionPreferences.minimapFog,
+    })
   }
 
   /** 小地图点击/拖拽 → 移动摄像机目标 */
   private handleMinimapClick(e: MouseEvent) {
-    const canvas = document.getElementById('minimap-canvas') as HTMLCanvasElement
-    if (!canvas) return
-    const rect = canvas.getBoundingClientRect()
-    const cx = e.clientX - rect.left
-    const cy = e.clientY - rect.top
-    // 小地图坐标 → 地图世界坐标
-    const wx = (cx / canvas.width) * this.mapRuntime.width
-    const wz = (cy / canvas.height) * this.mapRuntime.height
-    this.cameraCtrl.setTarget(wx, wz)
+    const target = this.minimapPresenter.getWorldPointFromEvent(e, this.mapRuntime)
+    if (!target) return
+    this.cameraCtrl.setTarget(target.x, target.z)
   }
 
   // ==================== 窗口缩放 ====================
@@ -6857,6 +6967,7 @@ export class Game {
     this.placementValidator.updateReferences(this.occupancy, this.mapRuntime)
     this.pathingGrid.updateReferences(this.mapRuntime, this.occupancy)
     this.treeManager.resize(mapW, mapH)
+    this.visibility.resize(mapW, mapH)
 
     // ===== 6. 创建新 W3X 渲染器 =====
     this.w3xRenderer = new W3XTerrainRenderer()
@@ -6882,6 +6993,13 @@ export class Game {
     this.createAI()
 
     this.phase.set(Phase.Playing)
+    this.renderObjectiveTracker(true)
+    this.renderPressureTracker(true)
+    this.renderMapObjectiveRadar(true)
+    this.renderWar3IdentityStatus(true)
+    this.renderHumanRoutePanel(true)
+    this.renderMilestoneStatusPanel(true)
+    this.renderPlaytestReadinessPanel(true)
     this.syncSessionOverlays()
   }
 
@@ -6931,6 +7049,7 @@ export class Game {
     this.placementValidator.updateReferences(this.occupancy, this.mapRuntime)
     this.pathingGrid.updateReferences(this.mapRuntime, this.occupancy)
     this.treeManager.resize(mapW, mapH)
+    this.visibility.resize(mapW, mapH)
 
     this.resources.reset()
     this.resources.init(0, 500, 200)
@@ -6945,6 +7064,13 @@ export class Game {
 
     this.currentMapSource = { kind: 'procedural' }
     this.phase.set(Phase.Playing)
+    this.renderObjectiveTracker(true)
+    this.renderPressureTracker(true)
+    this.renderMapObjectiveRadar(true)
+    this.renderWar3IdentityStatus(true)
+    this.renderHumanRoutePanel(true)
+    this.renderMilestoneStatusPanel(true)
+    this.renderPlaytestReadinessPanel(true)
     this.syncSessionOverlays()
   }
 
@@ -6952,11 +7078,7 @@ export class Game {
   private disposeAllUnits() {
     for (const unit of this.units) {
       // 清理血条
-      const bars = this.healthBars.get(unit)
-      if (bars) {
-        disposeObject3DDeep(bars.bg.parent!)
-        this.healthBars.delete(unit)
-      }
+      this.healthBarRenderer.remove(unit)
       // 清理单位模型
       disposeObject3DDeep(unit.mesh)
     }
@@ -7026,6 +7148,8 @@ export class Game {
         this.spawnUnit('worker', team, townhallX + offset.x, townhallZ + offset.z)
       }
     }
+
+    this.autoAssignOpeningGoldWorkers(0)
   }
 
   /**
@@ -7078,7 +7202,7 @@ export class Game {
       const groundH = terrain.groundHeight[dataIdx] * 3.0  // 匹配 renderer 的 heightScale
 
       const scale = 0.6 + rng() * 0.5
-      const tree = this.createSingleTree()
+      const tree = createTreeVisual()
       tree.position.set(x + 0.5, groundH, z + 0.5)
       tree.scale.setScalar(scale)
       tree.rotation.y = rng() * Math.PI * 2

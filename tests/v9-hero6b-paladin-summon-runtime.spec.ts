@@ -6,7 +6,7 @@
  * 2. Clicking summon spends Paladin cost and queues one summon.
  * 3. After train time, exactly one Paladin exists with correct hero identity.
  * 4. A second Paladin cannot be queued while one is alive.
- * 5. After HERO7, Holy Light appears on Paladin but not on Altar.
+ * 5. After HERO11 learning rules, learned Holy Light appears on Paladin but not on Altar.
  * 6. Barracks Footman training still works.
  *
  * Not revive, XP, leveling, skill points, AI, or visuals.
@@ -313,7 +313,7 @@ test.describe('V9 HERO6B Paladin hero summon runtime', () => {
     expect(result.secondReason).toContain('圣骑士')
   })
 
-  test('PSUM-5: Holy Light appears only on Paladin command card after HERO7', async ({ page }) => {
+  test('PSUM-5: learned Holy Light appears only on Paladin command card after HERO11', async ({ page }) => {
     await waitForRuntime(page)
 
     const result = await page.evaluate(({ paladinTrainTime }) => {
@@ -344,6 +344,9 @@ test.describe('V9 HERO6B Paladin hero summon runtime', () => {
       // Select Paladin
       const paladin = g.units.find((u: any) => u.type === 'paladin' && !u.isBuilding && u.team === 0)
       if (!paladin) return { found: true, noPaladin: true }
+      if (!paladin.abilityLevels) paladin.abilityLevels = {}
+      paladin.abilityLevels.holy_light = 1
+      paladin.heroSkillPoints = 0
 
       g.selectionModel.clear()
       g.selectionModel.setSelection([paladin])
@@ -351,9 +354,10 @@ test.describe('V9 HERO6B Paladin hero summon runtime', () => {
       g.updateHUD(0.016)
 
       const paladinButtons = Array.from(document.querySelectorAll('#command-card button'))
-      const holyLightBtn = paladinButtons.find((b: any) =>
-        b.querySelector('.btn-label')?.textContent?.trim() === '圣光术',
-      )
+      const holyLightBtn = paladinButtons.find((b: any) => {
+        const label = b.querySelector('.btn-label')?.textContent?.trim() ?? ''
+        return label.startsWith('圣光术')
+      })
 
       // Also check Altar
       g.selectionModel.clear()
@@ -362,9 +366,10 @@ test.describe('V9 HERO6B Paladin hero summon runtime', () => {
       g.updateHUD(0.016)
 
       const altarButtons = Array.from(document.querySelectorAll('#command-card button'))
-      const altarHolyLight = altarButtons.find((b: any) =>
-        b.querySelector('.btn-label')?.textContent?.trim() === '圣光术',
-      )
+      const altarHolyLight = altarButtons.find((b: any) => {
+        const label = b.querySelector('.btn-label')?.textContent?.trim() ?? ''
+        return label.startsWith('圣光术')
+      })
 
       return {
         found: true,

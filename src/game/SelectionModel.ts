@@ -1,4 +1,4 @@
-import type { Unit } from './Game'
+import type { Unit } from './UnitTypes'
 
 /**
  * War3 风格选择模型
@@ -78,22 +78,19 @@ export class SelectionModel {
   /**
    * Shift+click toggle 语义
    * - 如果单位已在选择中 → 移除
-   * - 如果单位不在选择中 → 添加（仅友方可控单位）
-   * 返回 true 表示是添加操作，false 表示移除操作
+   * - 如果单位不在选择中 → 添加友方单位
+   * - 未选中的敌方/中立单位 → 忽略
    */
   shiftToggle(unit: Unit, playerTeam: number): 'added' | 'removed' | 'rejected' {
-    // 只允许友方单位
-    if (unit.team !== playerTeam) return 'rejected'
-
     if (this.selected.includes(unit)) {
-      // 移除：但不能移除到空（war3 允许，和普通 RTS 一致）
-      // 但如果只剩一个且要移除，也允许（变为空选择）
       this.remove(unit)
       return 'removed'
-    } else {
-      this.add(unit)
-      return 'added'
     }
+
+    if (unit.team !== playerTeam) return 'rejected'
+
+    this.add(unit)
+    return 'added'
   }
 
   /**

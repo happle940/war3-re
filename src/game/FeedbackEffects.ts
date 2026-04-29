@@ -1,7 +1,44 @@
 import * as THREE from 'three'
-import type { Unit } from './Game'
+import type { Unit } from './UnitTypes'
 import { BUILDINGS } from './GameData'
 import { disposeObject3DDeep } from '../utils/dispose'
+
+export interface FeedbackEffectSnapshot {
+  activeMoveIndicators: number
+  activeImpactRings: number
+  activeQueueIndicators: number
+  activeAbilityEffectBursts: number
+  activeAbilityPreviewRings: number
+  activeAbilityTargetMarkers: number
+  activeAbilityValidTargetMarkers: number
+  activeAbilityInvalidTargetMarkers: number
+  activeCorpseMarkers: number
+  activeEligibleCorpseMarkers: number
+  activeResurrectionRadiusRings: number
+  totalMoveIndicators: number
+  totalAttackMoveIndicators: number
+  totalImpactRings: number
+  totalDamageNumbers: number
+  totalSelectionFlashes: number
+  totalHitFlashes: number
+  totalBuildCompleteEffects: number
+  totalAbilityEffectBursts: number
+  totalAbilityPreviewRefreshes: number
+  totalAbilityPreviewRingsShown: number
+  totalAbilityTargetMarkersShown: number
+  totalCorpseMarkerRefreshes: number
+}
+
+export type AbilityEffectTone =
+  | 'heal'
+  | 'shield'
+  | 'summon'
+  | 'area'
+  | 'teleport'
+  | 'stun'
+  | 'buff'
+  | 'debuff'
+  | 'resurrection'
 
 /**
  * Feedback and effect helpers extracted from Game.ts.
@@ -15,6 +52,8 @@ import { disposeObject3DDeep } from '../utils/dispose'
  * - floating damage numbers
  * - carry indicator (worker resource pack color/visibility)
  * - queue indicators (diamond markers for queued move targets)
+ * - ability preview rings and target markers (hero spell range, target area, active targeting)
+ * - resurrection corpse markers and radius rings
  *
  * This module owns no gameplay state. It only produces disposable visual
  * effects and reads unit/scene state through injected references.
@@ -28,7 +67,32 @@ export class FeedbackEffects {
   private impactRings: { mesh: THREE.Mesh; life: number; maxLife: number }[] = []
   private queueIndicators: THREE.Mesh[] = []
   private queueIndicatorGeo: THREE.PlaneGeometry | null = null
+  private abilityEffectBursts: Array<{
+    mesh: THREE.Mesh
+    life: number
+    maxLife: number
+    tone: AbilityEffectTone
+  }> = []
+  private abilityPreviewRings: THREE.Mesh[] = []
+  private abilityPreviewRingGeo: THREE.RingGeometry | null = null
+  private abilityTargetMarkers: THREE.Mesh[] = []
+  private abilityTargetMarkerGeo: THREE.CircleGeometry | null = null
+  private corpseMarkers: THREE.Mesh[] = []
+  private corpseMarkerGeo: THREE.RingGeometry | null = null
+  private resurrectionRadiusRings: THREE.Mesh[] = []
   private damageNumberGeo: THREE.PlaneGeometry | null = null
+  private totalMoveIndicators = 0
+  private totalAttackMoveIndicators = 0
+  private totalImpactRings = 0
+  private totalDamageNumbers = 0
+  private totalSelectionFlashes = 0
+  private totalHitFlashes = 0
+  private totalBuildCompleteEffects = 0
+  private totalAbilityEffectBursts = 0
+  private totalAbilityPreviewRefreshes = 0
+  private totalAbilityPreviewRingsShown = 0
+  private totalAbilityTargetMarkersShown = 0
+  private totalCorpseMarkerRefreshes = 0
 
   private findEmissiveMaterial(root: THREE.Object3D): (THREE.Material & { emissive: THREE.Color }) | null {
     let found: (THREE.Material & { emissive: THREE.Color }) | null = null
@@ -88,6 +152,7 @@ export class FeedbackEffects {
     dot.renderOrder = 999
     this.scene.add(dot)
     this.moveIndicators.push({ mesh: dot, life: 0.7 })
+    this.totalMoveIndicators += 2
   }
 
   showQueuedMoveIndicator(wx: number, wz: number) {
@@ -105,6 +170,7 @@ export class FeedbackEffects {
     mesh.renderOrder = 999
     this.scene.add(mesh)
     this.moveIndicators.push({ mesh, life: 0.6 })
+    this.totalMoveIndicators += 1
   }
 
   showAttackMoveIndicator(wx: number, wz: number) {
@@ -143,6 +209,8 @@ export class FeedbackEffects {
     vMesh.renderOrder = 999
     this.scene.add(vMesh)
     this.moveIndicators.push({ mesh: vMesh, life: 0.7 })
+    this.totalMoveIndicators += 3
+    this.totalAttackMoveIndicators += 1
   }
 
   updateMoveIndicators(dt: number) {
@@ -179,6 +247,7 @@ export class FeedbackEffects {
     ring.renderOrder = 998
     this.scene.add(ring)
     this.impactRings.push({ mesh: ring, life: 0.28, maxLife: 0.28 })
+    this.totalImpactRings += 1
   }
 
   updateImpactRings(dt: number) {
@@ -199,9 +268,68 @@ export class FeedbackEffects {
     }
   }
 
+  // ==================== Ability effect bursts ====================
+
+  spawnAbilityEffectBurst(input: {
+    x: number
+    z: number
+    tone: AbilityEffectTone
+    radius?: number
+    opacity?: number
+    life?: number
+  }) {
+    const toneColor: Record<AbilityEffectTone, number> = {
+      heal: 0x6fffb6,
+      shield: 0xf6e27a,
+      summon: 0x62d6ff,
+      area: 0x7ac8ff,
+      teleport: 0xb77dff,
+      stun: 0xffcc4a,
+      buff: 0xff9a4a,
+      debuff: 0x8ad17a,
+      resurrection: 0xf8e37d,
+    }
+    const radius = Math.max(0.25, input.radius ?? 0.9)
+    const geo = new THREE.RingGeometry(radius * 0.45, radius, 32)
+    geo.rotateX(-Math.PI / 2)
+    const mat = new THREE.MeshBasicMaterial({
+      color: toneColor[input.tone],
+      side: THREE.DoubleSide,
+      transparent: true,
+      opacity: input.opacity ?? 0.82,
+      depthTest: false,
+    })
+    const mesh = new THREE.Mesh(geo, mat)
+    const height = this.getWorldHeight(input.x - 0.5, input.z - 0.5) + 0.18
+    mesh.position.set(input.x, height, input.z)
+    mesh.renderOrder = 1001
+    this.scene.add(mesh)
+    const life = input.life ?? 0.85
+    this.abilityEffectBursts.push({ mesh, life, maxLife: life, tone: input.tone })
+    this.totalAbilityEffectBursts += 1
+  }
+
+  updateAbilityEffectBursts(dt: number) {
+    for (let i = this.abilityEffectBursts.length - 1; i >= 0; i--) {
+      const effect = this.abilityEffectBursts[i]
+      effect.life -= dt
+      const t = 1 - Math.max(0, effect.life / effect.maxLife)
+      const mat = effect.mesh.material as THREE.MeshBasicMaterial
+      effect.mesh.scale.setScalar(1 + t * 1.6)
+      mat.opacity = Math.max(0, 0.82 * (1 - t * t))
+      if (effect.life <= 0) {
+        this.scene.remove(effect.mesh)
+        effect.mesh.geometry.dispose()
+        mat.dispose()
+        this.abilityEffectBursts.splice(i, 1)
+      }
+    }
+  }
+
   // ==================== Build complete effect ====================
 
   playBuildCompleteEffect(unit: Unit) {
+    this.totalBuildCompleteEffects += 1
     // Scale bounce: 1.0 → 1.12 → 1.0 (快速)
     unit.mesh.scale.setScalar(1.12)
     setTimeout(() => { if (unit.mesh) unit.mesh.scale.setScalar(1.0) }, 120)
@@ -267,6 +395,7 @@ export class FeedbackEffects {
     })
 
     if (flashMats.length === 0) return
+    this.totalHitFlashes += 1
     for (const entry of flashMats) {
       entry.color.setHex(0xffffff)
     }
@@ -298,6 +427,7 @@ export class FeedbackEffects {
       entry.color.setHex(0xffffff)
     }
     if (flashMats.length > 0) {
+      this.totalSelectionFlashes += 1
       setTimeout(() => {
         for (const entry of flashMats) {
           entry.color.setHex(entry.orig)
@@ -309,6 +439,7 @@ export class FeedbackEffects {
   // ==================== Damage numbers ====================
 
   spawnDamageNumber(target: Unit, damage: number) {
+    this.totalDamageNumbers += 1
     // 复用 geometry
     if (!this.damageNumberGeo) {
       this.damageNumberGeo = new THREE.PlaneGeometry(0.45, 0.28)
@@ -456,5 +587,223 @@ export class FeedbackEffects {
       ;(mesh.material as THREE.Material).dispose()
     }
     this.queueIndicators = []
+  }
+
+  // ==================== Ability previews ====================
+
+  updateAbilityPreviews(previews: readonly {
+    kind?: string
+    x: number
+    z: number
+    radius: number
+    color: number
+    opacity?: number
+    legalityStatus?: string
+  }[]) {
+    if (!this.abilityPreviewRingGeo) {
+      this.abilityPreviewRingGeo = new THREE.RingGeometry(0.96, 1.0, 48)
+      this.abilityPreviewRingGeo.rotateX(-Math.PI / 2)
+    }
+    if (!this.abilityTargetMarkerGeo) {
+      this.abilityTargetMarkerGeo = new THREE.CircleGeometry(0.16, 18)
+      this.abilityTargetMarkerGeo.rotateX(-Math.PI / 2)
+    }
+
+    while (this.abilityPreviewRings.length < previews.length) {
+      const mat = new THREE.MeshBasicMaterial({
+        color: 0xffffff,
+        side: THREE.DoubleSide,
+        transparent: true,
+        opacity: 0.22,
+        depthTest: false,
+      })
+      const mesh = new THREE.Mesh(this.abilityPreviewRingGeo, mat)
+      mesh.renderOrder = 997
+      mesh.visible = false
+      this.scene.add(mesh)
+      this.abilityPreviewRings.push(mesh)
+    }
+
+    for (let i = 0; i < this.abilityPreviewRings.length; i++) {
+      const mesh = this.abilityPreviewRings[i]
+      const preview = previews[i]
+      if (!preview || preview.radius <= 0 || !Number.isFinite(preview.radius)) {
+        mesh.visible = false
+        continue
+      }
+      const mat = mesh.material as THREE.MeshBasicMaterial
+      const height = this.getWorldHeight(preview.x - 0.5, preview.z - 0.5) + 0.12
+      mesh.position.set(preview.x, height, preview.z)
+      mesh.scale.set(preview.radius, 1, preview.radius)
+      mat.color.setHex(preview.color)
+      mat.opacity = preview.opacity ?? 0.22
+      mesh.visible = true
+    }
+
+    const targetPreviews = previews.filter(preview => preview.kind === 'active-target')
+    while (this.abilityTargetMarkers.length < targetPreviews.length) {
+      const mat = new THREE.MeshBasicMaterial({
+        color: 0xffffff,
+        side: THREE.DoubleSide,
+        transparent: true,
+        opacity: 0.86,
+        depthTest: false,
+      })
+      const mesh = new THREE.Mesh(this.abilityTargetMarkerGeo, mat)
+      mesh.renderOrder = 998
+      mesh.visible = false
+      this.scene.add(mesh)
+      this.abilityTargetMarkers.push(mesh)
+    }
+
+    for (let i = 0; i < this.abilityTargetMarkers.length; i++) {
+      const mesh = this.abilityTargetMarkers[i]
+      const preview = targetPreviews[i]
+      if (!preview) {
+        mesh.visible = false
+        mesh.userData.legalityStatus = ''
+        continue
+      }
+      const mat = mesh.material as THREE.MeshBasicMaterial
+      const height = this.getWorldHeight(preview.x - 0.5, preview.z - 0.5) + 0.18
+      mesh.position.set(preview.x, height, preview.z)
+      mesh.scale.setScalar(preview.legalityStatus === 'valid' ? 1.0 : 1.25)
+      mat.color.setHex(preview.legalityStatus === 'valid' ? 0x58f080 : 0xff2f2f)
+      mat.opacity = preview.legalityStatus === 'valid' ? 0.86 : 0.92
+      mesh.userData.legalityStatus = preview.legalityStatus ?? 'valid'
+      mesh.visible = true
+    }
+
+    if (previews.length > 0) {
+      this.totalAbilityPreviewRefreshes += 1
+      this.totalAbilityPreviewRingsShown += previews.length
+    }
+    if (targetPreviews.length > 0) {
+      this.totalAbilityTargetMarkersShown += targetPreviews.length
+    }
+  }
+
+  updateResurrectionReadability(input: {
+    corpseMarkers: readonly {
+      x: number
+      z: number
+      color: number
+      opacity: number
+      eligible: boolean
+    }[]
+    radiusRings: readonly {
+      x: number
+      z: number
+      radius: number
+      color: number
+      opacity: number
+    }[]
+  }) {
+    if (!this.corpseMarkerGeo) {
+      this.corpseMarkerGeo = new THREE.RingGeometry(0.18, 0.32, 18)
+      this.corpseMarkerGeo.rotateX(-Math.PI / 2)
+    }
+    if (!this.abilityPreviewRingGeo) {
+      this.abilityPreviewRingGeo = new THREE.RingGeometry(0.96, 1.0, 48)
+      this.abilityPreviewRingGeo.rotateX(-Math.PI / 2)
+    }
+
+    while (this.corpseMarkers.length < input.corpseMarkers.length) {
+      const mat = new THREE.MeshBasicMaterial({
+        color: 0xffffff,
+        side: THREE.DoubleSide,
+        transparent: true,
+        opacity: 0.5,
+        depthTest: false,
+      })
+      const mesh = new THREE.Mesh(this.corpseMarkerGeo, mat)
+      mesh.renderOrder = 996
+      mesh.visible = false
+      this.scene.add(mesh)
+      this.corpseMarkers.push(mesh)
+    }
+
+    for (let i = 0; i < this.corpseMarkers.length; i++) {
+      const mesh = this.corpseMarkers[i]
+      const marker = input.corpseMarkers[i]
+      if (!marker) {
+        mesh.visible = false
+        mesh.userData.eligible = false
+        continue
+      }
+      const mat = mesh.material as THREE.MeshBasicMaterial
+      const height = this.getWorldHeight(marker.x - 0.5, marker.z - 0.5) + 0.1
+      mesh.position.set(marker.x, height, marker.z)
+      mesh.scale.setScalar(marker.eligible ? 1.25 : 1.0)
+      mat.color.setHex(marker.color)
+      mat.opacity = marker.opacity
+      mesh.userData.eligible = marker.eligible
+      mesh.visible = true
+    }
+
+    while (this.resurrectionRadiusRings.length < input.radiusRings.length) {
+      const mat = new THREE.MeshBasicMaterial({
+        color: 0xf7e070,
+        side: THREE.DoubleSide,
+        transparent: true,
+        opacity: 0.22,
+        depthTest: false,
+      })
+      const mesh = new THREE.Mesh(this.abilityPreviewRingGeo, mat)
+      mesh.renderOrder = 995
+      mesh.visible = false
+      this.scene.add(mesh)
+      this.resurrectionRadiusRings.push(mesh)
+    }
+
+    for (let i = 0; i < this.resurrectionRadiusRings.length; i++) {
+      const mesh = this.resurrectionRadiusRings[i]
+      const ring = input.radiusRings[i]
+      if (!ring || ring.radius <= 0 || !Number.isFinite(ring.radius)) {
+        mesh.visible = false
+        continue
+      }
+      const mat = mesh.material as THREE.MeshBasicMaterial
+      const height = this.getWorldHeight(ring.x - 0.5, ring.z - 0.5) + 0.08
+      mesh.position.set(ring.x, height, ring.z)
+      mesh.scale.set(ring.radius, 1, ring.radius)
+      mat.color.setHex(ring.color)
+      mat.opacity = ring.opacity
+      mesh.visible = true
+    }
+
+    if (input.corpseMarkers.length > 0 || input.radiusRings.length > 0) {
+      this.totalCorpseMarkerRefreshes += 1
+    }
+  }
+
+  getSnapshot(): FeedbackEffectSnapshot {
+    const activeAbilityTargetMarkers = this.abilityTargetMarkers.filter(mesh => mesh.visible)
+    const activeCorpseMarkers = this.corpseMarkers.filter(mesh => mesh.visible)
+    return {
+      activeMoveIndicators: this.moveIndicators.length,
+      activeImpactRings: this.impactRings.length,
+      activeQueueIndicators: this.queueIndicators.filter(mesh => mesh.visible).length,
+      activeAbilityEffectBursts: this.abilityEffectBursts.length,
+      activeAbilityPreviewRings: this.abilityPreviewRings.filter(mesh => mesh.visible).length,
+      activeAbilityTargetMarkers: activeAbilityTargetMarkers.length,
+      activeAbilityValidTargetMarkers: activeAbilityTargetMarkers.filter(mesh => mesh.userData.legalityStatus === 'valid').length,
+      activeAbilityInvalidTargetMarkers: activeAbilityTargetMarkers.filter(mesh => mesh.userData.legalityStatus !== 'valid').length,
+      activeCorpseMarkers: activeCorpseMarkers.length,
+      activeEligibleCorpseMarkers: activeCorpseMarkers.filter(mesh => mesh.userData.eligible).length,
+      activeResurrectionRadiusRings: this.resurrectionRadiusRings.filter(mesh => mesh.visible).length,
+      totalMoveIndicators: this.totalMoveIndicators,
+      totalAttackMoveIndicators: this.totalAttackMoveIndicators,
+      totalImpactRings: this.totalImpactRings,
+      totalDamageNumbers: this.totalDamageNumbers,
+      totalSelectionFlashes: this.totalSelectionFlashes,
+      totalHitFlashes: this.totalHitFlashes,
+      totalBuildCompleteEffects: this.totalBuildCompleteEffects,
+      totalAbilityEffectBursts: this.totalAbilityEffectBursts,
+      totalAbilityPreviewRefreshes: this.totalAbilityPreviewRefreshes,
+      totalAbilityPreviewRingsShown: this.totalAbilityPreviewRingsShown,
+      totalAbilityTargetMarkersShown: this.totalAbilityTargetMarkersShown,
+      totalCorpseMarkerRefreshes: this.totalCorpseMarkerRefreshes,
+    }
   }
 }

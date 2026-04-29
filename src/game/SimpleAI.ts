@@ -1,38 +1,48 @@
 import * as THREE from 'three'
-import { UnitState, BUILDINGS, UNITS, RESEARCHES, HERO_ABILITY_LEVELS } from './GameData'
-import type { Unit, ResourceTarget } from './Game'
+import { UnitState, BUILDINGS, UNITS, RESEARCHES, HERO_ABILITY_LEVELS, SHOP_PURCHASE_RANGE } from './GameData'
+import type { ItemKey } from './GameData'
+import type { Unit } from './UnitTypes'
+import type { AIContext } from './AIContext'
 import { issueCommand } from './GameCommand'
-import type { TeamResources } from './TeamResources'
-import type { PlacementValidator } from './OccupancyGrid'
-import type { TreeEntry } from './TreeManager'
-
-/** AI 运行时需要的外部依赖 */
-export interface AIContext {
-  team: number
-  units: Unit[]
-  resources: TeamResources
-  placement: PlacementValidator
-  findNearestUnit(unit: Unit, type: string, team: number): Unit | null
-  findNearestGoldmine(unit: Unit): Unit | null
-  findNearestTreeEntry(pos: THREE.Vector3, maxRange?: number): TreeEntry | null
-  spawnUnit(type: string, team: number, x: number, z: number): Unit
-  spawnBuilding(type: string, team: number, x: number, z: number): Unit
-  getWorldHeight(wx: number, wz: number): number
-  planPath(unit: Unit, target: THREE.Vector3): boolean
-  planPathToBuildingInteraction(unit: Unit, target: Unit): boolean
-  castHolyLight(caster: Unit, target: Unit): boolean
-  castDivineShield(caster: Unit): boolean
-  castResurrection(caster: Unit): boolean
-}
+import {
+  learnArchmagePrioritySkill,
+  learnMountainKingPrioritySkill,
+  selectArchmageBlizzardTarget,
+  selectMountainKingStormBoltTarget,
+  selectWaterElementalSummonTargets,
+  shouldMountainKingCastAvatar,
+  shouldMountainKingCastThunderClap,
+} from './systems/AIHeroStrategySystem'
+import {
+  buildAIPressureSnapshot,
+  createAIPressureSnapshot,
+  createAIPressureTelemetry,
+  recordAICounterAttack,
+  recordAIDefenseResponse,
+  recordAICreepIntent,
+  recordAIRegroup,
+  recordAIShopPurchase,
+  recordAIWaveLaunch,
+} from './systems/AIPressureSystem'
+import type {
+  AIDirectorPhase,
+  AIPressureSnapshot,
+  AIPressureTelemetry,
+} from './systems/AIPressureSystem'
 
 /** AI build order profile — 轻量倾向配置 */
 export interface AIBuildProfile {
   name: string
+  difficultyLabel: string
   targetGoldWorkers: number
   maxWorkers: number
   initialWaveSize: number
+  maxWaveSize: number
+  openingAttackDelayTicks: number
   /** 农场建造时机：supply 剩余多少时开始造 */
   farmSupplyThreshold: number
+  baseWaveCooldownTicks: number
+  counterAttackDelayTicks: number
   /** 是否在第二波后提高进攻频率 */
   aggressivePressure: boolean
 }
@@ -40,18 +50,28 @@ export interface AIBuildProfile {
 const BUILD_PROFILES: AIBuildProfile[] = [
   {
     name: 'standard',
+    difficultyLabel: '标准',
     targetGoldWorkers: 4,
     maxWorkers: 10,
     initialWaveSize: 2,
+    maxWaveSize: 10,
+    openingAttackDelayTicks: 300,
     farmSupplyThreshold: 4,
+    baseWaveCooldownTicks: 70,
+    counterAttackDelayTicks: 28,
     aggressivePressure: false,
   },
   {
     name: 'rush',
+    difficultyLabel: '压制',
     targetGoldWorkers: 3,
     maxWorkers: 8,
     initialWaveSize: 3,
+    maxWaveSize: 11,
+    openingAttackDelayTicks: 210,
     farmSupplyThreshold: 3,
+    baseWaveCooldownTicks: 50,
+    counterAttackDelayTicks: 20,
     aggressivePressure: true,
   },
 ]
@@ -79,6 +99,17 @@ const BUILD_PROFILES: AIBuildProfile[] = [
 
 /** 单金矿有效采集容量上限（超过此数边际收益极低） */
 const GOLDMINE_SATURATION_CAP = 5
+const WORKER_HARASS_MIN_TICK = 300
+const AI_BASE_DEFENSE_RADIUS = 16
+const AI_DEFENSE_REISSUE_TICKS = 10
+
+type AIDirectorConfig = {
+  phase: AIDirectorPhase
+  waveCooldownTicks: number
+  waveSizeBonus: number
+  maxWaveSize: number
+  counterAttackDelayTicks: number
+}
 
 export class SimpleAI {
   private ctx: AIContext
@@ -95,8 +126,13 @@ export class SimpleAI {
   private barracksBuilt = false   // 是否已造兵营
   private altarScheduled = false  // 是否已安排建 Altar（建造中或已完成）
   private paladinSummoned = false // 是否已召唤 Paladin（唯一性）
+  private archmageSummoned = false // 是否已召唤 Archmage（唯一性）
+  private mountainKingSummoned = false // 是否已召唤 Mountain King（唯一性）
   private waveCount = 0           // 已发起的进攻波次
   private tickCount = 0           // 内部 tick 计数器（≈ game seconds）
+  private creepIntentSent = false
+  private aiPressureTelemetry: AIPressureTelemetry = createAIPressureTelemetry()
+  private aiPressureSnapshot: AIPressureSnapshot = createAIPressureSnapshot()
 
   constructor(ctx: AIContext, profileIndex: number = 0) {
     this.ctx = ctx
@@ -123,8 +159,92 @@ export class SimpleAI {
     this.barracksBuilt = false
     this.altarScheduled = false
     this.paladinSummoned = false
+    this.archmageSummoned = false
+    this.mountainKingSummoned = false
     this.waveCount = 0
     this.attackWaveSize = this.profile.initialWaveSize
+    this.creepIntentSent = false
+    this.aiPressureTelemetry = createAIPressureTelemetry()
+    this.aiPressureSnapshot = createAIPressureSnapshot()
+  }
+
+  getPressureSnapshot(): AIPressureSnapshot {
+    return { ...this.aiPressureSnapshot }
+  }
+
+  private getWaveCooldownTicks(): number {
+    if (this.waveCount === 0) return this.profile.openingAttackDelayTicks
+    return this.getDirectorConfig().waveCooldownTicks
+  }
+
+  private getDirectorConfig(): AIDirectorConfig {
+    const phase = this.getDirectorPhase()
+    const wavePressure = Math.max(0, this.waveCount - 1)
+    const phaseCooldownBonus = phase === 'closing'
+      ? 18
+      : phase === 'assault'
+        ? 12
+        : phase === 'midgame'
+          ? 6
+          : 0
+    const minimumCooldown = this.profile.aggressivePressure ? 28 : 36
+    const waveCooldownTicks = Math.max(
+      minimumCooldown,
+      this.profile.baseWaveCooldownTicks - phaseCooldownBonus - wavePressure * 3,
+    )
+    const waveSizeBonus = phase === 'closing'
+      ? 3
+      : phase === 'assault'
+        ? 2
+        : phase === 'midgame'
+          ? 1
+          : 0
+    const counterAttackDelayTicks = Math.max(
+      12,
+      this.profile.counterAttackDelayTicks - (phase === 'closing' ? 8 : phase === 'assault' ? 5 : 0),
+    )
+    return {
+      phase,
+      waveCooldownTicks,
+      waveSizeBonus,
+      maxWaveSize: this.profile.maxWaveSize,
+      counterAttackDelayTicks,
+    }
+  }
+
+  private getDirectorPhase(): AIDirectorPhase {
+    if (this.waveCount >= 5 || this.tickCount >= 720) return 'closing'
+    if (this.waveCount >= 3 || this.tickCount >= 520) return 'assault'
+    if (this.waveCount >= 1 || this.tickCount >= 320) return 'midgame'
+    return 'opening'
+  }
+
+  private getNextWaveSizeAfterLaunch(): number {
+    return this.getRecommendedWaveSize()
+  }
+
+  private getRecommendedWaveSize(): number {
+    const director = this.getDirectorConfig()
+    return Math.min(
+      director.maxWaveSize,
+      this.profile.initialWaveSize + this.waveCount + director.waveSizeBonus,
+    )
+  }
+
+  private refreshPressureSnapshot() {
+    const director = this.getDirectorConfig()
+    this.aiPressureSnapshot = buildAIPressureSnapshot({
+      units: this.ctx.units,
+      team: this.ctx.team,
+      tickCount: this.tickCount,
+      attackWaveSize: Math.max(this.attackWaveSize, this.getRecommendedWaveSize()),
+      openingAttackDelayTicks: this.profile.openingAttackDelayTicks,
+      waveCooldownTicks: director.waveCooldownTicks,
+      directorPhase: director.phase,
+      difficultyLabel: this.profile.difficultyLabel,
+      attackWaveActive: this.attackWaveSent,
+      telemetry: this.aiPressureTelemetry,
+    })
   }
 
   private tick() {
@@ -201,6 +321,10 @@ export class SimpleAI {
       (u) => u.team === team && u.type === 'blacksmith' && u.hp > 0
         && u.buildProgress >= 1,
     )
+    const hasLumberMill = units.some(
+      (u) => u.team === team && u.type === 'lumber_mill' && u.hp > 0
+        && u.buildProgress >= 1,
+    )
     const blacksmithInProgress = units.some(
       (u) => u.team === team && u.type === 'blacksmith' && u.hp > 0
         && u.buildProgress < 1,
@@ -235,6 +359,25 @@ export class SimpleAI {
         if (altarDef && resources.canAfford(team, altarDef.cost)) {
           this.tryBuildBuilding('altar_of_kings', townhall, myIdleWorkers())
         }
+      }
+    }
+
+    // ===== 2aa. Build Arcane Vault once a hero path exists =====
+    const hasArcaneVault = units.some(
+      (u) => u.team === team && u.type === 'arcane_vault' && u.hp > 0
+        && u.buildProgress >= 1,
+    )
+    const arcaneVaultInProgress = units.some(
+      (u) => u.team === team && u.type === 'arcane_vault' && u.hp > 0
+        && u.buildProgress < 1,
+    )
+    const hasAnyHero = units.some(
+      (u) => u.team === team && !u.isBuilding && !!UNITS[u.type]?.isHero && u.hp > 0 && !u.isDead,
+    )
+    if (hasAltar && hasAnyHero && !hasArcaneVault && !arcaneVaultInProgress) {
+      const vaultDef = BUILDINGS['arcane_vault']
+      if (vaultDef && resources.canAfford(team, vaultDef.cost)) {
+        this.tryBuildBuilding('arcane_vault', townhall, myIdleWorkers())
       }
     }
 
@@ -340,6 +483,144 @@ export class SimpleAI {
       }
     }
 
+    // ===== 2ah. AI Archmage training readiness =====
+    // Strategy contract: docs/V9_HERO22_ARCHMAGE_AI_STRATEGY_CONTRACT.zh-CN.md
+    // Only after Paladin is handled; queue exactly one Archmage through existing Altar.
+    if (!this.archmageSummoned && hasAltar) {
+      const existingArchmage = units.some(
+        (u) => u.team === team && u.type === 'archmage' && u.hp > 0,
+      )
+      const archmageInTraining = units.some(
+        (u) => u.team === team && u.type === 'altar_of_kings' && u.isBuilding
+          && u.hp > 0 && u.buildProgress >= 1
+          && u.trainingQueue.some((item: { type: string }) => item.type === 'archmage'),
+      )
+      if (existingArchmage || archmageInTraining) {
+        this.archmageSummoned = true
+      } else {
+        const altar = units.find(
+          (u) => u.team === team && u.type === 'altar_of_kings' && u.isBuilding
+            && u.hp > 0 && u.buildProgress >= 1,
+        )
+        if (altar && altar.trainingQueue.length === 0) {
+          const aDef = UNITS['archmage']
+          if (aDef && resources.canAfford(team, aDef.cost)
+            && effectiveUsed + aDef.supply <= supply.total) {
+            resources.spend(team, aDef.cost)
+            issueCommand([], { type: 'train', building: altar, unitType: 'archmage', trainTime: aDef.trainTime })
+            this.archmageSummoned = true
+          }
+        }
+      }
+    }
+
+    // ===== 2ai. AI Archmage skill-learning priority =====
+    // Strategy contract: docs/V9_HERO22_ARCHMAGE_AI_STRATEGY_CONTRACT.zh-CN.md
+    // Priority: Water Elemental → Brilliance Aura → Blizzard → Mass Teleport
+    // Only learns when: alive, has skill points, meets hero level gate.
+    {
+      const archmage = units.find(
+        (u) => u.team === team && u.type === 'archmage' && u.hp > 0 && !u.isDead,
+      )
+      if (archmage) learnArchmagePrioritySkill(archmage)
+    }
+
+    // ===== 2aj. AI Archmage Water Elemental cast =====
+    // Strategy contract: docs/V9_HERO22_ARCHMAGE_AI_STRATEGY_CONTRACT.zh-CN.md
+    // Summon near combat/enemy pressure using existing Game.ts runtime.
+    // SimpleAI chooses intent (when/where); Game.ts owns mana, cooldown, range, walkability, summon stats.
+    {
+      const archmage = units.find(
+        (u) => u.team === team && u.type === 'archmage' && u.hp > 0 && !u.isDead
+          && (u.abilityLevels?.water_elemental ?? 0) > 0,
+      )
+      if (archmage) {
+        for (const target of selectWaterElementalSummonTargets(archmage, units, team)) {
+          if (this.ctx.castSummonWaterElemental(archmage, target.x, target.z)) break
+        }
+      }
+    }
+
+    // ===== 2ak. AI Archmage Blizzard cast =====
+    // Target contract: docs/V9_HERO22_ARCHMAGE_AI_BLIZZARD_TARGET_CONTRACT.zh-CN.md
+    // SimpleAI chooses target point using cluster scoring + friendly safety filter.
+    // Game.ts owns mana, cooldown, range, channel, waves, damage, building multiplier.
+    {
+      const archmage = units.find(
+        (u) => u.team === team && u.type === 'archmage' && u.hp > 0 && !u.isDead
+          && (u.abilityLevels?.blizzard ?? 0) > 0,
+      )
+      if (archmage) {
+        const target = selectArchmageBlizzardTarget(archmage, units, team)
+        if (target) this.ctx.castBlizzard(archmage, target.x, target.z)
+      }
+    }
+
+    // ===== 2al. AI Mountain King training readiness =====
+    // Mountain King enters after the first two hero paths so existing Paladin /
+    // Archmage behavior remains stable, but the AI can now field the Human
+    // melee-control hero in longer skirmishes.
+    if (!this.mountainKingSummoned && hasAltar) {
+      const existingMountainKing = units.some(
+        (u) => u.team === team && u.type === 'mountain_king' && u.hp > 0,
+      )
+      const mountainKingInTraining = units.some(
+        (u) => u.team === team && u.type === 'altar_of_kings' && u.isBuilding
+          && u.hp > 0 && u.buildProgress >= 1
+          && u.trainingQueue.some((item: { type: string }) => item.type === 'mountain_king'),
+      )
+      if (existingMountainKing || mountainKingInTraining) {
+        this.mountainKingSummoned = true
+      } else {
+        const altar = units.find(
+          (u) => u.team === team && u.type === 'altar_of_kings' && u.isBuilding
+            && u.hp > 0 && u.buildProgress >= 1,
+        )
+        if (altar && altar.trainingQueue.length === 0) {
+          const mkDef = UNITS['mountain_king']
+          if (mkDef && resources.canAfford(team, mkDef.cost)
+            && effectiveUsed + mkDef.supply <= supply.total) {
+            resources.spend(team, mkDef.cost)
+            issueCommand([], { type: 'train', building: altar, unitType: 'mountain_king', trainTime: mkDef.trainTime })
+            this.mountainKingSummoned = true
+          }
+        }
+      }
+    }
+
+    // ===== 2am. AI Mountain King skill-learning priority =====
+    {
+      const mountainKing = units.find(
+        (u) => u.team === team && u.type === 'mountain_king' && u.hp > 0 && !u.isDead,
+      )
+      if (mountainKing) learnMountainKingPrioritySkill(mountainKing)
+    }
+
+    // ===== 2an. AI Mountain King combat casting =====
+    // SimpleAI chooses conservative intent; Game.ts owns mana, cooldown,
+    // immunity, target validation, damage and status application.
+    {
+      const mountainKing = units.find(
+        (u) => u.team === team && u.type === 'mountain_king' && u.hp > 0 && !u.isDead,
+      )
+      if (mountainKing) {
+        if (shouldMountainKingCastAvatar(mountainKing, units, team)) {
+          this.ctx.castAvatar(mountainKing)
+        }
+        const stormBoltTarget = selectMountainKingStormBoltTarget(mountainKing, units, team)
+        if (stormBoltTarget) this.ctx.castStormBolt(mountainKing, stormBoltTarget)
+        if (shouldMountainKingCastThunderClap(mountainKing, units, team, this.tickCount)) {
+          this.ctx.castThunderClap(mountainKing)
+        }
+      }
+    }
+
+    // ===== 2ao. AI shop usage =====
+    // Arcane Vault is now part of the Human-like pressure route. The AI buys
+    // one or two readable hero items when a hero is nearby instead of treating
+    // the shop as inert scenery.
+    this.tryUseArcaneVault(hasArcaneVault)
+
     // Keep early pressure intact: V7 defense/siege tech starts after the
     // opening wave contract is already proven in live play.
     const canStartV7Expansion = this.waveCount >= 2
@@ -367,12 +648,29 @@ export class SimpleAI {
       }
     }
 
+    if (canStartV7Expansion && this.waveCount >= 4 && townhall.type === 'keep' && !townhall.upgradeQueue) {
+      const keepDef = BUILDINGS['keep']
+      const castleDef = BUILDINGS['castle']
+      if (keepDef?.upgradeTo === 'castle' && castleDef) {
+        const productionReserveGold = (UNITS['footman']?.cost.gold ?? 0) * 2
+        const productionReserveLumber = (UNITS['rifleman']?.cost.lumber ?? 0) * 2
+        const canAffordUpgrade = resources.canAfford(team, castleDef.cost)
+          && resources.get(team).gold >= castleDef.cost.gold + productionReserveGold
+          && resources.get(team).lumber >= castleDef.cost.lumber + productionReserveLumber
+        if (canAffordUpgrade && hasBarracks && hasBlacksmith && hasLumberMill) {
+          resources.spend(team, castleDef.cost)
+          issueCommand([], {
+            type: 'upgradeBuilding',
+            building: townhall,
+            targetKey: 'castle',
+            upgradeTime: castleDef.buildTime,
+          })
+        }
+      }
+    }
+
     if (canStartV7Expansion) {
       // ===== 2b-V7. 有铁匠铺 → 建伐木场（解锁箭塔）=====
-      const hasLumberMill = units.some(
-        (u) => u.team === team && u.type === 'lumber_mill' && u.hp > 0
-          && u.buildProgress >= 1,
-      )
       const lumberMillInProgress = units.some(
         (u) => u.team === team && u.type === 'lumber_mill' && u.hp > 0
           && u.buildProgress < 1,
@@ -486,11 +784,21 @@ export class SimpleAI {
       // Count existing military to decide composition ratio
       const existingFootmen = myUnits('footman').filter((u) => !u.isBuilding).length
       const existingRiflemen = myUnits('rifleman').filter((u) => !u.isBuilding).length
+      const existingKnights = myUnits('knight').filter((u) => !u.isBuilding).length
 
       // Decide what to train: prefer rifleman if blacksmith is up and ratio allows
       let unitType: string | null = null
       let unitDef = null
-      if (hasBlacksmith && existingRiflemen < existingFootmen + 1) {
+      const directorPhase = this.getDirectorPhase()
+      const canTrainKnight = townhall.type === BUILDINGS.castle.key && hasBlacksmith && hasLumberMill
+      if (canTrainKnight && directorPhase !== 'opening' && existingKnights < Math.max(1, Math.floor(this.waveCount / 2))) {
+        const kDef = UNITS['knight']
+        if (kDef && resources.canAfford(team, kDef.cost)) {
+          unitType = 'knight'
+          unitDef = kDef
+        }
+      }
+      if (!unitType && hasBlacksmith && existingRiflemen < existingFootmen + 1) {
         // Train rifleman (cap at footmen+1 to maintain a healthy mix)
         const rDef = UNITS['rifleman']
         if (rDef && resources.canAfford(team, rDef.cost)) {
@@ -653,9 +961,17 @@ export class SimpleAI {
     const isReadyForWave = (u: Unit) =>
       u.state === UnitState.Idle || u.state === UnitState.Moving || u.state === UnitState.AttackMove
 
-    // V7: mortar_team 也算军事单位；Priest 的随军支援留给独立编队任务。
+    // V7+: heroes, support casters, summons and higher-tier units all count
+    // for pressure/defense decisions even if composition logic trains them elsewhere.
     const isMilitaryType = (u: Unit) =>
-      u.type === 'footman' || u.type === 'rifleman' || u.type === 'mortar_team'
+      u.type === 'footman' ||
+      u.type === 'rifleman' ||
+      u.type === 'mortar_team' ||
+      u.type === 'knight' ||
+      u.type === 'priest' ||
+      u.type === 'sorceress' ||
+      u.type === 'water_elemental' ||
+      !!UNITS[u.type]?.isHero
 
     const idleMilitary = units.filter(
       (u) => u.team === team && !u.isBuilding && u.hp > 0
@@ -670,7 +986,18 @@ export class SimpleAI {
         && isMilitaryType(u),
     )
 
-    if (waveReadyMilitary.length >= this.attackWaveSize && !this.attackWaveSent) {
+    const defenseIntentIssued = this.tryDefendBase(allMilitary)
+    const creepIntentIssued = !defenseIntentIssued && this.tryStartCreepObjective(waveReadyMilitary)
+    const counterAttackIssued = !defenseIntentIssued && !creepIntentIssued &&
+      this.tryLaunchCounterAttack(waveReadyMilitary)
+
+    const nextAllowedWaveTick = this.waveCount === 0
+      ? this.profile.openingAttackDelayTicks
+      : this.attackWaveSentTick + this.getWaveCooldownTicks()
+    const waveCadenceReady = this.tickCount >= nextAllowedWaveTick
+    const creepRecentlyOrdered = this.aiPressureTelemetry.lastCreepIntentAt !== null &&
+      this.tickCount - this.aiPressureTelemetry.lastCreepIntentAt <= 45
+    if (!defenseIntentIssued && !creepIntentIssued && !counterAttackIssued && !creepRecentlyOrdered && waveCadenceReady && waveReadyMilitary.length >= this.attackWaveSize && !this.attackWaveSent) {
       const target = this.selectAttackTarget(team)
       if (target) {
         issueCommand(waveReadyMilitary, { type: 'attackMove', target: target.mesh.position.clone() })
@@ -680,6 +1007,8 @@ export class SimpleAI {
         this.attackWaveSent = true
         this.attackWaveSentTick = this.tickCount
         this.waveCount++
+        recordAIWaveLaunch(this.aiPressureTelemetry, this.tickCount, target.type)
+        this.attackWaveSize = this.getNextWaveSizeAfterLaunch()
       }
     }
 
@@ -688,18 +1017,24 @@ export class SimpleAI {
       const ticksSinceWave = this.tickCount - this.attackWaveSentTick
       if (allMilitary.length === 0) {
         this.attackWaveSent = false
+        this.recordRegroupIntent('wave-lost')
       }
       else if (allMilitary.length <= 2 && idleMilitary.length >= this.attackWaveSize) {
         this.attackWaveSent = false
+        this.recordRegroupIntent('new-wave-ready')
       }
       else if (ticksSinceWave >= 60 && waveReadyMilitary.length >= this.attackWaveSize) {
         this.attackWaveSent = false
+        this.recordRegroupIntent('wave-timeout')
       }
       // aggressive profile：只要新兵够就继续发波
       else if (this.profile.aggressivePressure && waveReadyMilitary.length >= this.attackWaveSize + 2) {
         this.attackWaveSent = false
+        this.recordRegroupIntent('aggressive-followup')
       }
     }
+
+    this.refreshPressureSnapshot()
 
     // ===== 7. 集结点：根据金矿饱和状态动态调整 =====
     // 饱和契约：当前 gold workers >= goldEffectiveCap → 清掉 gold rally。
@@ -754,7 +1089,7 @@ export class SimpleAI {
         && (u.state === UnitState.MovingToGather || u.state === UnitState.Gathering
           || u.state === UnitState.MovingToReturn || u.state === UnitState.Idle),
     )
-    if (enemyWorkers.length > 0 && this.waveCount > 0) {
+    if (enemyWorkers.length > 0 && this.waveCount > 0 && this.tickCount >= WORKER_HARASS_MIN_TICK) {
       // 非首波优先杀农民
       return enemyWorkers[0]
     }
@@ -770,6 +1105,169 @@ export class SimpleAI {
 
     // 攻击任何敌方单位
     return enemies[0]
+  }
+
+  private tryDefendBase(allMilitary: Unit[]): boolean {
+    const threat = this.selectDefenseThreat()
+    if (!threat) return false
+
+    const recentDefense = this.aiPressureTelemetry.lastDefenseAt !== null &&
+      this.tickCount - this.aiPressureTelemetry.lastDefenseAt < AI_DEFENSE_REISSUE_TICKS
+    if (recentDefense) return true
+
+    const defenders = allMilitary.filter(unit => unit.hp > 0 && !unit.isDead)
+    if (defenders.length === 0) return false
+
+    const target = threat.enemy ?? threat.building
+    issueCommand(defenders, { type: 'attackMove', target: target.mesh.position.clone() })
+    for (const unit of defenders) {
+      this.ctx.planPath(unit, target.mesh.position)
+    }
+
+    if (this.attackWaveSent) {
+      this.attackWaveSent = false
+      this.recordRegroupIntent('base-defense')
+    }
+    recordAIDefenseResponse(this.aiPressureTelemetry, this.tickCount, threat.building.type)
+    return true
+  }
+
+  private selectDefenseThreat(): { building: Unit; enemy: Unit | null } | null {
+    const { team, units } = this.ctx
+    const buildings = units
+      .filter(unit => unit.team === team && unit.isBuilding && unit.hp > 0 && unit.buildProgress >= 1)
+      .sort((a, b) => {
+        const aScore = (a.type === 'townhall' || a.type === 'keep' || a.type === 'castle') ? 0 : 1
+        const bScore = (b.type === 'townhall' || b.type === 'keep' || b.type === 'castle') ? 0 : 1
+        return aScore - bScore
+      })
+    const enemies = units.filter(unit =>
+      unit.team !== team &&
+      unit.team >= 0 &&
+      unit.hp > 0 &&
+      !unit.isDead &&
+      unit.type !== 'goldmine',
+    )
+
+    for (const building of buildings) {
+      const damaged = building.hp < building.maxHp * 0.96
+      const nearbyEnemies = enemies
+        .filter(enemy => enemy.mesh.position.distanceTo(building.mesh.position) <= AI_BASE_DEFENSE_RADIUS)
+        .sort((a, b) =>
+          a.mesh.position.distanceTo(building.mesh.position) -
+          b.mesh.position.distanceTo(building.mesh.position),
+        )
+      if (nearbyEnemies[0]) return { building, enemy: nearbyEnemies[0] }
+      if (damaged) return { building, enemy: null }
+    }
+
+    return null
+  }
+
+  private recordRegroupIntent(reason: string) {
+    if (this.aiPressureTelemetry.lastRegroupAt !== null &&
+      this.tickCount - this.aiPressureTelemetry.lastRegroupAt < 12) {
+      return
+    }
+    recordAIRegroup(this.aiPressureTelemetry, this.tickCount, reason)
+  }
+
+  private tryLaunchCounterAttack(waveReadyMilitary: Unit[]): boolean {
+    const lastDefenseAt = this.aiPressureTelemetry.lastDefenseAt
+    if (lastDefenseAt === null) return false
+    const director = this.getDirectorConfig()
+    if (this.tickCount - lastDefenseAt < director.counterAttackDelayTicks) return false
+    if (this.aiPressureTelemetry.lastCounterAttackAt !== null &&
+      this.aiPressureTelemetry.lastCounterAttackAt >= lastDefenseAt) {
+      return false
+    }
+
+    const counterSize = Math.max(2, Math.min(this.attackWaveSize, director.maxWaveSize - 1))
+    if (waveReadyMilitary.length < counterSize) return false
+
+    const target = this.selectAttackTarget(this.ctx.team)
+    if (!target) return false
+
+    const group = waveReadyMilitary.slice(0, Math.min(waveReadyMilitary.length, counterSize + 1))
+    issueCommand(group, { type: 'attackMove', target: target.mesh.position.clone() })
+    for (const unit of group) {
+      this.ctx.planPath(unit, target.mesh.position)
+    }
+
+    this.attackWaveSent = true
+    this.attackWaveSentTick = this.tickCount
+    this.waveCount++
+    recordAIWaveLaunch(this.aiPressureTelemetry, this.tickCount, target.type)
+    recordAICounterAttack(this.aiPressureTelemetry, this.tickCount, target.type)
+    this.attackWaveSize = this.getNextWaveSizeAfterLaunch()
+    return true
+  }
+
+  private tryStartCreepObjective(waveReadyMilitary: Unit[]): boolean {
+    const { team, units } = this.ctx
+    if (this.creepIntentSent) return false
+    if (this.waveCount > 0) return false
+    if (this.tickCount < Math.max(120, Math.floor(this.profile.openingAttackDelayTicks * 0.65))) return false
+
+    const heroes = waveReadyMilitary.filter(u => !!UNITS[u.type]?.isHero)
+    if (heroes.length === 0) return false
+    if (waveReadyMilitary.length < 3) return false
+
+    const creeps = units
+      .filter(u => u.team === 2 && u.hp > 0 && !u.isBuilding && !!UNITS[u.type]?.isCreep)
+      .sort((a, b) => {
+        const ax = heroes[0].mesh.position.distanceTo(a.mesh.position)
+        const bx = heroes[0].mesh.position.distanceTo(b.mesh.position)
+        return ax - bx
+      })
+    const target = creeps[0]
+    if (!target) return false
+
+    const group = waveReadyMilitary.slice(0, Math.min(waveReadyMilitary.length, this.attackWaveSize + 1))
+    issueCommand(group, { type: 'attackMove', target: target.mesh.position.clone() })
+    for (const unit of group) {
+      this.ctx.planPath(unit, target.mesh.position)
+    }
+    this.creepIntentSent = true
+    recordAICreepIntent(this.aiPressureTelemetry, this.tickCount)
+    return true
+  }
+
+  private tryUseArcaneVault(hasArcaneVault: boolean): boolean {
+    if (!hasArcaneVault) return false
+    const { team, units } = this.ctx
+    const shop = units.find(
+      u => u.team === team && u.type === 'arcane_vault' && u.isBuilding && u.hp > 0 && u.buildProgress >= 1,
+    )
+    if (!shop) return false
+
+    const hero = units
+      .filter(u => u.team === team && !u.isBuilding && !!UNITS[u.type]?.isHero && u.hp > 0 && !u.isDead)
+      .sort((a, b) => a.mesh.position.distanceTo(shop.mesh.position) - b.mesh.position.distanceTo(shop.mesh.position))[0]
+    if (!hero) return false
+
+    const distance = hero.mesh.position.distanceTo(shop.mesh.position)
+    if (distance > SHOP_PURCHASE_RANGE) {
+      if (hero.state === UnitState.Idle || hero.state === UnitState.Moving) {
+        issueCommand([hero], { type: 'move', target: shop.mesh.position.clone() })
+        this.ctx.planPath(hero, shop.mesh.position)
+      }
+      return false
+    }
+
+    const candidates: ItemKey[] = []
+    if (!hero.inventoryItems.includes('boots_of_speed')) candidates.push('boots_of_speed')
+    if (hero.hp < hero.maxHp * 0.75) candidates.push('healing_potion')
+    if (hero.maxMana > 0 && hero.mana < hero.maxMana * 0.55) candidates.push('mana_potion')
+    if (candidates.length === 0 && hero.inventoryItems.length < 2) candidates.push('healing_potion')
+
+    for (const itemKey of candidates) {
+      if (this.ctx.purchaseShopItem(shop, itemKey)) {
+        recordAIShopPurchase(this.aiPressureTelemetry, this.tickCount)
+        return true
+      }
+    }
+    return false
   }
 
   /**
@@ -821,7 +1319,7 @@ export class SimpleAI {
       if (tree) {
         issueCommand([w], { type: 'gather', resourceType: 'lumber', target: tree.mesh.position })
         w.resourceTarget = { type: 'tree', entry: tree }
-        this.ctx.planPath(w, tree.mesh.position)
+        this.ctx.planPathToTreeInteraction(w, tree)
         lumberCount++
         continue
       }

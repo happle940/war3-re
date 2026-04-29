@@ -1,6 +1,7 @@
 import * as THREE from 'three'
 import { UnitState, UNITS } from './GameData'
-import type { Unit } from './Game'
+import type { Unit } from './UnitTypes'
+import { clearPreviousUnitOrder } from './systems/UnitOrderState'
 
 // ===== 命令类型 =====
 
@@ -40,13 +41,7 @@ export function issueCommand(units: Unit[], cmd: GameCommand) {
         u.goldLoopSlotMine = null
         u.goldStandMine = null
         u.carryAmount = 0  // 中断采集时丢弃携带资源
-        u.previousState = null
-        u.previousGatherType = null
-        u.previousResourceTarget = null
-        u.previousMoveTarget = null
-        u.previousWaypoints = []
-        u.previousMoveQueue = []
-        u.previousAttackMoveTarget = null
+        clearPreviousUnitOrder(u)
       }
       break
 
@@ -63,13 +58,7 @@ export function issueCommand(units: Unit[], cmd: GameCommand) {
         u.goldLoopSlotMine = null
         u.goldStandMine = null
         u.carryAmount = 0
-        u.previousState = null
-        u.previousGatherType = null
-        u.previousResourceTarget = null
-        u.previousMoveTarget = null
-        u.previousWaypoints = []
-        u.previousMoveQueue = []
-        u.previousAttackMoveTarget = null
+        clearPreviousUnitOrder(u)
         u.aggroSuppressUntil = 0  // attack is offensive intent — clear suppression
       }
       break
@@ -88,13 +77,7 @@ export function issueCommand(units: Unit[], cmd: GameCommand) {
         u.resourceTarget = null  // 调用方在 issueCommand 后立即设置具体资源目标
         u.goldLoopSlotMine = null
         u.goldStandMine = null
-        u.previousState = null
-        u.previousGatherType = null
-        u.previousResourceTarget = null
-        u.previousMoveTarget = null
-        u.previousWaypoints = []
-        u.previousMoveQueue = []
-        u.previousAttackMoveTarget = null
+        clearPreviousUnitOrder(u)
       }
       break
 
@@ -112,13 +95,7 @@ export function issueCommand(units: Unit[], cmd: GameCommand) {
         u.goldLoopSlotMine = null
         u.goldStandMine = null
         u.carryAmount = 0
-        u.previousState = null
-        u.previousGatherType = null
-        u.previousResourceTarget = null
-        u.previousMoveTarget = null
-        u.previousWaypoints = []
-        u.previousMoveQueue = []
-        u.previousAttackMoveTarget = null
+        clearPreviousUnitOrder(u)
       }
       break
 
@@ -143,13 +120,7 @@ export function issueCommand(units: Unit[], cmd: GameCommand) {
         u.buildTarget = null
         u.carryAmount = 0  // stop 丢弃携带的资源
         // stop 明确切断恢复链
-        u.previousState = null
-        u.previousGatherType = null
-        u.previousResourceTarget = null
-        u.previousMoveTarget = null
-        u.previousWaypoints = []
-        u.previousMoveQueue = []
-        u.previousAttackMoveTarget = null
+        clearPreviousUnitOrder(u)
       }
       break
 
@@ -167,13 +138,7 @@ export function issueCommand(units: Unit[], cmd: GameCommand) {
         u.goldLoopSlotMine = null
         u.goldStandMine = null
         // hold 明确切断恢复链
-        u.previousState = null
-        u.previousGatherType = null
-        u.previousResourceTarget = null
-        u.previousMoveTarget = null
-        u.previousWaypoints = []
-        u.previousMoveQueue = []
-        u.previousAttackMoveTarget = null
+        clearPreviousUnitOrder(u)
       }
       break
 
@@ -192,13 +157,7 @@ export function issueCommand(units: Unit[], cmd: GameCommand) {
         u.goldLoopSlotMine = null
         u.goldStandMine = null
         u.carryAmount = 0
-        u.previousState = null
-        u.previousGatherType = null
-        u.previousResourceTarget = null
-        u.previousMoveTarget = null
-        u.previousWaypoints = []
-        u.previousMoveQueue = []
-        u.previousAttackMoveTarget = null
+        clearPreviousUnitOrder(u)
         u.aggroSuppressUntil = 0  // attackMove must auto-engage — clear suppression
       }
       break

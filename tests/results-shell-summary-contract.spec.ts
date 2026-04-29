@@ -52,10 +52,37 @@ test.describe('Results Shell Summary Truth', () => {
 
       const message = (document.getElementById('results-shell-message') as HTMLElement).textContent ?? ''
       const summary = (document.getElementById('results-shell-summary') as HTMLElement).textContent ?? ''
+      const visual = g.getResultPresentationSnapshot()
+      const visualRoot = document.getElementById('results-visual-summary') as HTMLElement
+      const cards = Array.from(document.querySelectorAll('#results-stat-grid .result-stat-card')).map((el: any) => ({
+        key: el.dataset.key,
+        tone: el.dataset.tone,
+        text: el.textContent ?? '',
+      }))
+      const objectives = Array.from(document.querySelectorAll('#results-objective-recap .result-objective-chip')).map((el: any) => ({
+        key: el.dataset.key,
+        complete: el.dataset.complete,
+        text: el.textContent ?? '',
+      }))
+      const flow = Array.from(document.querySelectorAll('#results-flow-recap .result-flow-step')).map((el: any) => ({
+        key: el.dataset.key,
+        complete: el.dataset.complete,
+        text: el.textContent ?? '',
+      }))
       const matchResult = g.getMatchResult()
       const isGameOver = g.phase.isGameOver()
 
-      return { message, summary, matchResult, isGameOver }
+      return {
+        message,
+        summary,
+        visual,
+        visualComplete: visualRoot.dataset.complete,
+        cards,
+        objectives,
+        flow,
+        matchResult,
+        isGameOver,
+      }
     })
 
     expect(result.error).toBeUndefined()
@@ -68,6 +95,18 @@ test.describe('Results Shell Summary Truth', () => {
     expect(result.summary).toContain('敌方')
     expect(result.summary).toContain('单位:')
     expect(result.summary).toContain('建筑:')
+    expect(result.visual.completed).toBe(true)
+    expect(result.visualComplete).toBe('true')
+    expect(result.cards.map((card: any) => card.key)).toEqual(expect.arrayContaining([
+      'duration',
+      'objectives',
+      'player',
+      'enemy',
+      'pressure',
+    ]))
+    expect(result.objectives.length).toBeGreaterThanOrEqual(7)
+    expect(result.flow.length).toBeGreaterThanOrEqual(9)
+    expect(result.flow.map((step: any) => step.key)).toContain('result')
   })
 
   test('defeat summary has different unit counts than victory', async ({ page }) => {
@@ -133,14 +172,18 @@ test.describe('Results Shell Summary Truth', () => {
       await new Promise(r => setTimeout(r, 100))
 
       const summaryAfter = (document.getElementById('results-shell-summary') as HTMLElement).textContent ?? ''
+      const visualCardCountAfter = document.querySelectorAll('#results-stat-grid .result-stat-card').length
+      const visualCompleteAfter = (document.getElementById('results-visual-summary') as HTMLElement).dataset.complete ?? ''
       const isPlaying = g.phase.isPlaying()
 
-      return { summaryBefore, summaryAfter, isPlaying }
+      return { summaryBefore, summaryAfter, visualCardCountAfter, visualCompleteAfter, isPlaying }
     })
 
     expect(result.error).toBeUndefined()
     expect(result.summaryBefore.length).toBeGreaterThan(0)
     expect(result.summaryAfter).toBe('')
+    expect(result.visualCardCountAfter).toBe(0)
+    expect(result.visualCompleteAfter).toBe('false')
     expect(result.isPlaying).toBe(true)
   })
 })

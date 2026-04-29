@@ -10,7 +10,7 @@
  *  2. AI does not send every worker to gold; worker split is bounded
  *  3. AI completes at least one farm before supply cap blocks production
  *  4. AI trains workers and footmen without overspending or exceeding supply
- *  5. First attack wave: AI schedules pressure by midgame
+ *  5. First attack wave: AI schedules pressure after opening economy grace
  *  6. After first wave, AI can schedule a later wave (no permanent lock)
  *  7. If one AI worker is killed early, AI still recovers opening loop
  *  8. AI placement spam is bounded: no infinite retry on impossible placement
@@ -367,7 +367,9 @@ test.describe('AI Economy Deepening', () => {
   })
 
   // ----------------------------------------------------------
-  // 5. First attack wave: AI schedules pressure by midgame.
+  // 5. First attack wave: AI schedules pressure after the opening economy
+  //    grace window. Early pressure should not erase the player's mining loop
+  //    before the first few minutes are playable.
   //    Movement/combat state is sampled opportunistically, but the stable
   //    contract is that the wave system actually fires.
   // ----------------------------------------------------------
@@ -375,9 +377,9 @@ test.describe('AI Economy Deepening', () => {
     test.setTimeout(180000)
     await waitForGame(page)
 
-    // Advance 210 game-seconds — after unit-presence separation and W3X
-    // pathing, 150s is too tight on CI for deterministic pressure evidence.
-    await advanceGameTime(page, 210)
+    // Advance 330 game-seconds — standard AI now waits through a five-minute
+    // opening grace before sending the first real attack wave.
+    await advanceGameTime(page, 330)
 
     const snap = await getAISnapshot(page)
     if (!snap) await diagnose(page, 't5-no-game')
@@ -405,9 +407,9 @@ test.describe('AI Economy Deepening', () => {
     test.setTimeout(180000)
     await waitForGame(page)
 
-    // Advance 360 game-seconds — enough for at least 2 waves under slower
-    // CI and post-separation movement/production timing.
-    await advanceGameTime(page, 360)
+    // Advance 480 game-seconds — enough for at least 2 waves after the
+    // opening attack grace and slower CI movement/production timing.
+    await advanceGameTime(page, 480)
 
     const snap = await getAISnapshot(page)
     if (!snap) await diagnose(page, 't6-no-game')

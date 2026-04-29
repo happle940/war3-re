@@ -1,5 +1,5 @@
 import type { MapRuntime } from '../map/MapRuntime'
-import type { Unit } from './Game'
+import type { Unit } from './UnitTypes'
 
 /**
  * 建筑占用网格

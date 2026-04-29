@@ -4,7 +4,7 @@
  * Proves that after migrating dealAoeSplash to read from ABILITIES.mortar_aoe,
  * all user-visible splash behavior is unchanged:
  *
- * 1. Game.ts reads aoeRadius and aoeFalloff from ABILITIES.mortar_aoe
+ * 1. CombatDamageApplicationSystem reads aoeRadius and aoeFalloff from ABILITIES.mortar_aoe
  * 2. Siege attack still triggers AOE splash
  * 3. Splash still excludes primary target, attacker, same team, dead units, goldmine
  * 4. Center/edge falloff results match MORTAR_AOE_FALLOFF contract
@@ -14,7 +14,10 @@ import { readFileSync } from 'node:fs'
 import { ABILITIES, MORTAR_AOE_RADIUS, MORTAR_AOE_FALLOFF } from '../src/game/GameData'
 
 const BASE = 'http://127.0.0.1:4173/?runtimeTest=1'
-const gameSource = readFileSync(new URL('../src/game/Game.ts', import.meta.url), 'utf8')
+const combatDamageApplicationSource = readFileSync(
+  new URL('../src/game/systems/CombatDamageApplicationSystem.ts', import.meta.url),
+  'utf8',
+)
 
 async function waitForGame(page: Page) {
   const consoleErrors: string[] = []
@@ -48,13 +51,13 @@ test.describe('V9 Mortar AOE Runtime Data-Read Migration', () => {
     await waitForGame(page)
   })
 
-  test('proof-1: Game.ts reads Mortar AOE runtime values from ABILITIES.mortar_aoe', () => {
-    expect(gameSource).toContain('const ma = ABILITIES.mortar_aoe')
-    expect(gameSource).toContain('ma.aoeRadius ?? 0')
-    expect(gameSource).toContain('ma.aoeFalloff ?? 0')
-    expect(gameSource).toContain('ABILITIES.mortar_aoe.aoeRadius ?? 0')
-    expect(gameSource).toContain('dist > aoeRadius')
-    expect(gameSource).toContain('1.0 - aoeFalloff')
+  test('proof-1: CombatDamageApplicationSystem reads Mortar AOE runtime values from ABILITIES.mortar_aoe', () => {
+    expect(combatDamageApplicationSource).toContain('const mortarAoe = ABILITIES.mortar_aoe')
+    expect(combatDamageApplicationSource).toContain('mortarAoe.aoeRadius ?? 0')
+    expect(combatDamageApplicationSource).toContain('mortarAoe.aoeFalloff ?? 0')
+    expect(combatDamageApplicationSource).toContain('ABILITIES.mortar_aoe.aoeRadius ?? 0')
+    expect(combatDamageApplicationSource).toContain('distance > aoeRadius')
+    expect(combatDamageApplicationSource).toContain('1.0 - aoeFalloff')
   })
 
   test('proof-2: ABILITIES.mortar_aoe seed matches legacy constants', () => {
